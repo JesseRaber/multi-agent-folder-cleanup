@@ -36,8 +36,6 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      # The skill declares its own version. If the tag and the skill disagree,
-      # one of them is wrong — stop rather than ship a mislabeled package.
       - name: Check package versions agree
         run: |
           python3 - "${{ steps.ver.outputs.version }}" <<'EOF'
@@ -53,8 +51,32 @@ jobs:
           mismatches = {name: value for name, value in versions.items() if value != tag}
           if mismatches:
               sys.exit(f"Version mismatch: build says {tag}, packages say {mismatches}")
+          catalog = json.load(open('.claude-plugin/marketplace.json'))
+          names = [p.get('name') for p in catalog.get('plugins', [])]
+          if 'multi-agent-folder-cleanup' not in names:
+              sys.exit('marketplace.json does not list multi-agent-folder-cleanup')
           print(f"All package versions agree: {tag}")
           EOF
+
+      - name: Run OpenAI skill validator
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/skills/49f948faa9258a0c61caceaf225e179651397431/skills/.system/skill-creator/scripts/quick_validate.py \
+            --output /tmp/openai-quick-validate.py
+          python /tmp/openai-quick-validate.py skills/multi-agent-folder-cleanup
+
+      - name: Run OpenAI plugin validator
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py \
+            --output /tmp/validate_plugin.py
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py \
+            --output /tmp/identifier_validation.py
+          python /tmp/validate_plugin.py .
+
+      - name: Run package checks
+        run: python -m unittest tests/test_package.py -v
 
       - name: Validate skill frontmatter
         run: |
@@ -74,11 +96,8 @@ jobs:
           print("Frontmatter OK")
           EOF
 
-      - name: Validate plugin manifests
-        run: python3 -c "import json; json.load(open('.claude-plugin/plugin.json')); json.load(open('.codex-plugin/plugin.json')); print('plugin manifests OK')"
-
       - name: Compile Python scripts
-        run: python3 -m compileall -q skills/multi-agent-folder-cleanup/scripts
+        run: python3 -m compileall -q skills/multi-agent-folder-cleanup/scripts tests
 
       - name: Parse PowerShell script
         shell: pwsh
@@ -93,9 +112,6 @@ jobs:
           }
           Write-Host "audit_folder.ps1 parses clean"
 
-      # Smoke test: the audit scripts must actually run, and both languages
-      # must agree. A package that ships a script nobody executed is the
-      # failure mode this repo exists to argue against.
       - name: Smoke test the audit scripts
         shell: bash
         run: |
@@ -121,8 +137,6 @@ jobs:
           printf 'source,target\n/tmp/tf/docs/plan.md,/tmp/tf/archive/moved.md\n' > /tmp/moves.csv
           python3 skills/multi-agent-folder-cleanup/scripts/verify_move.py \
             baseline --map /tmp/moves.csv --out /tmp/baseline.json
-          # The move was never performed, so verify MUST exit nonzero.
-          # `if ! cmd` is exempt from -e, so this works without disabling it.
           if python3 skills/multi-agent-folder-cleanup/scripts/verify_move.py \
                verify --baseline /tmp/baseline.json; then
             echo "verify_move.py reported success on an un-performed move"
@@ -138,20 +152,17 @@ jobs:
           SRC=skills/multi-agent-folder-cleanup
           rm -rf build dist && mkdir -p dist
 
-          # --- portable: the bare skill folder for standalone skill hosts ---
           mkdir -p build/portable
           cp -r "$SRC" build/portable/multi-agent-folder-cleanup
           cp LICENSE build/portable/
           cp packaging/INSTALL-portable.md build/portable/INSTALL.md
 
-          # --- openai: skills-only ChatGPT / Codex plugin layout ---
           mkdir -p build/openai/multi-agent-folder-cleanup
           cp -r skills build/openai/multi-agent-folder-cleanup/
           cp -r .codex-plugin build/openai/multi-agent-folder-cleanup/
           cp LICENSE README.md CHANGELOG.md build/openai/multi-agent-folder-cleanup/
           cp packaging/INSTALL-openai.md build/openai/multi-agent-folder-cleanup/INSTALL.md
 
-          # --- claude: plugin layout with the manifest where the loader expects it ---
           mkdir -p build/claude/multi-agent-folder-cleanup
           cp -r skills build/claude/multi-agent-folder-cleanup/
           cp -r .claude-plugin build/claude/multi-agent-folder-cleanup/
@@ -170,7 +181,6 @@ jobs:
           ls -lh dist
           cat dist/SHA256SUMS.txt
 
-      # Prove the shipped ZIP actually works, rather than asserting it.
       - name: Verify the built packages
         run: |
           set -euo pipefail
@@ -205,9 +215,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           NOTES=packaging/RELEASE_NOTES_v$VERSION.md
-          if [ -f "$NOTES" ]; then
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt --clobber
+            if [ -f "$NOTES" ]; then
+              gh release edit "$GITHUB_REF_NAME" --notes-file "$NOTES"
+            fi
+          elif [ -f "$NOTES" ]; then
             gh release create "$GITHUB_REF_NAME" \
               --title "Multi-Agent Folder Cleanup v$VERSION" \
               --notes-file "$NOTES" \
