@@ -107,15 +107,14 @@ jobs:
       - name: Smoke test verify_move.py
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
           printf 'source,target\n/tmp/tf/docs/plan.md,/tmp/tf/archive/moved.md\n' > /tmp/moves.csv
           python3 skills/multi-agent-folder-cleanup/scripts/verify_move.py \
             baseline --map /tmp/moves.csv --out /tmp/baseline.json
-          python3 skills/multi-agent-folder-cleanup/scripts/verify_move.py \
-            verify --baseline /tmp/baseline.json
-          # The move was never performed, so verify MUST fail. If it passes,
-          # the check that guards every Execute run is broken.
-          if [ $? -eq 0 ]; then
+          # The move was never performed, so verify MUST exit nonzero.
+          # `if ! cmd` is exempt from -e, so this works without disabling it.
+          if python3 skills/multi-agent-folder-cleanup/scripts/verify_move.py \
+               verify --baseline /tmp/baseline.json; then
             echo "verify_move.py reported success on an un-performed move"
             exit 1
           fi
