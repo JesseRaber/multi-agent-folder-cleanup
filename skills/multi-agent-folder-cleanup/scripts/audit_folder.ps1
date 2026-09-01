@@ -153,8 +153,8 @@ function Get-CleanReference([string]$value) {
 function Test-CaseExact([string]$full) {
     $cur = $full
     while ($true) {
-        $parent = Split-Path -LiteralPath $cur -Parent
-        $leaf = Split-Path -LiteralPath $cur -Leaf
+        $parent = [System.IO.Path]::GetDirectoryName($cur)
+        $leaf = [System.IO.Path]::GetFileName($cur)
         if (-not $parent -or -not $leaf -or $parent -eq $cur) { return $true }
         $names = @(Get-ChildItem -LiteralPath $parent -Force -ErrorAction SilentlyContinue |
                    ForEach-Object { $_.Name })
