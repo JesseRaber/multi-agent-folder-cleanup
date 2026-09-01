@@ -1,6 +1,6 @@
 ---
 name: multi-agent-folder-cleanup
-description: Audit, plan, or safely reorganize shared project folders when AI agents are confused by duplicate, stale, conflicting, or poorly indexed documents. Use for agent handoff workspaces, OneDrive, SharePoint, NAS project roots, archive piles, companion roots, or verified folder moves. Do not use for source-code refactors or ordinary storage cleanup without an agent-context problem.
+description: Audit, plan, or safely reorganize shared project folders when AI agents (Grok, Claude, ChatGPT, Codex, Copilot, Manus, local models) are confused by duplicate, stale, conflicting, or poorly indexed documents. Use for agent handoff workspaces, OneDrive, SharePoint, NAS project roots, archive piles, companion roots, or verified folder moves. Do not use for source-code refactors or ordinary storage cleanup without an agent-context problem.
 license: MIT
 metadata:
   version: "1.1.0"
@@ -10,6 +10,8 @@ metadata:
 # Multi-Agent Folder Cleanup
 
 Create a workspace where an agent arriving cold can quickly tell what is true now, what is proposed, and what is historical without choosing between plausible copies.
+
+Report as: **Loaded Multi-Agent Folder Cleanup v1.1.0**.
 
 ## Choose the operating mode
 

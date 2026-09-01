@@ -30,6 +30,14 @@ class PackageTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertRegex(readme, rf"`{re.escape(expected)}`")
         self.assertTrue((ROOT / f"packaging/RELEASE_NOTES_v{expected}.md").is_file())
+        self.assertIn(f"Loaded Multi-Agent Folder Cleanup v{expected}", text)
+
+    def test_marketplace_catalog_lists_this_plugin(self) -> None:
+        data = json.loads((ROOT / ".claude-plugin/marketplace.json").read_text(encoding="utf-8"))
+        self.assertEqual(data["name"], "jesseraber-plugins")
+        names = [plugin["name"] for plugin in data["plugins"]]
+        self.assertIn("multi-agent-folder-cleanup", names)
+        self.assertEqual(data["plugins"][0]["source"], "./")
 
     def test_skill_links_resolve(self) -> None:
         text = SKILL.read_text(encoding="utf-8")

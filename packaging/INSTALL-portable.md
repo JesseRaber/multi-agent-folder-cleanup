@@ -4,8 +4,18 @@ Portable standalone Agent Skill package. Use the separate `-openai.zip` when
 testing or distributing the native ChatGPT and Codex plugin form.
 
 The folder `multi-agent-folder-cleanup/` **is** the skill. Keep it intact -
-`SKILL.md`, `scripts/`, and `references/` must stay together and keep their
-relative paths, because `SKILL.md` points at the other two by relative path.
+`SKILL.md`, `agents/`, `scripts/`, and `references/` must stay together and keep
+their relative paths.
+
+When a host has no native skill loader, paste this into its instructions:
+
+> When the user mentions a messy or sprawling project folder, an AI handoff
+> folder, duplicate or superseded docs, a stale index, or wants a folder
+> audited, restructured, or moved with verification, follow `SKILL.md`.
+> State the operating mode (Audit / Plan / Execute) in the first line.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.1.0.
+> Read `references/workflow.md` before any Audit, Plan, or Execute run.
+> Never move or delete anything without an explicitly approved move map.
 
 ---
 
@@ -16,13 +26,17 @@ skills. Install `multi-agent-folder-cleanup/` through the host's Skills
 interface or configured skills directory. For distribution across supported
 ChatGPT and Codex surfaces, use the native `-openai.zip` plugin package.
 
+Custom GPT / Project without a skill ZIP: upload `SKILL.md`,
+`references/workflow.md`, and `references/navigation-templates.md` as knowledge
+files and paste the instruction block above.
+
 ---
 
 ## Grok
 
 1. Upload the whole `multi-agent-folder-cleanup/` folder (or this ZIP) to the
    conversation or workspace.
-2. Give Grok the same instruction block shown under ChatGPT above.
+2. Paste the instruction block at the top of this file.
 3. In a Grok sandbox with Python, run the scripts directly:
 
    ```bash

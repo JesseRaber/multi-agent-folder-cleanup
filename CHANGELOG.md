@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Restored the `Loaded Multi-Agent Folder Cleanup v1.1.0` report line in `SKILL.md`.
+- Put host names back in the skill description.
+- Fixed `INSTALL-portable.md`: Grok no longer points at a missing ChatGPT instruction block; `agents/` is part of the keep-intact list.
+- Release workflow now runs the same OpenAI validators and package tests as PR CI, and uploads assets if the GitHub release already exists.
+- Package tests now require the version report line and a parseable marketplace catalog.
+
 ## 1.1.0 - 2026-09-01
 
 - Added a native OpenAI skills-only plugin manifest at
