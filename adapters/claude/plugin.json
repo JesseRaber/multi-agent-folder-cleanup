@@ -1,0 +1,4 @@
+{
+  "name": "multi-agent-folder-cleanup",
+  "description": "Audit, plan, and safely reorganize a shared project folder so multiple AI agents (Grok, Claude, Copilot, Codex, ChatGPT, Manus, local models) can find current authority, tell evidence apart from backlog and history, and continue work without duplicate or ambiguous trees."
+}
