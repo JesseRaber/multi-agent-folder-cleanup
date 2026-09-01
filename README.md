@@ -4,7 +4,7 @@ Canonical source for the `multi-agent-folder-cleanup` Agent Skill.
 
 Goal: a shared project folder where any agent opening it cold can answer, in under a minute, what is true now, what is proposed, and what is dead — without picking between two copies of the same document.
 
-Wiki home: [`wiki/Home.md`](wiki/Home.md)
+Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Layout
 
@@ -24,12 +24,9 @@ packaging/
   INSTALL-claude.md              install doc packaged with the Claude ZIP
   RELEASE_NOTES_v*.md            release notes, one per version
 .github/workflows/release.yml    builds and publishes both ZIPs on a v* tag
-wiki/
-  Home.md                        project wiki page
-  _Sidebar.md                    wiki sidebar
 ```
 
-The skill folder is the authority. Everything else is packaging.
+The skill folder is the authority. Everything else is packaging. Project wiki lives on the GitHub Wiki tab, not in this tree.
 
 ## Version
 
@@ -57,9 +54,11 @@ Do not install from a mixed ZIP that also contains a nested ZIP or loose root co
 Releases are built in CI, not by hand. Push a version tag and the workflow validates the skill, smoke-tests both audit scripts and `verify_move.py`, builds both ZIPs with a `SHA256SUMS.txt`, extracts and re-runs them, then publishes:
 
 ```bash
-git tag -a v1.0.0 -m "Multi-Agent Folder Cleanup v1.0.0"
-git push origin v1.0.0
+git tag -a vX.Y.Z -m "Multi-Agent Folder Cleanup vX.Y.Z"
+git push origin vX.Y.Z
 ```
+
+Do not create the release in the GitHub UI. That creates the tag and the release together and the publish step fails.
 
 The tag must match `metadata.version` in `SKILL.md` or the build stops. Use **Actions → Release → Run workflow** to build artifacts without publishing.
 
