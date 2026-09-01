@@ -19,6 +19,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install validation dependency
+        run: python -m pip install --disable-pip-version-check PyYAML
 
       - name: Resolve version
         id: ver
@@ -33,17 +38,22 @@ jobs:
 
       # The skill declares its own version. If the tag and the skill disagree,
       # one of them is wrong — stop rather than ship a mislabeled package.
-      - name: Check tag matches SKILL.md metadata.version
+      - name: Check package versions agree
         run: |
           python3 - "${{ steps.ver.outputs.version }}" <<'EOF'
-          import sys, yaml
+          import json, sys, yaml
           tag = sys.argv[1]
           text = open('skills/multi-agent-folder-cleanup/SKILL.md', encoding='utf-8').read()
           fm = yaml.safe_load(text.split('---')[1])
-          declared = str(fm.get('metadata', {}).get('version', ''))
-          if declared != tag:
-              sys.exit(f"Version mismatch: tag says {tag}, SKILL.md says {declared}")
-          print(f"Version agrees: {tag}")
+          versions = {
+              'SKILL.md': str(fm.get('metadata', {}).get('version', '')),
+              '.codex-plugin/plugin.json': json.load(open('.codex-plugin/plugin.json'))['version'],
+              '.claude-plugin/plugin.json': json.load(open('.claude-plugin/plugin.json'))['version'],
+          }
+          mismatches = {name: value for name, value in versions.items() if value != tag}
+          if mismatches:
+              sys.exit(f"Version mismatch: build says {tag}, packages say {mismatches}")
+          print(f"All package versions agree: {tag}")
           EOF
 
       - name: Validate skill frontmatter
@@ -64,8 +74,8 @@ jobs:
           print("Frontmatter OK")
           EOF
 
-      - name: Validate plugin manifest
-        run: python3 -c "import json; json.load(open('.claude-plugin/plugin.json')); print('plugin.json OK')"
+      - name: Validate plugin manifests
+        run: python3 -c "import json; json.load(open('.claude-plugin/plugin.json')); json.load(open('.codex-plugin/plugin.json')); print('plugin manifests OK')"
 
       - name: Compile Python scripts
         run: python3 -m compileall -q skills/multi-agent-folder-cleanup/scripts
@@ -128,11 +138,18 @@ jobs:
           SRC=skills/multi-agent-folder-cleanup
           rm -rf build dist && mkdir -p dist
 
-          # --- portable: the bare skill folder, for ChatGPT / Grok / Codex / local ---
+          # --- portable: the bare skill folder for standalone skill hosts ---
           mkdir -p build/portable
           cp -r "$SRC" build/portable/multi-agent-folder-cleanup
           cp LICENSE build/portable/
           cp packaging/INSTALL-portable.md build/portable/INSTALL.md
+
+          # --- openai: skills-only ChatGPT / Codex plugin layout ---
+          mkdir -p build/openai/multi-agent-folder-cleanup
+          cp -r skills build/openai/multi-agent-folder-cleanup/
+          cp -r .codex-plugin build/openai/multi-agent-folder-cleanup/
+          cp LICENSE README.md CHANGELOG.md build/openai/multi-agent-folder-cleanup/
+          cp packaging/INSTALL-openai.md build/openai/multi-agent-folder-cleanup/INSTALL.md
 
           # --- claude: plugin layout with the manifest where the loader expects it ---
           mkdir -p build/claude/multi-agent-folder-cleanup
@@ -145,6 +162,7 @@ jobs:
           find build -name '*.pyc' -delete
 
           (cd build/portable && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-portable.zip" .)
+          (cd build/openai && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-openai.zip" multi-agent-folder-cleanup)
           (cd build/claude && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-claude.zip" multi-agent-folder-cleanup)
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
 
@@ -157,11 +175,14 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          rm -rf /tmp/x && mkdir -p /tmp/x/portable /tmp/x/claude
+          rm -rf /tmp/x && mkdir -p /tmp/x/portable /tmp/x/openai /tmp/x/claude
           unzip -q "dist/multi-agent-folder-cleanup-$VERSION-portable.zip" -d /tmp/x/portable
+          unzip -q "dist/multi-agent-folder-cleanup-$VERSION-openai.zip" -d /tmp/x/openai
           unzip -q "dist/multi-agent-folder-cleanup-$VERSION-claude.zip" -d /tmp/x/claude
 
           test -f /tmp/x/portable/multi-agent-folder-cleanup/SKILL.md
+          test -f /tmp/x/openai/multi-agent-folder-cleanup/.codex-plugin/plugin.json
+          test -f /tmp/x/openai/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup/agents/openai.yaml
           test -f /tmp/x/claude/multi-agent-folder-cleanup/.claude-plugin/plugin.json
           test -f /tmp/x/claude/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup/SKILL.md
 
@@ -170,7 +191,8 @@ jobs:
           fi
 
           python3 /tmp/x/portable/multi-agent-folder-cleanup/scripts/audit_folder.py --root /tmp/tf > /dev/null
-          echo "Both packages extract and run"
+          python3 /tmp/x/openai/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup/scripts/audit_folder.py --root /tmp/tf > /dev/null
+          echo "All packages extract and run"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

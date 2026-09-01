@@ -1,0 +1,33 @@
+{
+  "name": "multi-agent-folder-cleanup",
+  "version": "1.1.0",
+  "description": "Audit, plan, and safely reorganize shared project folders so AI agents can find current authority without duplicate or ambiguous trees.",
+  "skills": "./skills/",
+  "author": {
+    "name": "Jesse Raber",
+    "url": "https://github.com/JesseRaber"
+  },
+  "homepage": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
+  "repository": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
+  "license": "MIT",
+  "keywords": [
+    "folder-cleanup",
+    "agent-handoff",
+    "onedrive",
+    "sharepoint",
+    "audit"
+  ],
+  "interface": {
+    "displayName": "Multi-Agent Folder Cleanup",
+    "shortDescription": "Safely audit and reorganize shared agent workspaces",
+    "longDescription": "Find conflicting authority, stale indexes, duplicate documents, generated noise, and unsafe move conditions in shared project folders. Plan or execute verified reorganizations only within an explicitly approved scope.",
+    "developerName": "Jesse Raber",
+    "category": "Productivity",
+    "capabilities": [
+      "Folder audit",
+      "Reorganization planning",
+      "Verified file moves"
+    ],
+    "defaultPrompt": "Use $multi-agent-folder-cleanup to audit this shared project folder and explain what is authoritative, stale, or ambiguous."
+  }
+}

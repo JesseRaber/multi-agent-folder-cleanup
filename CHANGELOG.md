@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 - 2026-09-01
+
+- Added a native OpenAI skills-only plugin manifest at
+  `.codex-plugin/plugin.json` and skill presentation metadata at
+  `skills/multi-agent-folder-cleanup/agents/openai.yaml`.
+- Refactored the 30 KB `SKILL.md` into a concise routing and safety contract;
+  detailed helper usage now lives in `references/audit-tools.md`, while the
+  complete operational protocol remains in `references/workflow.md`.
+- Fixed Python/PowerShell parity for versioned claim filenames, claim byte-size
+  reporting, and dotfile extension classification.
+- Added pull-request CI with OpenAI's pinned validators, package consistency
+  checks, PowerShell parsing, and a shared-fixture cross-language parity test.
+- Added a separate `-openai.zip` release package, OpenAI install guide, and
+  v1.1.0 release notes. Synchronized both plugin manifests and skill metadata.
 
 - Added `.claude-plugin/marketplace.json`. `/plugin marketplace add` reads a
   marketplace catalog from that path; `plugin.json` alone is a plugin manifest

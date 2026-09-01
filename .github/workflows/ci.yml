@@ -1,0 +1,56 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install validator dependency
+        run: python -m pip install --disable-pip-version-check PyYAML
+      - name: Run OpenAI skill validator
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/skills/49f948faa9258a0c61caceaf225e179651397431/skills/.system/skill-creator/scripts/quick_validate.py \
+            --output /tmp/openai-quick-validate.py
+          python /tmp/openai-quick-validate.py skills/multi-agent-folder-cleanup
+      - name: Run OpenAI plugin validator
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py \
+            --output /tmp/validate_plugin.py
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py \
+            --output /tmp/identifier_validation.py
+          python /tmp/validate_plugin.py .
+      - name: Run package checks
+        run: python -m unittest tests/test_package.py -v
+      - name: Compile Python scripts
+        run: python -m compileall -q skills/multi-agent-folder-cleanup/scripts tests
+      - name: Parse PowerShell script
+        shell: pwsh
+        run: |
+          $errors = $null
+          $tokens = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "skills/multi-agent-folder-cleanup/scripts/audit_folder.ps1",
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error "line $($_.Extent.StartLineNumber): $($_.Message)" }
+            exit 1
+          }
+      - name: Verify Python and PowerShell parity
+        run: python -m unittest tests/test_audit_parity.py -v

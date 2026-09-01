@@ -1,0 +1,6 @@
+interface:
+  display_name: "Multi-Agent Folder Cleanup"
+  short_description: "Audit and safely reorganize agent workspaces"
+  default_prompt: "Use $multi-agent-folder-cleanup to audit this shared project folder and explain what is authoritative, stale, or ambiguous."
+policy:
+  allow_implicit_invocation: true
