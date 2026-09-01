@@ -18,13 +18,18 @@ skills/multi-agent-folder-cleanup/
   references/
     workflow.md                  full Audit / Plan / Execute protocol
     navigation-templates.md      entrypoint / index templates
-adapters/claude/plugin.json      Claude plugin wrapper only
+.claude-plugin/plugin.json       Claude plugin manifest
+packaging/
+  INSTALL-portable.md            install doc packaged with the portable ZIP
+  INSTALL-claude.md              install doc packaged with the Claude ZIP
+  RELEASE_NOTES_v*.md            release notes, one per version
+.github/workflows/release.yml    builds and publishes both ZIPs on a v* tag
 wiki/
   Home.md                        project wiki page
   _Sidebar.md                    wiki sidebar
 ```
 
-The skill folder is the authority. Platform packaging lives under `adapters/`.
+The skill folder is the authority. Everything else is packaging.
 
 ## Version
 
@@ -34,13 +39,29 @@ Report as: **Loaded Multi-Agent Folder Cleanup v1.0.0**.
 
 ## Install
 
-Copy or upload `skills/multi-agent-folder-cleanup/` (the folder that contains `SKILL.md`, `scripts/`, and `references/`).
+Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases), and each one carries its own `INSTALL.md`:
 
-- **Claude:** use that folder, plus `adapters/claude/plugin.json` if the host wants a plugin wrapper.
-- **ChatGPT / Codex / other Agent Skills hosts:** upload the skill folder only. Do not include `.claude-plugin/` or `adapters/`.
+- `…-claude.zip` — Claude Code / Claude Desktop plugin layout, or Claude.ai skill upload
+- `…-portable.zip` — ChatGPT, Grok, Codex, and local models
+
+To install from a clone instead, copy or upload `skills/multi-agent-folder-cleanup/` (the folder that contains `SKILL.md`, `scripts/`, and `references/`).
+
+- **Claude:** use that folder, plus `.claude-plugin/plugin.json` if the host wants the plugin form.
+- **ChatGPT / Codex / other Agent Skills hosts:** upload the skill folder only. Do not include `.claude-plugin/`, `packaging/`, or `.github/`.
 - **Grok / local models:** point the host at `skills/multi-agent-folder-cleanup/`.
 
 Do not install from a mixed ZIP that also contains a nested ZIP or loose root copies of the scripts.
+
+## Releases
+
+Releases are built in CI, not by hand. Push a version tag and the workflow validates the skill, smoke-tests both audit scripts and `verify_move.py`, builds both ZIPs with a `SHA256SUMS.txt`, extracts and re-runs them, then publishes:
+
+```bash
+git tag -a v1.0.0 -m "Multi-Agent Folder Cleanup v1.0.0"
+git push origin v1.0.0
+```
+
+The tag must match `metadata.version` in `SKILL.md` or the build stops. Use **Actions → Release → Run workflow** to build artifacts without publishing.
 
 ## What the scripts do
 
@@ -58,7 +79,7 @@ python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
   --baseline /tmp/baseline.json
 ```
 
-On Windows / OneDrive, prefer `audit_folder.ps1`. On POSIX, including remote agent sandboxes, use `audit_folder.py` and record OneDrive hydration as unverified unless checked on Windows.
+Python 3.8+, standard library only. On Windows / OneDrive, prefer `audit_folder.ps1` (PowerShell 5.1 or 7+). On POSIX, including remote agent sandboxes, use `audit_folder.py` and record OneDrive hydration as unverified unless checked on Windows.
 
 ## Authority rule
 
