@@ -6,46 +6,47 @@ Two ways to install, depending on which Claude surface you use.
 
 ## A. Claude Code / Claude Desktop - plugin
 
-This package is already in plugin layout:
+This package is in plugin layout and carries its own marketplace catalog:
 
 ```
 multi-agent-folder-cleanup/
-  .claude-plugin/plugin.json
+  .claude-plugin/
+    plugin.json          plugin manifest
+    marketplace.json     catalog listing this folder as its own plugin
   skills/multi-agent-folder-cleanup/
     SKILL.md
     scripts/
     references/
 ```
 
-**From GitHub**
+Either route needs **two** commands: the first registers the catalog, the second
+installs the plugin listed in it. `jesseraber-plugins` is the marketplace name
+from `marketplace.json`, not the repo or folder name.
 
-The repository is also its own marketplace catalog, so both commands are needed:
-the first registers the catalog, the second installs the plugin listed in it.
-
-```
-/plugin marketplace add JesseRaber/multi-agent-folder-cleanup
-/plugin install multi-agent-folder-cleanup@jesseraber-plugins
-```
-
-The `@jesseraber-plugins` suffix is the marketplace name, not the repo name.
-If the install summary says `Run /reload-plugins to activate.`, run that.
-
-**From this ZIP instead**
+**From this ZIP**
 
 1. Unzip so the `multi-agent-folder-cleanup/` folder sits somewhere permanent
    (not Downloads - the path is read at load time).
-2. This ZIP contains the plugin, not the marketplace catalog, so point Claude
-   Code at the folder directly:
+2. In Claude Code:
 
    ```
    /plugin marketplace add <path-to-the-unzipped-folder>
    /plugin install multi-agent-folder-cleanup@jesseraber-plugins
    ```
 
-   If that add is rejected because the folder has no `marketplace.json`, use the
-   GitHub commands above instead - they are the supported path.
+**From GitHub instead**
 
-3. Restart the session and confirm with `/plugin`.
+```
+/plugin marketplace add JesseRaber/multi-agent-folder-cleanup
+/plugin install multi-agent-folder-cleanup@jesseraber-plugins
+```
+
+If the install summary says `Run /reload-plugins to activate.`, run that.
+Confirm with `/plugin`.
+
+Not yet verified end to end: these commands match the documented schema and the
+package layout satisfies it, but they have not been run against a live Claude
+Code install. Report anything that fails.
 
 ---
 
