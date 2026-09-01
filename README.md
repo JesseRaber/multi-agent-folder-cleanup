@@ -18,7 +18,9 @@ skills/multi-agent-folder-cleanup/
   references/
     workflow.md                  full Audit / Plan / Execute protocol
     navigation-templates.md      entrypoint / index templates
-.claude-plugin/plugin.json       Claude plugin manifest
+.claude-plugin/
+  plugin.json                    Claude plugin manifest
+  marketplace.json               marketplace catalog listing this repo as its own plugin
 packaging/
   INSTALL-portable.md            install doc packaged with the portable ZIP
   INSTALL-claude.md              install doc packaged with the Claude ZIP
@@ -41,11 +43,26 @@ Prebuilt packages are attached to each [release](https://github.com/JesseRaber/m
 - `…-claude.zip` — Claude Code / Claude Desktop plugin layout, or Claude.ai skill upload
 - `…-portable.zip` — ChatGPT, Grok, Codex, and local models
 
-To install from a clone instead, copy or upload `skills/multi-agent-folder-cleanup/` (the folder that contains `SKILL.md`, `scripts/`, and `references/`).
+### Claude Code / Claude Desktop
 
-- **Claude:** use that folder, plus `.claude-plugin/plugin.json` if the host wants the plugin form.
+This repository is also its own marketplace catalog. Both commands are needed — the first registers the catalog, the second installs the plugin listed in it:
+
+```
+/plugin marketplace add JesseRaber/multi-agent-folder-cleanup
+/plugin install multi-agent-folder-cleanup@jesseraber-plugins
+```
+
+`jesseraber-plugins` is the marketplace name from `marketplace.json`, not the repo name.
+
+Not yet verified end to end: these commands match the documented schema and the repository layout satisfies it, but no one has run them against a live Claude Code install. Report anything that fails.
+
+### Other hosts
+
+Copy or upload `skills/multi-agent-folder-cleanup/` (the folder that contains `SKILL.md`, `scripts/`, and `references/`).
+
 - **ChatGPT / Codex / other Agent Skills hosts:** upload the skill folder only. Do not include `.claude-plugin/`, `packaging/`, or `.github/`.
 - **Grok / local models:** point the host at `skills/multi-agent-folder-cleanup/`.
+- **Claude.ai:** zip that folder on its own and upload it under Settings → Capabilities → Skills.
 
 Do not install from a mixed ZIP that also contains a nested ZIP or loose root copies of the scripts.
 
