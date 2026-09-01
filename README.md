@@ -4,6 +4,8 @@ Canonical source for the `multi-agent-folder-cleanup` Agent Skill.
 
 Goal: a shared project folder where any agent opening it cold can answer, in under a minute, what is true now, what is proposed, and what is dead — without picking between two copies of the same document.
 
+Wiki home: [`wiki/Home.md`](wiki/Home.md)
+
 ## Layout
 
 ```
@@ -17,6 +19,9 @@ skills/multi-agent-folder-cleanup/
     workflow.md                  full Audit / Plan / Execute protocol
     navigation-templates.md      entrypoint / index templates
 adapters/claude/plugin.json      Claude plugin wrapper only
+wiki/
+  Home.md                        project wiki page
+  _Sidebar.md                    wiki sidebar
 ```
 
 The skill folder is the authority. Platform packaging lives under `adapters/`.
