@@ -45,13 +45,32 @@ Each ZIP has its own `INSTALL.md` with per-host steps.
 - Python 3.8+, standard library only. No dependencies.
 - PowerShell 5.1 or 7+ for the `.ps1` script (Windows only; optional elsewhere).
 
-## Verified in this release
+## What CI checked before publishing
 
-Both audit scripts were run against the same test tree and produce matching
-findings. `verify_move.py` was exercised across all three subcommands.
-`audit_folder.ps1` parses clean under PowerShell 7.4. All documented edge-case
-behaviors (comma-argument rejection, missing-index reporting, exclusion coverage
-accounting) were confirmed to behave as written.
+The release workflow ran against this tag and every step passed:
+
+- `SKILL.md` frontmatter parses; name matches the skill folder; description
+  within the length limit; tag matches `metadata.version`
+- `plugin.json` is valid JSON; Python scripts compile; `audit_folder.ps1`
+  parses under the PowerShell parser
+- Both audit scripts ran against the same test tree and both reported the same
+  duplicate group
+- `verify_move.py` was run through `baseline` and `verify`, and the build fails
+  if `verify` reports success on a move that was never performed
+- Both ZIPs were extracted after building and a script was run from inside the
+  extracted package
+
+Not checked by CI: OneDrive hydration behaviour, which needs Windows; and
+whether a host actually loads the skill, which needs a real install.
+
+## Known issue in this release
+
+`INSTALL.md` inside `-claude.zip` says to run
+`/plugin marketplace add JesseRaber/multi-agent-folder-cleanup`. That command
+fails on this tag: `/plugin marketplace add` needs
+`.claude-plugin/marketplace.json`, which this tag does not contain. Use the
+local-path install, or the `-portable` package, until a release that includes
+the catalog. Fixed on `main`.
 
 ## Authority
 

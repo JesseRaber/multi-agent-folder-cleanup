@@ -17,24 +17,35 @@ multi-agent-folder-cleanup/
     references/
 ```
 
-**Local install**
+**From GitHub**
 
-1. Unzip so the `multi-agent-folder-cleanup/` folder sits somewhere permanent
-   (not Downloads - the path is read at load time).
-2. In Claude Code:
-
-   ```
-   /plugin marketplace add <path-to-the-unzipped-folder>
-   /plugin install multi-agent-folder-cleanup
-   ```
-
-3. Restart the session and confirm with `/plugin`.
-
-**From GitHub instead**
+The repository is also its own marketplace catalog, so both commands are needed:
+the first registers the catalog, the second installs the plugin listed in it.
 
 ```
 /plugin marketplace add JesseRaber/multi-agent-folder-cleanup
+/plugin install multi-agent-folder-cleanup@jesseraber-plugins
 ```
+
+The `@jesseraber-plugins` suffix is the marketplace name, not the repo name.
+If the install summary says `Run /reload-plugins to activate.`, run that.
+
+**From this ZIP instead**
+
+1. Unzip so the `multi-agent-folder-cleanup/` folder sits somewhere permanent
+   (not Downloads - the path is read at load time).
+2. This ZIP contains the plugin, not the marketplace catalog, so point Claude
+   Code at the folder directly:
+
+   ```
+   /plugin marketplace add <path-to-the-unzipped-folder>
+   /plugin install multi-agent-folder-cleanup@jesseraber-plugins
+   ```
+
+   If that add is rejected because the folder has no `marketplace.json`, use the
+   GitHub commands above instead - they are the supported path.
+
+3. Restart the session and confirm with `/plugin`.
 
 ---
 
