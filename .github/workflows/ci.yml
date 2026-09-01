@@ -28,10 +28,10 @@ jobs:
       - name: Run OpenAI plugin validator
         run: |
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/openai/skills/49f948faa9258a0c61caceaf225e179651397431/skills/.system/plugin-creator/scripts/validate_plugin.py \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/validate_plugin.py \
             --output /tmp/validate_plugin.py
           curl --fail --silent --show-error --location \
-            https://raw.githubusercontent.com/openai/skills/49f948faa9258a0c61caceaf225e179651397431/skills/.system/plugin-creator/scripts/identifier_validation.py \
+            https://raw.githubusercontent.com/openai/codex/2b7c279735d0d096cf7b34fe98938f46792f4d4f/codex-rs/skills/src/assets/samples/plugin-creator/scripts/identifier_validation.py \
             --output /tmp/identifier_validation.py
           python /tmp/validate_plugin.py .
       - name: Run package checks
