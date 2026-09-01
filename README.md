@@ -1,83 +1,69 @@
 # Multi-Agent Folder Cleanup
 
-Canonical source for the `multi-agent-folder-cleanup` Agent Skill.
+Canonical source for the `multi-agent-folder-cleanup` Agent Skill and its OpenAI and Claude plugin packages.
 
-Goal: a shared project folder where any agent opening it cold can answer, in under a minute, what is true now, what is proposed, and what is dead — without picking between two copies of the same document.
+The goal is a shared project folder where an agent arriving cold can quickly tell what is true now, what is proposed, and what is historical without choosing between plausible copies.
 
 Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
-## Layout
-
-```
-skills/multi-agent-folder-cleanup/
-  SKILL.md                       canonical skill
-  scripts/
-    audit_folder.py              cross-platform read-only inventory
-    audit_folder.ps1             Windows / OneDrive inventory
-    verify_move.py               hash baseline / preflight / verify (never moves)
-  references/
-    workflow.md                  full Audit / Plan / Execute protocol
-    navigation-templates.md      entrypoint / index templates
-.claude-plugin/
-  plugin.json                    Claude plugin manifest
-  marketplace.json               marketplace catalog listing this repo as its own plugin
-packaging/
-  INSTALL-portable.md            install doc packaged with the portable ZIP
-  INSTALL-claude.md              install doc packaged with the Claude ZIP
-  RELEASE_NOTES_v*.md            release notes, one per version
-.github/workflows/release.yml    builds and publishes both ZIPs on a v* tag
-```
-
-The skill folder is the authority. Everything else is packaging. Project wiki lives on the GitHub Wiki tab, not in this tree.
-
 ## Version
 
-`1.0.0` — see `CHANGELOG.md`.
+`1.1.0` — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.0.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.1.0**.
 
 ## Install
 
-Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases), and each one carries its own `INSTALL.md`:
+Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases):
 
-- `…-claude.zip` — Claude Code / Claude Desktop plugin layout, or Claude.ai skill upload
-- `…-portable.zip` — ChatGPT, Grok, Codex, and local models
+- `…-openai.zip` — native skills-only plugin for ChatGPT and Codex, with `.codex-plugin/plugin.json`
+- `…-portable.zip` — standalone Agent Skill for ChatGPT desktop, Codex CLI/IDE, Claude.ai skill upload, Grok, and compatible local hosts
+- `…-claude.zip` — Claude Code / Claude Desktop plugin layout
+
+Each archive includes its own `INSTALL.md`. Keep the extracted package structure intact.
+
+### ChatGPT and Codex
+
+OpenAI distinguishes authoring from distribution: a standalone skill is useful for personal workflows in ChatGPT desktop and Codex, while a plugin is the installable package used to distribute skills across supported ChatGPT and Codex surfaces.
+
+For local development, extract the `-openai.zip`, add its outer folder to a local marketplace, install it, refresh the app, and test it in a new conversation. Publication to the universal plugin directory is a separate OpenAI review step and is not claimed by this repository.
+
+For a personal installation in ChatGPT desktop, Codex CLI, or the IDE extension, install the inner `skills/multi-agent-folder-cleanup/` directory as a standalone skill. Its optional OpenAI display metadata lives in `agents/openai.yaml`.
 
 ### Claude Code / Claude Desktop
 
-This repository is also its own marketplace catalog. Both commands are needed — the first registers the catalog, the second installs the plugin listed in it:
+This repository is also its own Claude marketplace catalog:
 
-```
+```text
 /plugin marketplace add JesseRaber/multi-agent-folder-cleanup
 /plugin install multi-agent-folder-cleanup@jesseraber-plugins
 ```
 
-`jesseraber-plugins` is the marketplace name from `marketplace.json`, not the repo name.
-
-Not yet verified end to end: these commands match the documented schema and the repository layout satisfies it, but no one has run them against a live Claude Code install. Report anything that fails.
+`jesseraber-plugins` is the marketplace name from `.claude-plugin/marketplace.json`.
 
 ### Other hosts
 
-Copy or upload `skills/multi-agent-folder-cleanup/` (the folder that contains `SKILL.md`, `scripts/`, and `references/`).
+Copy or upload only `skills/multi-agent-folder-cleanup/`, preserving its `SKILL.md`, `agents/`, `scripts/`, and `references/` directories. Do not install from a mixed archive containing nested packages or loose duplicate scripts.
 
-- **ChatGPT / Codex / other Agent Skills hosts:** upload the skill folder only. Do not include `.claude-plugin/`, `packaging/`, or `.github/`.
-- **Grok / local models:** point the host at `skills/multi-agent-folder-cleanup/`.
-- **Claude.ai:** zip that folder on its own and upload it under Settings → Capabilities → Skills.
+## Repository layout
 
-Do not install from a mixed ZIP that also contains a nested ZIP or loose root copies of the scripts.
-
-## Releases
-
-Releases are built in CI, not by hand. Push a version tag and the workflow validates the skill, smoke-tests both audit scripts and `verify_move.py`, builds both ZIPs with a `SHA256SUMS.txt`, extracts and re-runs them, then publishes:
-
-```bash
-git tag -a vX.Y.Z -m "Multi-Agent Folder Cleanup vX.Y.Z"
-git push origin vX.Y.Z
+```text
+.codex-plugin/plugin.json        OpenAI plugin manifest
+.claude-plugin/                  Claude plugin manifest and marketplace catalog
+skills/multi-agent-folder-cleanup/
+  SKILL.md                       concise routing and safety contract
+  agents/openai.yaml             OpenAI discovery and starter-prompt metadata
+  scripts/                       read-only audit and move-verification helpers
+  references/workflow.md         full Audit / Plan / Execute protocol
+  references/audit-tools.md      deterministic helper usage and limitations
+  references/navigation-templates.md
+packaging/                       per-host install docs and release notes
+tests/                           package and Python/PowerShell parity checks
+.github/workflows/ci.yml         pull-request and main validation
+.github/workflows/release.yml    tagged package build and publication
 ```
 
-Do not create the release in the GitHub UI. That creates the tag and the release together and the publish step fails.
-
-The tag must match `metadata.version` in `SKILL.md` or the build stops. Use **Actions → Release → Run workflow** to build artifacts without publishing.
+The skill folder is the workflow authority. Plugin manifests and release files package it without duplicating the instructions.
 
 ## What the scripts do
 
@@ -88,15 +74,28 @@ python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
   --root <folder> --index-path INDEX.md --hash-files
 
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
-  --map moves.csv --out /tmp/baseline.json
+  --map moves.csv --out /safe/audit/baseline.json
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py preflight \
   --map moves.csv --path-threshold 240
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
-  --baseline /tmp/baseline.json
+  --baseline /safe/audit/baseline.json
 ```
 
-Python 3.8+, standard library only. On Windows / OneDrive, prefer `audit_folder.ps1` (PowerShell 5.1 or 7+). On POSIX, including remote agent sandboxes, use `audit_folder.py` and record OneDrive hydration as unverified unless checked on Windows.
+Python 3.8+, standard library only. On Windows or OneDrive, prefer `audit_folder.ps1` (PowerShell 5.1 or 7+) because it can inspect placeholder attributes. On other platforms, record hydration as unverified until checked on Windows.
+
+## Validation and releases
+
+Every pull request runs the pinned OpenAI skill validator, package/version checks, Python compilation, PowerShell parsing, and a cross-language parity fixture. Tagged releases repeat runtime smoke tests, build all three install archives, extract them, run the packaged code, and publish SHA-256 checksums.
+
+To publish after the release commit is merged:
+
+```bash
+git tag -a vX.Y.Z -m "Multi-Agent Folder Cleanup vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+The tag must match the versions in `SKILL.md`, `.codex-plugin/plugin.json`, and `.claude-plugin/plugin.json`. Use **Actions → Release → Run workflow** to build artifacts without publishing.
 
 ## Authority rule
 
-If two copies of this skill disagree, this repository is current. A downloaded ZIP, a chat upload, or a host-local skill cache is not.
+If two copies disagree, this repository is current. A release archive, chat upload, or host-local cache is not.

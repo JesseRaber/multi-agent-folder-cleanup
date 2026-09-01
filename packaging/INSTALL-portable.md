@@ -1,7 +1,7 @@
 # Install - Multi-Agent Folder Cleanup
 
-Portable Agent Skill package. Works with ChatGPT, Grok, Codex, Copilot, local
-models, and Claude.ai's skill uploader.
+Portable standalone Agent Skill package. Use the separate `-openai.zip` when
+testing or distributing the native ChatGPT and Codex plugin form.
 
 The folder `multi-agent-folder-cleanup/` **is** the skill. Keep it intact -
 `SKILL.md`, `scripts/`, and `references/` must stay together and keep their
@@ -11,27 +11,10 @@ relative paths, because `SKILL.md` points at the other two by relative path.
 
 ## ChatGPT
 
-**Custom GPT / Projects**
-
-1. Create or open a Custom GPT (or a Project).
-2. Upload the three documents as knowledge files:
-   - `multi-agent-folder-cleanup/SKILL.md`
-   - `multi-agent-folder-cleanup/references/workflow.md`
-   - `multi-agent-folder-cleanup/references/navigation-templates.md`
-3. Paste this into the GPT's instructions:
-
-   > When the user mentions a messy or sprawling project folder, an AI handoff
-   > folder, duplicate or superseded docs, a stale index, or wants a folder
-   > audited, restructured, or moved with verification, follow `SKILL.md`.
-   > State the operating mode (Audit / Plan / Execute) in the first line.
-   > Read `references/workflow.md` before any Audit, Plan, or Execute run.
-   > Never move or delete anything without an explicitly approved move map.
-
-4. Upload the `scripts/` files too if Code Interpreter is enabled. ChatGPT can
-   run `audit_folder.py` and `verify_move.py` on an uploaded folder ZIP.
-
-**Codex / agent hosts that read Agent Skills natively:** drop
-`multi-agent-folder-cleanup/` into the host's skills directory. No wrapper.
+ChatGPT desktop, Codex CLI, and the Codex IDE extension support standalone
+skills. Install `multi-agent-folder-cleanup/` through the host's Skills
+interface or configured skills directory. For distribution across supported
+ChatGPT and Codex surfaces, use the native `-openai.zip` plugin package.
 
 ---
 
@@ -64,8 +47,8 @@ instead, use the `-claude` package from the same release.
 ## Local models (Ollama, LM Studio, llama.cpp front-ends)
 
 Point the host's system prompt or context loader at
-`multi-agent-folder-cleanup/SKILL.md`. Load `references/workflow.md` on demand
-rather than up front - it is 301 lines and only needed once a mode is chosen.
+`multi-agent-folder-cleanup/SKILL.md`. Load references only when the skill
+routes to them.
 
 ---
 

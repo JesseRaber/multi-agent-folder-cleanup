@@ -419,7 +419,14 @@ def main():
     section("Extensions")
     ext = defaultdict(int)
     for p, _, _ in files:
-        ext[os.path.splitext(p)[1].lower() or "(none)"] += 1
+        name = os.path.basename(p)
+        suffix = os.path.splitext(name)[1].lower()
+        # PowerShell treats a single-suffix dotfile such as .gitignore as its
+        # extension. Match that behavior so both audit helpers classify the
+        # same mounted tree identically.
+        if not suffix and name.startswith(".") and name.count(".") == 1:
+            suffix = name.lower()
+        ext[suffix or "(none)"] += 1
     for e, c in sorted(ext.items(), key=lambda x: -x[1])[:20]:
         print(f"  {c:6d}  {e}")
 

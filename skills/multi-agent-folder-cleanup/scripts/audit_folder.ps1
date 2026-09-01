@@ -87,7 +87,7 @@ $InstructionNames = @(
 $ClaimPatterns = @(
     '*authority*', '*status*', '*index*', '*manifest*', '*inventory*', '*handoff*',
     '*final*', '*current*', '*roadmap*', '*quick_context*', '*state*', '*latest*',
-    '*master*', '*policy*', '*summary*'
+    '*master*', '*policy*', '*summary*', '*_v[0-9]*'
 )
 $NoiseDirHints = @(
     '__pycache__', 'node_modules', '.git', '.svn', '.venv', 'venv', '.mypy_cache',
@@ -454,8 +454,7 @@ $claims = @($files | Where-Object {
     })
 if ($claims.Count) {
     $claims | Sort-Object LastWriteTime -Descending | Select-Object -First 40 | ForEach-Object {
-        $lines = try { @(Get-Content -LiteralPath $_.FullName -ErrorAction Stop).Count } catch { '?' }
-        Write-Host ("  {0:yyyy-MM-dd}  {1,8}  {2}" -f $_.LastWriteTime, $lines, (Get-Short $_.FullName))
+        Write-Host ("  {0:yyyy-MM-dd}  {1,9}  {2}" -f $_.LastWriteTime, $_.Length, (Get-Short $_.FullName))
     }
     if ($claims.Count -gt 40) { Write-Host ("  ... +" + ($claims.Count - 40) + " more") }
     Write-Host "  Each is verified, contradicted or unverifiable. Never upgrade unverifiable to current."
