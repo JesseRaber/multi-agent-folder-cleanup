@@ -46,6 +46,18 @@ class PackageTests(unittest.TestCase):
                 with self.subTest(target=target):
                     self.assertTrue((SKILL.parent / target).is_file())
 
+    def test_reference_links_resolve_and_no_section_numbers(self) -> None:
+        # SKILL.md has no numbered sections; "SKILL.md §3" style pointers rot.
+        for doc in sorted((SKILL.parent / "references").glob("*.md")):
+            text = doc.read_text(encoding="utf-8")
+            with self.subTest(doc=doc.name):
+                self.assertNotRegex(text, r"SKILL\.md\s*§")
+            for target in re.findall(r"\[[^]]+\]\(([^)#]+)(?:#[^)]*)?\)", text):
+                if "://" in target:
+                    continue
+                with self.subTest(doc=doc.name, target=target):
+                    self.assertTrue((doc.parent / target).exists())
+
     def test_openai_default_prompt_names_skill(self) -> None:
         data = yaml.safe_load(
             (SKILL.parent / "agents/openai.yaml").read_text(encoding="utf-8")
