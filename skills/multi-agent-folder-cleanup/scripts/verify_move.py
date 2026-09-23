@@ -75,12 +75,12 @@ def load_map(path):
         return pairs
     pairs = []
     # utf-8-sig: Excel's "CSV UTF-8" writes a BOM, which used to turn the
-    # header into a bogus '﻿source' pair and fail preflight.
+    # header into a bogus 'U+FEFF + source' pair and fail preflight.
     with open(path, newline="", encoding="utf-8-sig") as fh:
         for row in csv.reader(fh):
             if len(row) < 2:
                 continue
-            src, tgt = row[0].strip().lstrip("﻿"), row[1].strip()
+            src, tgt = row[0].strip().lstrip(chr(0xFEFF)), row[1].strip()
             if not src or src.lower() in ("source", "src"):
                 continue
             pairs.append((_resolve(src, base), _resolve(tgt, base)))

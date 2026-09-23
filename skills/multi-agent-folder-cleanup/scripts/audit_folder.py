@@ -19,11 +19,13 @@ Noise control:
 """
 
 import argparse
+import csv
 import fnmatch
 import hashlib
 import os
 import re
 import sys
+import urllib.parse
 import zipfile
 from collections import defaultdict
 from datetime import datetime
@@ -59,7 +61,11 @@ SECRET_HINT_NAMES = {
     "cookies", "cookies-journal", "login data", "login data-journal",
     "web data", "local state", "credentials", ".env", "id_rsa", "token.json",
     "secrets.json", ".npmrc", ".pypirc", "credentials.json",
+    "id_ed25519", "id_ecdsa", "id_dsa", ".netrc", "_netrc", ".git-credentials",
 }
+
+# Key and vault containers flagged by extension. Name-only; never opened.
+SECRET_HINT_EXTENSIONS = {".pem", ".key", ".pfx", ".p12", ".kdbx", ".ppk", ".jks", ".keystore"}
 
 # Browser engines and tools add account/profile suffixes to these names. Match
 # only when the prefix is followed by a separator, so an unrelated word such as
@@ -72,7 +78,9 @@ SECRET_HINT_PREFIX_RULES = {
     "credentials": (" ", "-", "_", "."),
 }
 
-MARKDOWN_LINK_RE = re.compile(r"\]\(([^)]+)\)")
+# [text](target), [text](<target with spaces>), [text](target "title").
+MARKDOWN_LINK_RE = re.compile(
+    r"""\]\(\s*(<[^>\r\n]+>|[^)\s]+)(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)""")
 BACKTICK_PATH_RE = re.compile(r"`([^`\r\n]+\.[A-Za-z0-9]{1,8})`")
 
 
@@ -81,7 +89,10 @@ def section(title):
 
 
 def rel(path, root):
-    return "." + path[len(root):] if path.startswith(root) else path
+    if not path.startswith(root):
+        return path
+    tail = path[len(root):].lstrip("\\/").replace(os.sep, "/")
+    return "./" + tail if tail else "."
 
 
 def relslash(path, root):
@@ -106,13 +117,28 @@ def sha256(path):
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 
 
+# Bit 29 of a reparse tag marks a "name surrogate": the entry stands for another
+# path (junction 0xA0000003, symlink 0xA000000C). Cloud-file tags used by
+# OneDrive Files On-Demand (0x9000xxxA) are NOT name surrogates: those
+# directories hold real project content and must be walked, not skipped.
+IO_REPARSE_TAG_NAME_SURROGATE = 0x20000000
+
+
 def _is_windows_reparse(path):
-    """Detect a Windows junction, which os.path.islink misses on older Pythons."""
+    """Detect a Windows junction or directory symlink, which os.path.islink
+    misses on older Pythons. A plain FILE_ATTRIBUTE_REPARSE_POINT test is not
+    enough: OneDrive marks ordinary synced folders as reparse points too."""
     try:
-        attrs = os.lstat(path).st_file_attributes
+        st = os.lstat(path)
+        attrs = st.st_file_attributes
     except (AttributeError, OSError):
         return False
-    return bool(attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+    if not attrs & FILE_ATTRIBUTE_REPARSE_POINT:
+        return False
+    tag = getattr(st, "st_reparse_tag", None)
+    if tag is None:
+        return True  # cannot tell; treat conservatively as a link
+    return bool(tag & IO_REPARSE_TAG_NAME_SURROGATE)
 
 
 def collect(root):
@@ -121,13 +147,21 @@ def collect(root):
     empty_folders = []
     metadata_failures = []
     reparse_points = []
+    unreadable_dirs = []
     # os.walk does not follow directory symlinks or junctions, which is the
     # correct arithmetic -- an external runtime is not project content. But an
     # unreported skip becomes the claim "not project contents", and on a synced
     # root the provider may have materialized the target as real cloud files
     # that every Graph-indexed agent sees. Name them so that gets checked.
-    for dirpath, dirnames, filenames in os.walk(root):
+    def _walk_error(exc):
+        # os.walk skips an unreadable directory silently by default. A skipped
+        # subtree is a hole in every count below, so it must be reported.
+        unreadable_dirs.append((getattr(exc, "filename", None) or "?",
+                                exc.__class__.__name__))
+
+    for dirpath, dirnames, filenames in os.walk(root, onerror=_walk_error):
         folders += len(dirnames)
+        was_empty = not dirnames and not filenames
         for d in list(dirnames):
             full = os.path.join(dirpath, d)
             if os.path.islink(full) or _is_windows_reparse(full):
@@ -141,7 +175,7 @@ def collect(root):
                         target = "<unreadable>"
                 reparse_points.append((full, target))
                 dirnames.remove(d)
-        if dirpath != root and not dirnames and not filenames:
+        if dirpath != root and was_empty:
             empty_folders.append(dirpath)
         for name in filenames:
             full = os.path.join(dirpath, name)
@@ -151,7 +185,7 @@ def collect(root):
                 metadata_failures.append((full, exc.__class__.__name__))
                 continue
             files.append((full, st.st_size, st.st_mtime))
-    return files, folders, empty_folders, metadata_failures, reparse_points
+    return files, folders, empty_folders, metadata_failures, reparse_points, unreadable_dirs
 
 
 # Only these may match as a prefix (e.g. 'chrome-profile-2'). Everything else
@@ -165,15 +199,72 @@ def is_noise_segment(seg):
     return s in NOISE_DIR_HINTS or s.startswith(NOISE_PREFIX_HINTS)
 
 
+_GLOB_CACHE = {}
+
+
+def glob_regex(pat):
+    """Translate an --exclude glob into a segment-aware, case-insensitive regex.
+
+    Semantics (identical in audit_folder.ps1):
+      *      any characters within ONE path segment
+      ?      one character within a segment
+      **/    zero or more whole leading segments ('**/logs/**' matches 'logs/a')
+      /**    everything below ('tmp/**')
+      [..]   character class
+    A pattern with no '/' is matched against every path segment, so '*.log'
+    matches at any depth and a bare 'tmp' matches any folder named tmp. Matching
+    is case-insensitive because the primary targets (Windows, OneDrive,
+    SharePoint, default macOS volumes) are case-insensitive.
+    """
+    cached = _GLOB_CACHE.get(pat)
+    if cached:
+        return cached
+    p = pat.replace("\\", "/").strip()
+    anchored = "/" in p.rstrip("/")
+    p = p.rstrip("/") if p != "/" else p
+    out, i = [], 0
+    while i < len(p):
+        if p.startswith("**/", i):
+            out.append("(?:[^/]*/)*")
+            i += 3
+        elif p.startswith("/**", i) and i + 3 == len(p):
+            out.append("(?:/.*)?")
+            i += 3
+        elif p.startswith("**", i):
+            out.append(".*")
+            i += 2
+        elif p[i] == "*":
+            out.append("[^/]*")
+            i += 1
+        elif p[i] == "?":
+            out.append("[^/]")
+            i += 1
+        elif p[i] == "[":
+            j = p.find("]", i + 1)
+            if j == -1:
+                out.append(re.escape(p[i]))
+                i += 1
+            else:
+                body = p[i + 1:j]
+                if body.startswith("!"):
+                    body = "^" + body[1:]
+                out.append("[" + body.replace("\\", "\\\\") + "]")
+                i = j + 1
+        else:
+            out.append(re.escape(p[i]))
+            i += 1
+    body = "".join(out)
+    if anchored:
+        rx = re.compile(r"\A" + body + r"(?:/.*)?\Z", re.IGNORECASE | re.DOTALL)
+    else:
+        rx = re.compile(r"(?:\A|.*/)" + body + r"(?:/.*)?\Z", re.IGNORECASE | re.DOTALL)
+    _GLOB_CACHE[pat] = rx
+    return rx
+
+
 def matches_any(relpath, patterns):
-    for pat in patterns:
-        if fnmatch.fnmatch(relpath, pat):
-            return True
-        # bare directory name, e.g. --exclude tmp
-        if "/" not in pat and "*" not in pat:
-            if relpath == pat or relpath.startswith(pat + "/") or f"/{pat}/" in relpath:
-                return True
-    return False
+    relpath = relpath.rstrip("/")
+    return any(glob_regex(pat).match(relpath) for pat in patterns)
 
 
 def is_secret_hint_name(name):
@@ -181,17 +272,43 @@ def is_secret_hint_name(name):
     lowered = name.lower()
     if lowered in SECRET_HINT_NAMES:
         return True
+    if os.path.splitext(lowered)[1] in SECRET_HINT_EXTENSIONS:
+        return True
     return any(lowered.startswith(prefix + sep)
                for prefix, separators in SECRET_HINT_PREFIX_RULES.items()
                for sep in separators)
 
 
+# Any URI scheme (http:, mailto:, file:, onenote:, ...) but not a Windows drive
+# letter such as C:/ - a single letter before the colon is a path.
+URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]+:")
+# Version strings such as v1.2.0 or 3.11 look like 'name.ext' to the backtick
+# pattern but are never paths.
+VERSION_RE = re.compile(r"^v?\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?$")
+
+
 def clean_local_reference(value):
-    """Normalize a local Markdown/code reference without guessing its meaning."""
+    """Normalize a local Markdown/code reference without guessing its meaning.
+
+    Handles <angle-bracketed> targets, an optional "title" / 'title' after the
+    target, URL-encoded characters (%20), and #fragments.
+    """
+    value = value.strip()
+    if value.startswith("<") and ">" in value:
+        value = value[1:value.index(">")].strip()
+    else:
+        m = re.match(r"""^(\S+)\s+(?:"[^"]*"|'[^']*'|\([^)]*\))\s*$""", value)
+        if m:
+            value = m.group(1)
     value = value.split("#", 1)[0].strip()
-    if value.startswith("<") and value.endswith(">"):
-        value = value[1:-1].strip()
+    if "%" in value:
+        value = urllib.parse.unquote(value)
     return value
+
+
+def is_external_or_nonpath(value):
+    return (not value or value.startswith("#") or bool(URI_SCHEME_RE.match(value))
+            or bool(VERSION_RE.match(value)))
 
 
 def _resolved_paths(value, index_dir, root):
@@ -236,7 +353,82 @@ def reference_case_mismatch(value, index_dir, root):
     return bool(hits) and not any(case_exact(h) for h in hits)
 
 
+def _resolve_under_root(value, root):
+    return value if os.path.isabs(value) else os.path.join(root, value.replace("/", os.sep))
+
+
+def load_expected_manifest(path):
+    """Return path plus optional size/sha256 rows; never changes the target."""
+    with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as fh:
+        sample = fh.read(4096)
+        fh.seek(0)
+        first = sample.splitlines()[0].lower() if sample.splitlines() else ""
+        if "," in first and "path" in first:
+            rows = []
+            for row in csv.DictReader(fh):
+                value = (row.get("path") or row.get("relative_path") or "").strip()
+                if value:
+                    rows.append({"path": value, "size": (row.get("size") or "").strip(),
+                                 "sha256": (row.get("sha256") or "").strip().lower()})
+            return rows
+        return [{"path": line.strip(), "size": "", "sha256": ""}
+                for line in fh if line.strip() and not line.lstrip().startswith("#")]
+
+
+def pointer_candidate(path, size):
+    if size > 4096 or os.path.splitext(path)[1].lower() not in {".md", ".txt"}:
+        return False
+    try:
+        text = open(path, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return False
+    lines = [line for line in text.splitlines() if line.strip()]
+    if not lines or len(lines) > 12:
+        return False
+    directive = re.search(r"(?i)\b(read|see|start|canonical|authoritative|use|go to|continue in)\b", text)
+    local_ref = MARKDOWN_LINK_RE.search(text) or BACKTICK_PATH_RE.search(text)
+    return bool(directive and local_ref)
+
+
+def portfolio_rows(root, expected):
+    defaults = ["AGENTS.md", "README_FIRST.md", "PROJECT_ROADMAP_STATUS.md",
+                "AUTHORITY_MAP.md", "INDEX.md", "AI_CONTEXT/README_FIRST.md",
+                "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md",
+                "AI_CONTEXT/PROJECT_ACTIVITY_JOURNAL.md", "AI_CONTEXT/CHAT_INDEX.md"]
+    checks = list(dict.fromkeys(defaults + list(expected or [])))
+    rows = []
+    try:
+        children = sorted((e for e in os.scandir(root) if e.is_dir(follow_symlinks=False)),
+                          key=lambda e: e.name.lower())
+    except OSError:
+        return []
+    for child in children:
+        try:
+            root_items = len(list(os.scandir(child.path)))
+        except OSError:
+            root_items = "?"
+        present = [x for x in checks if os.path.exists(os.path.join(child.path, x.replace("/", os.sep)))]
+        rows.append((child.name, root_items, present))
+    return rows
+
+def _safe_stdout():
+    """Never crash on a filename the console cannot encode.
+
+    Redirected output on Windows defaults to the ANSI code page (cp1252), so a
+    single CJK or emoji filename used to abort the whole audit with
+    UnicodeEncodeError. Write UTF-8 when redirected; escape instead of failing.
+    """
+    try:
+        if sys.stdout.isatty():
+            sys.stdout.reconfigure(errors="backslashreplace")
+        else:
+            sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
+
 def main():
+    _safe_stdout()
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", required=True)
     ap.add_argument("--index-path", action="append", default=[],
@@ -251,6 +443,16 @@ def main():
     ap.add_argument("--path-threshold", type=int, default=240)
     ap.add_argument("--dup-group-cap", type=int, default=8,
                     help="Max paths printed per duplicate group.")
+    ap.add_argument("--journal-threshold-kb", type=int, default=100,
+                    help="Flag journal-like files at or above this size; default 100 KB.")
+    ap.add_argument("--entrypoint", action="append", default=[],
+                    help="Repeatable expected entrypoint relative to root.")
+    ap.add_argument("--portfolio", action="store_true",
+                    help="Report an advisory immediate-child project matrix.")
+    ap.add_argument("--detect-pointers", action="store_true",
+                    help="Report conservative small pointer-stub candidates.")
+    ap.add_argument("--expected-upload-manifest", action="append", default=[],
+                    help="Repeatable CSV or line manifest of expected relative paths; optional size and sha256 columns.")
     args = ap.parse_args()
 
     # A comma inside a pattern is almost always someone reaching for the PowerShell
@@ -283,10 +485,16 @@ def main():
                 "(PowerShell's -IndexPath takes comma-separated values; Python's does not.)"
             )
 
+    for ep in (args.entrypoint or []):
+        if "," in ep:
+            sys.exit("--entrypoint contains a comma; repeat the flag instead.")
+    if args.journal_threshold_kb < 0:
+        sys.exit("--journal-threshold-kb must be zero or greater")
+
     print(f"Read-only audit of {root}")
     print(f"Generated {datetime.now():%Y-%m-%d %H:%M}")
 
-    all_files, folders, empty_folders, metadata_failures, reparse_points = collect(root)
+    all_files, folders, empty_folders, metadata_failures, reparse_points, unreadable_dirs = collect(root)
 
     excluded = []
     files = []
@@ -321,6 +529,8 @@ def main():
     print(f"  Files (all):      {discovered_files}")
     if metadata_failures:
         print(f"  Metadata readable: {len(all_files)}")
+    if unreadable_dirs:
+        print(f"  Unreadable dirs:  {len(unreadable_dirs)} (contents NOT counted)")
     print(f"  Folders:          {folders}")
     print(f"  Total MB:         {total / (1024*1024):.2f}")
     print(f"  Max depth:        {max(depths)}")
@@ -339,6 +549,15 @@ def main():
             print(f"  ... and {len(metadata_failures) - 25} more")
         print("  These directory entries were counted but could not be stat'ed. "
               "On synced storage this may be transient; re-check before Execute.")
+
+    if unreadable_dirs:
+        section("Directories not readable (contents missing from every count)")
+        for path, why in unreadable_dirs[:25]:
+            print(f"  {why:18} {rel(path, root)}")
+        if len(unreadable_dirs) > 25:
+            print(f"  ... and {len(unreadable_dirs) - 25} more")
+        print("  Access was denied or the directory vanished mid-walk. Nothing below "
+              "these paths is in any total. Resolve access or disclose the gap.")
 
     if args.exclude:
         section("Excluded from detail sections (counted, not examined)")
@@ -386,13 +605,13 @@ def main():
     per = defaultdict(int)
     for p, _, _ in files:
         per[os.path.dirname(p)] += 1
-    for d, c in sorted(per.items(), key=lambda x: -x[1])[:25]:
+    for d, c in sorted(per.items(), key=lambda x: (-x[1], rel(x[0], root).lower()))[:25]:
         print(f"  {c:6d}  {rel(d, root)}")
 
     section("Reparse points not descended (junctions / directory symlinks)")
     if reparse_points:
         for path, target in reparse_points:
-            print(f"  {path}")
+            print(f"  {rel(path, root)}")
             print(f"     -> {target or '<unresolved>'}")
         print("  Descendants of these are in NO count in this report.")
         print("  That is correct locally. If this root is OneDrive/SharePoint-synced,")
@@ -427,7 +646,7 @@ def main():
         if not suffix and name.startswith(".") and name.count(".") == 1:
             suffix = name.lower()
         ext[suffix or "(none)"] += 1
-    for e, c in sorted(ext.items(), key=lambda x: -x[1])[:20]:
+    for e, c in sorted(ext.items(), key=lambda x: (-x[1], x[0]))[:20]:
         print(f"  {c:6d}  {e}")
 
     section("Archives")
@@ -478,11 +697,13 @@ def main():
     section("Duplicate names across folders")
     by_name = defaultdict(list)
     for p, _, m in files:
-        by_name[os.path.basename(p)].append((p, m))
-    dups = {k: v for k, v in by_name.items() if len(v) > 1}
+        # Case-insensitive, like Windows/OneDrive and audit_folder.ps1.
+        by_name[os.path.basename(p).lower()].append((p, m))
+    dups = {k: sorted(v, key=lambda e: rel(e[0], root).lower())
+            for k, v in by_name.items() if len(v) > 1}
     if dups:
-        for name, entries in sorted(dups.items(), key=lambda x: -len(x[1]))[:20]:
-            print(f"-- {name}  ({len(entries)})")
+        for name, entries in sorted(dups.items(), key=lambda x: (-len(x[1]), x[0]))[:20]:
+            print(f"-- {os.path.basename(entries[0][0])}  ({len(entries)})")
             for p, m in entries[:args.dup_group_cap]:
                 print(f"     {datetime.fromtimestamp(m):%Y-%m-%d}  {rel(p, root)}")
             if len(entries) > args.dup_group_cap:
@@ -521,7 +742,8 @@ def main():
         if groups:
             n_files = sum(len(ps) for ps in groups.values())
             print(f"  {len(groups)} groups, {n_files} files")
-            for h, ps in sorted(groups.items(), key=lambda x: -len(x[1])):
+            for h, ps in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
+                ps = sorted(ps, key=lambda q: rel(q, root).lower())
                 print(f"-- {h[:12]}...  ({len(ps)} copies)")
                 for p in ps[:args.dup_group_cap]:
                     print(f"     {rel(p, root)}")
@@ -533,11 +755,13 @@ def main():
         # The dangerous inverse: one name, several different documents.
         section("Same name, DIFFERENT content (ambiguous citation)")
         ambiguous = 0
-        for name, entries in sorted(dups.items()):
+        for name, entries in sorted(dups.items(), key=lambda x: (-len(x[1]), x[0])):
             paths = [p for p, _ in entries if p in hashes]
             if len({hashes[p] for p in paths}) > 1:
                 ambiguous += 1
-                print(f"-- {name}")
+                if ambiguous > 20:
+                    continue
+                print(f"-- {os.path.basename(entries[0][0])}")
                 for p in paths[:args.dup_group_cap]:
                     print(f"     {hashes[p][:8]}  {rel(p, root)}")
                 if len(paths) > args.dup_group_cap:
@@ -578,6 +802,85 @@ def main():
     else:
         print("  none detected by name")
 
+    section(f"Large journals (threshold {args.journal_threshold_kb} KB)")
+    journal_limit = args.journal_threshold_kb * 1024
+    journals = [(p, size) for p, size, _ in all_files
+                if "journal" in os.path.basename(p).lower() and size >= journal_limit]
+    if journals:
+        for path, size in sorted(journals, key=lambda x: -x[1]):
+            print(f"  {size:9d}  {rel(path, root)}")
+        print("  Rotation is a proposal only; preserve every entry and require approval.")
+    else:
+        print("  none")
+
+    if args.entrypoint:
+        section("Expected entrypoints")
+        for value in args.entrypoint:
+            target = _resolve_under_root(value, root)
+            state = "PRESENT" if os.path.exists(target) else "MISSING"
+            print(f"  {state:7}  {value}")
+        print("  Missing is established against this direct filesystem root only.")
+
+    if args.portfolio:
+        section("Portfolio root matrix (immediate children; advisory)")
+        rows = portfolio_rows(root, args.entrypoint)
+        print("  Project | Count scope | Root items | Entrypoints present")
+        if rows:
+            for name, count, present in rows:
+                value = ", ".join(present) if present else "(none detected)"
+                print(f"  {name} | root-level | {count} | {value}")
+        else:
+            print("  no immediate child directories")
+        print("  Presence does not determine authority or operational state.")
+
+    if args.detect_pointers:
+        section("Possible pointer stubs (advisory; content not authority)")
+        candidates = [p for p, size, _ in files if pointer_candidate(p, size)]
+        if candidates:
+            for path in candidates:
+                print(f"  {rel(path, root)}")
+            print("  Verify the target exists and that the file contains no independent guidance.")
+        else:
+            print("  none")
+
+    for manifest_value in (args.expected_upload_manifest or []):
+        section(f"Expected upload manifest: {manifest_value}")
+        manifest_path = _resolve_under_root(manifest_value, root)
+        if not os.path.isfile(manifest_path):
+            print(f"  MANIFEST NOT FOUND: {manifest_path}")
+            continue
+        try:
+            expected = load_expected_manifest(manifest_path)
+        except (OSError, csv.Error) as exc:
+            print(f"  MANIFEST UNREADABLE: {exc.__class__.__name__}")
+            continue
+        present = missing = size_bad = hash_bad = 0
+        for row in expected:
+            target = _resolve_under_root(row["path"], root)
+            if not os.path.isfile(target):
+                missing += 1
+                print(f"  MISSING        {row['path']}")
+                continue
+            present += 1
+            if row["size"]:
+                try:
+                    wanted = int(row["size"])
+                except ValueError:
+                    print(f"  BAD SIZE VALUE {row['path']} = {row['size']!r}")
+                    size_bad += 1
+                else:
+                    actual = os.path.getsize(target)
+                    if actual != wanted:
+                        size_bad += 1
+                        print(f"  SIZE MISMATCH  {row['path']} expected={wanted} actual={actual}")
+            if row["sha256"]:
+                actual_hash = sha256(target)
+                if actual_hash.lower() != row["sha256"]:
+                    hash_bad += 1
+                    print(f"  HASH MISMATCH  {row['path']}")
+        print(f"  Expected: {len(expected)}  Present: {present}  Missing: {missing}  Size mismatches: {size_bad}  Hash mismatches: {hash_bad}")
+        print("  This verifies listed files only; it does not authorize upload, overwrite, or promotion.")
+
     for index_path in (args.index_path or []):
         section(f"Index link check: {index_path}")
         idx = os.path.join(root, index_path)
@@ -587,14 +890,14 @@ def main():
             markdown_links = []
             for match in MARKDOWN_LINK_RE.finditer(content):
                 link = clean_local_reference(match.group(1))
-                if link and not re.match(r"^(https?:|mailto:|#)", link):
+                if not is_external_or_nonpath(link):
                     markdown_links.append(link)
             markdown_links = list(dict.fromkeys(markdown_links))
 
             backticked_refs = [clean_local_reference(match.group(1))
                                for match in BACKTICK_PATH_RE.finditer(content)]
             backticked_refs = [ref for ref in dict.fromkeys(backticked_refs)
-                               if ref and not re.match(r"^(https?:|mailto:|#)", ref)]
+                               if not is_external_or_nonpath(ref)]
             # A relative link in AI_CONTEXT/CHAT_INDEX.md is relative to
             # AI_CONTEXT/, not to the root. Resolving everything against the
             # root reports working links as broken - the exact false alarm
@@ -659,6 +962,10 @@ def main():
         print(f"\nCoverage: {len(files)} of {discovered_files} files examined in detail; "
               f"{excluded_total} excluded by --exclude and classified by nothing. "
               "Say so in the report.")
+    if unreadable_dirs:
+        print(f"Coverage gap: {len(unreadable_dirs)} director"
+              f"{'y' if len(unreadable_dirs) == 1 else 'ies'} could not be read; "
+              "their contents are in no count.")
     if detail_metadata_failures:
         print(f"Coverage gap: {len(detail_metadata_failures)} non-excluded directory "
               "entries could not be stat'ed and were not examined.")
