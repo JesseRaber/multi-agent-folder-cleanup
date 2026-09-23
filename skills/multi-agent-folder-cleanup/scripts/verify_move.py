@@ -12,6 +12,14 @@ Move map: CSV with `source,target` (header optional) or JSON list of
     python verify_move.py verify    --baseline /tmp/baseline.json [--stage DIR]
 
 Write the baseline OUTSIDE the folder being reorganized.
+
+Relative paths in a move map resolve against the map file's own folder, not
+the current directory, so preflight, baseline and verify agree no matter where
+they are run from. A UTF-8 byte-order mark (Excel "CSV UTF-8") is accepted.
+
+Final verify (no --stage) also requires every source to be gone: a copy that
+leaves the source in place is a dual tree, not a move. Pass
+--allow-source-present only when the approved plan is a copy.
 """
 
 import argparse
@@ -20,7 +28,7 @@ import hashlib
 import json
 import os
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 
@@ -33,24 +41,49 @@ def sha256(path):
     return h.hexdigest()
 
 
+def _safe_stdout():
+    """Never crash on a path the console cannot encode (Windows cp1252)."""
+    try:
+        if sys.stdout.isatty():
+            sys.stdout.reconfigure(errors="backslashreplace")
+        else:
+            sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
+
+def _resolve(value, base):
+    value = os.path.expanduser(value.strip())
+    return os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
+
+
 def load_map(path):
+    base = os.path.dirname(os.path.abspath(path))
     if path.lower().endswith(".json"):
-        with open(path, encoding="utf-8") as fh:
+        # utf-8-sig: tolerate a byte-order mark from Windows editors.
+        with open(path, encoding="utf-8-sig") as fh:
             rows = json.load(fh)
-        pairs = [(os.path.abspath(r["source"]), os.path.abspath(r["target"]))
-                 for r in rows]
+        if isinstance(rows, dict):
+            rows = rows.get("pairs") or rows.get("moves") or []
+        try:
+            pairs = [(_resolve(r["source"], base), _resolve(r["target"], base))
+                     for r in rows]
+        except (KeyError, TypeError):
+            sys.exit(f"JSON map must be a list of {{\"source\": ..., \"target\": ...}}: {path}")
         if not pairs:
             sys.exit(f"No source,target pairs found in {path}")
         return pairs
     pairs = []
-    with open(path, newline="", encoding="utf-8") as fh:
+    # utf-8-sig: Excel's "CSV UTF-8" writes a BOM, which used to turn the
+    # header into a bogus '﻿source' pair and fail preflight.
+    with open(path, newline="", encoding="utf-8-sig") as fh:
         for row in csv.reader(fh):
             if len(row) < 2:
                 continue
-            src, tgt = row[0].strip(), row[1].strip()
+            src, tgt = row[0].strip().lstrip("﻿"), row[1].strip()
             if not src or src.lower() in ("source", "src"):
                 continue
-            pairs.append((os.path.abspath(src), os.path.abspath(tgt)))
+            pairs.append((_resolve(src, base), _resolve(tgt, base)))
     if not pairs:
         sys.exit(f"No source,target pairs found in {path}")
     return pairs
@@ -116,17 +149,27 @@ def cmd_preflight(args):
     target_root = common_parent([t for _, t in pairs])
 
     missing = [s for s, _ in pairs if not os.path.isfile(s)]
-    collisions = {t: [s for s, tt in pairs if tt == t]
-                  for t in {t for _, t in pairs}
-                  if sum(1 for _, tt in pairs if tt == t) > 1}
+    # Case-insensitive: 'A.md' and 'a.md' are one file on Windows, OneDrive,
+    # SharePoint and default macOS volumes, which is where these moves land.
+    by_target = defaultdict(list)
+    for s, t in pairs:
+        by_target[os.path.normcase(t).lower()].append((s, t))
+    collisions = {group[0][1]: [s for s, _ in group]
+                  for group in by_target.values() if len(group) > 1}
     existing_targets = [t for _, t in pairs if os.path.exists(t)]
     long_paths = [t for _, t in pairs if len(t) > args.path_threshold]
     can_check = placeholder_check_available()
     placeholders = ([s for s, _ in pairs if os.path.isfile(s) and is_placeholder(s)]
                     if can_check else [])
 
-    dupe_sources = [s for s, c in defaultdict(int, {
-        s: sum(1 for x, _ in pairs if x == s) for s, _ in pairs}).items() if c > 1]
+    source_counts = Counter(os.path.normcase(s).lower() for s, _ in pairs)
+    seen = set()
+    dupe_sources = []
+    for s, _ in pairs:
+        key = os.path.normcase(s).lower()
+        if source_counts[key] > 1 and key not in seen:
+            seen.add(key)
+            dupe_sources.append(s)
 
     print(f"Move map: {args.map}")
     print(f"  pairs:                    {len(pairs)}")
@@ -226,7 +269,7 @@ def cmd_verify(args):
         sys.exit("Baseline targets have incompatible roots; cannot resolve a safe "
                  "staging tree")
 
-    ok = missing = mismatch = 0
+    ok = missing = mismatch = still_at_source = 0
     for e in entries:
         if args.stage:
             # Mirror the target tree under staging. Flattening to basename lets
@@ -256,9 +299,21 @@ def cmd_verify(args):
             mismatch += 1
             continue
         ok += 1
+        # A verified target with the source still present is a copy - the
+        # dual-tree state this protocol exists to prevent - not a move.
+        if (not args.stage and not args.allow_source_present
+                and os.path.normcase(e["source"]) != os.path.normcase(e["target"])
+                and os.path.exists(e["source"])):
+            print(f"  STILL AT SOURCE (copied, not moved): {e['source']}")
+            still_at_source += 1
 
-    print(f"\nVerified {ok}/{len(entries)}   missing {missing}   mismatched {mismatch}")
-    if missing or mismatch:
+    print(f"\nVerified {ok}/{len(entries)}   missing {missing}   mismatched {mismatch}"
+          + ("" if args.stage else f"   still at source {still_at_source}"))
+    if still_at_source:
+        print("Sources still present: this is a dual tree, not a completed move. "
+              "Finish or reverse the move; use --allow-source-present only for an "
+              "approved copy.")
+    if missing or mismatch or still_at_source:
         print("VERIFY FAILED — stop. Do not remove staging or source folders.")
         return 1
     print("All files verified. Staging may be removed once sources are confirmed empty.")
@@ -266,6 +321,7 @@ def cmd_verify(args):
 
 
 def main():
+    _safe_stdout()
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -277,7 +333,10 @@ def main():
     b.add_argument("--out", required=True); b.set_defaults(fn=cmd_baseline)
 
     v = sub.add_parser("verify"); v.add_argument("--baseline", required=True)
-    v.add_argument("--stage"); v.set_defaults(fn=cmd_verify)
+    v.add_argument("--stage")
+    v.add_argument("--allow-source-present", action="store_true",
+                   help="Final verify of an approved COPY: do not fail when sources remain.")
+    v.set_defaults(fn=cmd_verify)
 
     args = ap.parse_args()
     sys.exit(args.fn(args))
