@@ -72,6 +72,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# A redirected report (`> report.txt`, a CI log, a calling agent) would otherwise
+# use the OEM/ANSI code page and turn every non-ASCII filename into '?'. Match
+# audit_folder.py, which writes UTF-8 whenever its output is redirected.
+try { if ([Console]::IsOutputRedirected) { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } } catch { }
+
 # `pwsh -File script.ps1 -Exclude 'a/**','b/**'` hands the script ONE string,
 # "a/**,b/**", because -File does not parse PowerShell argument syntax. The same
 # happens to -IndexPath. Splitting on commas makes both parameters behave
