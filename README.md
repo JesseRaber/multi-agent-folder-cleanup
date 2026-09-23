@@ -8,19 +8,20 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.1.0` — see `CHANGELOG.md`.
+`1.2.0` — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.1.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.2.0**.
 
 ## Install
 
 Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases):
 
 - `…-openai.zip` — native skills-only plugin for ChatGPT and Codex, with `.codex-plugin/plugin.json`
-- `…-portable.zip` — standalone Agent Skill for ChatGPT desktop, Codex CLI/IDE, Claude.ai skill upload, Grok, and compatible local hosts
+- `…-portable.zip` — standalone Agent Skill (with INSTALL.md and LICENSE) for ChatGPT desktop, Codex CLI/IDE, Grok, and compatible local hosts
 - `…-claude.zip` — Claude Code / Claude Desktop plugin layout
+- `…-skill.zip` — the skill folder only, for Claude.ai skill upload and other skill uploaders
 
-Each archive includes its own `INSTALL.md`. Keep the extracted package structure intact.
+Every archive except `-skill.zip` includes its own `INSTALL.md`. Keep the extracted package structure intact.
 
 ### ChatGPT and Codex
 
@@ -56,14 +57,28 @@ skills/multi-agent-folder-cleanup/
   scripts/                       read-only audit and move-verification helpers
   references/workflow.md         full Audit / Plan / Execute protocol
   references/audit-tools.md      deterministic helper usage and limitations
+  references/connector-audit.md   connector evidence and safe cloud-edit boundaries
+  references/portfolio-audit-template.md  multi-project audit matrix
   references/navigation-templates.md
 packaging/                       per-host install docs and release notes
-tests/                           package and Python/PowerShell parity checks
+tests/                           package, regression, and Python/PowerShell parity tests
 .github/workflows/ci.yml         pull-request and main validation
 .github/workflows/release.yml    tagged package build and publication
 ```
 
 The skill folder is the workflow authority. Plugin manifests and release files package it without duplicating the instructions.
+
+## What v1.2.0 adds
+
+- Portfolio-root audits with count-scope and entrypoint matrices.
+- Strict full-path validation for connector and enterprise-search results.
+- Documentary-state versus operationally verified state.
+- Pointer, identical-duplicate, divergent-control, and claim-family distinctions.
+- Separate move, record-only, and additive-intake execution boundaries.
+- Connector-safe exact-context edits with virtualized-editor and concurrent-writer guards.
+- Privacy-minimized incoming packages and post-upload manifest verification.
+- New audit-helper options for journal thresholds, expected entrypoints, portfolio matrices, pointer candidates, and expected upload manifests.
+
 
 ## What the scripts do
 
@@ -73,10 +88,17 @@ All three scripts are read-only against the target folder. `verify_move.py` neve
 python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
   --root <folder> --index-path INDEX.md --hash-files
 
-python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
-  --map moves.csv --out /safe/audit/baseline.json
+# Optional advisory checks
+python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
+  --root <portfolio> --portfolio \
+  --entrypoint AGENTS.md --entrypoint AI_CONTEXT/README_FIRST.md \
+  --journal-threshold-kb 100 --detect-pointers \
+  --expected-upload-manifest expected-files.csv
+
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py preflight \
   --map moves.csv --path-threshold 240
+python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
+  --map moves.csv --out /safe/audit/baseline.json
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
   --baseline /safe/audit/baseline.json
 ```
@@ -85,7 +107,7 @@ Python 3.8+, standard library only. On Windows or OneDrive, prefer `audit_folder
 
 ## Validation and releases
 
-Every pull request runs the pinned OpenAI skill validator, package/version checks, Python compilation, PowerShell parsing, and a cross-language parity fixture. Tagged releases repeat runtime smoke tests, build all three install archives, extract them, run the packaged code, and publish SHA-256 checksums.
+Every pull request runs the pinned OpenAI skill and plugin validators, package/version checks, Python compilation, PowerShell parsing, all regression tests, and a line-by-line Python/PowerShell report comparison on Ubuntu, plus the full suite on Windows (PowerShell 7 and a Windows PowerShell 5.1 junction smoke test). Tagged releases repeat runtime smoke tests, build all four install archives, extract them, run the packaged code, and publish SHA-256 checksums.
 
 To publish after the release commit is merged:
 

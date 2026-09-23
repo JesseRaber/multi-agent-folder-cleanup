@@ -13,7 +13,7 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.1.0.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.2.0.
 > Read `references/workflow.md` before any Audit, Plan, or Execute run.
 > Never move or delete anything without an explicitly approved move map.
 
@@ -52,8 +52,10 @@ Execute run. The skill says this too; it is the most common way a run goes wrong
 
 ## Claude.ai (skill upload)
 
-Zip the `multi-agent-folder-cleanup/` folder on its own and upload it under
-Settings -> Capabilities -> Skills. If you want the Claude Code **plugin** form
+Upload the `-skill.zip` asset from the same release (it holds only the
+`multi-agent-folder-cleanup/` folder), or zip that folder on its own, under
+Settings -> Capabilities -> Skills. This portable ZIP itself also carries
+`INSTALL.md` and `LICENSE` at the top level, so do not upload it directly. If you want the Claude Code **plugin** form
 instead, use the `-claude` package from the same release.
 
 ---
@@ -63,6 +65,15 @@ instead, use the `-claude` package from the same release.
 Point the host's system prompt or context loader at
 `multi-agent-folder-cleanup/SKILL.md`. Load references only when the skill
 routes to them.
+
+---
+
+## Smoke test
+
+> Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
+
+A loaded skill states **Mode: Audit** first and reports
+**Loaded Multi-Agent Folder Cleanup v1.2.0**.
 
 ---
 
@@ -76,8 +87,16 @@ routes to them.
 
 ## Verify what you downloaded
 
+Run this in the folder that holds the downloaded ZIPs and `SHA256SUMS.txt`,
+before extracting anything:
+
 ```bash
-sha256sum -c SHA256SUMS.txt
+sha256sum -c SHA256SUMS.txt          # macOS: shasum -a 256 -c SHA256SUMS.txt
+```
+
+```powershell
+Get-FileHash .\multi-agent-folder-cleanup-*.zip -Algorithm SHA256
+# compare each Hash with the matching line in SHA256SUMS.txt
 ```
 
 ## Authority
