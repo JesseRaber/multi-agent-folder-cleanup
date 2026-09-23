@@ -30,8 +30,9 @@ def section(text: str, name: str) -> str:
 class AuditParityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        if not shutil.which("pwsh"):
-            raise unittest.SkipTest("pwsh is required for cross-language parity")
+        cls.powershell = shutil.which("pwsh") or shutil.which("powershell.exe")
+        if not cls.powershell:
+            raise unittest.SkipTest("PowerShell is required for cross-language parity")
 
     def test_shared_fixture_has_matching_observable_results(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -53,12 +54,15 @@ class AuditParityTests(unittest.TestCase):
             py = subprocess.run(
                 [sys.executable, str(PY_AUDIT), "--root", str(root),
                  "--index-path", "INDEX.md", "--hash-files"],
-                check=True, capture_output=True, text=True, env=env,
+                check=True, capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, env=env,
             ).stdout
+            ps_cmd = [self.powershell, "-NoProfile"]
+            if Path(self.powershell).name.lower().startswith("powershell"):
+                ps_cmd += ["-ExecutionPolicy", "Bypass"]
             ps = subprocess.run(
-                ["pwsh", "-NoProfile", "-File", str(PS_AUDIT),
+                ps_cmd + ["-File", str(PS_AUDIT),
                  "-Root", str(root), "-IndexPath", "INDEX.md", "-HashFiles"],
-                check=True, capture_output=True, text=True, env=env,
+                check=True, capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, env=env,
             ).stdout
 
             # PowerShell emits native separators while Python normalizes to

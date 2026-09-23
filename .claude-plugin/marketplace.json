@@ -10,7 +10,7 @@
     {
       "name": "multi-agent-folder-cleanup",
       "source": "./",
-      "description": "Audit, plan, and safely reorganize a shared project folder so multiple AI agents can find current authority, tell evidence apart from backlog and history, and continue work without duplicate or ambiguous trees.",
+      "description": "Audit, plan, and safely reorganize shared project folders or portfolios with authority, connector-evidence, operational-state, pointer, and duplicate controls.",
       "author": {
         "name": "Jesse Raber"
       },
@@ -18,7 +18,13 @@
       "repository": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
       "license": "MIT",
       "category": "productivity",
-      "keywords": ["folder-cleanup", "agent-handoff", "onedrive", "sharepoint", "audit"]
+      "keywords": [
+        "folder-cleanup",
+        "agent-handoff",
+        "onedrive",
+        "sharepoint",
+        "audit"
+      ]
     }
   ]
 }

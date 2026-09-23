@@ -5,6 +5,8 @@ Contents:
 - [B. Audit mode](#b-audit-mode)
 - [C. Plan mode](#c-plan-mode)
 - [D. Execute mode](#d-execute-mode)
+  - [D9. Connector-safe record editing](#d9-connector-safe-record-editing)
+  - [D10. Additive intake](#d10-additive-intake)
 - [E. Verification block](#e-verification-block)
 - [F. Failure recovery](#f-failure-recovery)
 - [G. Report formats](#g-report-formats)
@@ -17,10 +19,10 @@ Before any mode:
 
 1. **Confirm the root.** One absolute path. If the user names a folder loosely ("the project folder"), echo the resolved path and continue only once it matches.
 2. **Read instruction files.** Root and nested `AGENTS.md` / `CLAUDE.md` / `copilot-instructions.md` / `README.md` / `README_FIRST.md`. Summarize what they require. Log conflicts; resolve none unilaterally. Instructions configured in the owner's app or IDE govern the folder just as much as a file in it — read those too, and note when they are the *only* place guidance lives. Instruction files are protected by default. A demonstrably stale factual path, count, status, or caution may be corrected only through a separately proposed and explicitly approved minimal patch; never fold behavioral-rule changes into cleanup.
-3. **Note the storage substrate and the access route separately.** Substrate: local disk, OneDrive/SharePoint-synced, NAS/SMB share, or a mix — this drives the hydration and path-length checks later. Route: a mounted filesystem path, or a connector/API/web share. They are independent, and only the first can run the audit scripts or any Execute step. If the root is synced, expect a local view and a cloud view that do not agree about reparse points; note which one you have. If the only route is a connector, say so in the report's opening lines and use the degraded inventory in SKILL.md §3.
+3. **Note the storage substrate and the access route separately.** Substrate: local disk, OneDrive/SharePoint-synced, NAS/SMB share, or a mix — this drives the hydration and path-length checks later. Route: a mounted filesystem path, or a connector/API/web share. They are independent, and only the first can run the audit scripts or any Execute step. If the root is synced, expect a local view and a cloud view that do not agree about reparse points; note which one you have. If the only route is a connector, say so in the report's opening lines and follow the degraded connector protocol in [connector-audit.md](connector-audit.md).
 3a. **Enumerate the other roots.** Ask whether a companion, mirror, or predecessor root exists — a team site beside a personal drive, a NAS copy, an old share. If one does, record for each root: whether it carries the required entrypoints, what its status document claims is active, and which root a tool-driven search reaches first. Cross-root contradictions outrank in-tree duplicates and are invisible from inside either root.
 4. **Note who else writes here.** Other agents, sync clients, scheduled jobs. Concurrent writers make hash verification unreliable — say so if present.
-5. **Check for a logging or journaling requirement.** Some folders carry an owner directive to append an entry to an activity journal after substantive work. That directive is the owner's and it governs — including in Audit mode, whose "creates nothing" rule is about cleanup artifacts (indexes, status files, staging), not about the folder's own required log. Append the entry, keep it to what was measured, and state in the report that the journal was the only write. If a folder's logging policy and this skill's mode rules appear to conflict beyond that, record the conflict and ask.
+5. **Check for a logging or journaling requirement.** Some folders carry an owner directive to append an entry to an activity journal after substantive work. That directive is the owner's and it governs — including in Audit mode, whose "creates nothing" rule is about cleanup artifacts (indexes, status files, staging), not about the folder's own required log. Append the entry, keep it to what was measured, and state in the report that the journal was the only write. If a folder's logging policy and this skill's mode rules appear to conflict beyond that, record the conflict and ask. If the user explicitly requires read-only work, or the access route cannot append without replacement and immediate verification, do not write; provide the exact owed entry instead. Measure journal size and flag the configured rotation threshold (default 100 KB) without rotating unless approved.
 6. **Check repository state without changing it.** If the root is in a Git worktree, record tracked, modified, and untracked paths that overlap the proposed map. Git operations remain out of scope unless separately authorized; never clean or reset a dirty tree as part of folder organization.
 
 ---
@@ -37,7 +39,7 @@ Run the bundled audit script, or gather equivalently:
 - Depth and per-folder file counts
 - Empty directories, listed separately as cosmetic findings rather than automatic removal targets
 - Archives (`.zip`, `.7z`, `.tar*`, `.rar`) with size and date
-- Files over ~1 MB and files at depth > 5
+- Maximum depth (reported by the audit script); note unusually large files from the inventory when they matter
 - Path lengths, flagging anything over 240 characters
 - Duplicate candidates: same name across folders; with `--hash-files`, identical-content groups **and** the inverse — one name resolving to several different documents
 - Index/link check: every Markdown link target in each named index that does not resolve, reported as a broken link. Report unresolved backticked filename/path references separately as review items, because examples and historical labels may be intentionally non-live. `--index-path` is repeatable; an index named in navigation but absent on disk is itself a finding.
@@ -66,7 +68,7 @@ A stale index is not only one that points at missing paths. Check the inverse to
 
 ### B3. Classify
 
-Assign every substantive file to one of the eight buckets in SKILL.md §4. Produce a table: path → bucket → evidence for the call. Files you cannot classify go in a short "needs owner decision" list rather than a guess. Files excluded by `--exclude` are reported as bucket 8 by pattern, not classified individually — say so.
+Assign every substantive file to one of the eight buckets in SKILL.md ("Classify each substantive file once"). Produce a table: path → bucket → evidence for the call. Files you cannot classify go in a short "needs owner decision" list rather than a guess. Files excluded by `--exclude` are reported as bucket 8 by pattern, not classified individually — say so.
 
 ### B4. Name the confusion sources
 
@@ -140,7 +142,7 @@ Approval must reference the specific map, not the idea. "Yes, run the map as wri
 
 ## D. Execute mode
 
-Execute has two subtypes. Use **D0–D7** when files move. Use **D8** when the approved work changes only navigation/current-state records or separately authorized factual instruction text. Do not create an empty move map for record-only work.
+Execute has three mutation types. Use **D0–D7** when files move. Use **D8–D9** for approved record-only work, with D9 applying when the editor is connector- or web-based. Use **D10** for an approved additive incoming package. Do not create an empty move map for record-only or additive work.
 
 ### D0–D7. Staged move protocol
 
@@ -153,7 +155,7 @@ Preconditions: an approved literal map, zero collisions, no target over the path
 - Confirm free space ≥ 2× the total size being moved (staging holds a second copy).
 - Confirm no other agent or job is mid-write.
 
-Run `scripts/verify_move.py preflight --map moves.csv`. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
+Run `scripts/verify_move.py preflight --map moves.csv`. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
 
 ### D1. Baseline hashes
 
@@ -163,7 +165,7 @@ Save the baseline to a scratch location **outside** the target root, e.g. `%TEMP
 
 ### D2. Copy to labeled staging
 
-Copy — do not move — into a clearly labeled staging folder, e.g. `<root>/_STAGING_<timestamp>/`. Mirror each target's path relative to the move map's common target root; do not flatten staging to basenames, because same-named files from different folders would collide. The baseline records the common target root used by `verify --stage`. The staging name must make it obvious to any agent that arrives mid-operation that this is transient.
+Copy — do not move — into a clearly labeled staging folder, e.g. `_STAGING_<timestamp>/`. Prefer a location on the same volume but **outside** any OneDrive/SharePoint-synced root: staging inside a synced root uploads a complete second copy that other agents and org search will index as a duplicate tree. If staging must live inside the root, say so in the report and remove it as soon as D5 passes. Mirror each target's path relative to the move map's common target root; do not flatten staging to basenames, because same-named files from different folders would collide. The baseline records the common target root used by `verify --stage`. The staging name must make it obvious to any agent that arrives mid-operation that this is transient.
 
 ### D3. Verify staging
 
@@ -180,6 +182,8 @@ This is consistent with normal consent practice rather than an exception to it: 
 ### D5. Verify final
 
 `scripts/verify_move.py verify --baseline <scratch>/baseline.json`
+
+Final verify also fails when a source file still exists: a verified target plus a surviving source is a copy, which is the dual-tree state this protocol prevents. Use `--allow-source-present` only when the approved plan was explicitly a copy.
 
 Report count moved, count verified, any mismatch. Nonzero exit means the run is incomplete — say so plainly rather than reporting success with a caveat.
 
@@ -210,6 +214,61 @@ Use this subtype for an approved literal list of factual corrections where no fi
 5. Re-hash the changed files and verify the intended facts directly. Search for the specific stale or contradictory claims the correction was meant to remove or label; absence must be measured, not assumed.
 6. Verify protected authority and instruction files are byte-identical except for any instruction file explicitly approved in step 1. For an approved instruction edit, verify that only the named factual text changed and that behavioral rules, authority, scope, permissions and read order remain intact.
 7. If a required journal write occurs after these checks, guard it independently and verify the appended entry. Do not present the journal hash as proof that earlier shared records remained unchanged.
+
+
+### D9. Connector-safe record editing
+
+Use D9 only when the user approved exact files and factual changes and the connector or web editor can expose the complete current document. A connector cannot execute moves because hydration, local path length, source hashes and staging are unavailable; that limitation does not prohibit a guarded record-only patch.
+
+1. **Declare the access route.** Name the service, editor, target URL/path, and which local checks remain unavailable.
+2. **Capture a service guard.** Prefer ETag, version ID, modified time, content hash, or a full-text fingerprint. Record the expected document title/header and the exact context around every patch.
+3. **Re-read immediately before writing.** If the guard changed, another writer is active. Rebase the approved factual patch on the new complete document; never force an older copy back.
+4. **Require full document state.** A viewport, preview, search snippet, or virtualized DOM fragment is not the document. If the complete document cannot be obtained, stop and provide the exact patch for manual application.
+5. **Patch exact context.** Every expected old fragment must match exactly once. Zero matches or multiple matches is a safe stop. Avoid broad replacement and whole-file regeneration when a narrow patch is possible.
+6. **Never use keyboard-only Home/End insertion in a virtualized editor.** It can target the first rendered tile rather than the real document boundary. Use the editor's complete document model, a provider API with concurrency control, or stop.
+7. **Save once, then reopen.** Do not treat a save toast or successful click as proof. Reopen the canonical file and verify:
+   - expected title/header is first and unchanged;
+   - section order is intact;
+   - the marker count is exactly one for every new marker;
+   - intended stale text is absent or explicitly labeled;
+   - neighboring text was not joined, duplicated, deleted or reordered;
+   - required links and backticked paths still resolve where measurable;
+   - protected authority/instruction records are unchanged outside approval.
+8. **Rollback or stop.** If verification fails and provider version history offers a known pre-write version, restore only with authorization appropriate to that system. Otherwise stop, preserve the observed state, and report the exact repair needed. Never improvise a second broad edit.
+
+Record-only connector work is incomplete until the reopened file passes every applicable check.
+
+### D10. Additive intake
+
+Use D10 only after approval of an exact destination and expected-file manifest. The destination must already be classified by the project as incoming, unreviewed, inbox, or quarantine material.
+
+1. Record the exact destination, filenames, expected sizes or hashes when available, and the source-system provenance to preserve.
+2. Create a new destination; do not merge into accepted evidence, authority, production data, or an existing package unless that exact merge was separately approved.
+3. Label the package non-governing and candidate-only. State its duplicate-control, privacy and review gates.
+4. Minimize data. Prefer internal pointers and redacted extracts. Exclude unnecessary customer names, addresses, contact details, signatures, payment links, account data, design identifiers and unrelated plans.
+5. Keep unknown values null. Use exact / likely same family / no result / verified absent / inaccessible rather than converting uncertainty into absence or independence.
+6. Group email, attachment, revision, invoice, benchmark and summary records into one claim family until independence is proved.
+7. Upload the approved manifest once. Multi-file selection may finish partially: wait for completion, reopen the destination, and compare every expected filename, count, size and hash available. Do not retry the whole batch until partial success is ruled out.
+8. Update navigation and journals only if approved or required by project instructions, using D8 or D9 independently. An additive package does not authorize edits to controls.
+
+Close additive execution with:
+
+```
+ADDITIVE VERIFICATION
+- Destination:                    <exact path>
+- Expected files:                 N
+- Files visibly present:          N/N
+- Sizes / hashes verified:        N/N or NOT AVAILABLE
+- Duplicate filenames created:    0
+- Existing files overwritten:     0
+- Non-governing label verified:   yes
+- Privacy exclusions verified:    yes
+- Accepted / authority changed:   none
+- Navigation/journal updates:     <verified list or none>
+- Unverified / out of scope:      <list, or "none">
+```
+
+Any missing file, unexplained duplicate, overwrite, or unapproved control change makes the additive run incomplete.
 
 ---
 
