@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
       - name: Install validation dependency
@@ -27,11 +27,18 @@ jobs:
 
       - name: Resolve version
         id: ver
+        env:
+          # Passed through the environment, never interpolated into the script,
+          # so a crafted dispatch input cannot inject shell.
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_VERSION"
           else
             VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Refusing non-semver version: $VERSION"; exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
@@ -75,8 +82,8 @@ jobs:
             --output /tmp/identifier_validation.py
           python /tmp/validate_plugin.py .
 
-      - name: Run package checks
-        run: python -m unittest tests/test_package.py -v
+      - name: Run all regression and parity tests
+        run: python -m unittest discover -s tests -v
 
       - name: Validate skill frontmatter
         run: |
@@ -175,6 +182,9 @@ jobs:
           (cd build/portable && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-portable.zip" .)
           (cd build/openai && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-openai.zip" multi-agent-folder-cleanup)
           (cd build/claude && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-claude.zip" multi-agent-folder-cleanup)
+          # Skill-only upload shape (Claude.ai, Opal, other skill uploaders): the
+          # skill folder and nothing else at the ZIP root.
+          (cd build/portable && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-skill.zip" multi-agent-folder-cleanup)
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
 
           echo "--- built ---"
@@ -189,6 +199,10 @@ jobs:
           unzip -q "dist/multi-agent-folder-cleanup-$VERSION-portable.zip" -d /tmp/x/portable
           unzip -q "dist/multi-agent-folder-cleanup-$VERSION-openai.zip" -d /tmp/x/openai
           unzip -q "dist/multi-agent-folder-cleanup-$VERSION-claude.zip" -d /tmp/x/claude
+          mkdir -p /tmp/x/skill
+          unzip -q "dist/multi-agent-folder-cleanup-$VERSION-skill.zip" -d /tmp/x/skill
+          test "$(ls -A /tmp/x/skill)" = "multi-agent-folder-cleanup" || { echo "skill zip has extra top-level entries"; exit 1; }
+          test -f /tmp/x/skill/multi-agent-folder-cleanup/SKILL.md
 
           test -f /tmp/x/portable/multi-agent-folder-cleanup/SKILL.md
           test -f /tmp/x/openai/multi-agent-folder-cleanup/.codex-plugin/plugin.json
@@ -205,7 +219,7 @@ jobs:
           echo "All packages extract and run"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: packages-${{ steps.ver.outputs.version }}
           path: dist/
