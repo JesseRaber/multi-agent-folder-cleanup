@@ -52,6 +52,7 @@ All findings remain advisory. The helpers never select authority, move files, pr
 - More credential-name hints: `*.pem`, `*.key`, `*.pfx`, `*.p12`, `*.kdbx`, `*.ppk`, `*.jks`, `id_ed25519`, `id_ecdsa`, `.netrc`, `.git-credentials`.
 - Documentation: removed dead `SKILL.md §3/§4` references; preflight now runs before baseline everywhere; staging is recommended outside synced roots; the Claude.ai upload instructions no longer contradict the package layout; checksum steps include Windows `Get-FileHash`.
 - Release and CI: new `-skill.zip` asset (the skill folder only) for Claude.ai and other skill uploaders; a Windows CI job runs the full suite with PowerShell 7 plus a Windows PowerShell 5.1 junction smoke test; actions are pinned by commit SHA; the dispatch version input is passed through the environment and validated as semver.
+- `audit_folder.ps1` relativizes paths against the walk's own spelling of the root. On Windows, enumerated paths can carry expanded 8.3 short names (`RUNNER~1` → `runneradmin`), which previously added a bogus leading folder to every path, overstated max depth by one, and skipped the root-level instruction-file conflict warning. Found by the new Windows CI job's full-report parity test.
 - `claude plugin validate` was run against `plugin.json` and `marketplace.json` on 2026-09-23 and passed, resolving the v1.1.0 "not verified" note.
 
 ## Validation
