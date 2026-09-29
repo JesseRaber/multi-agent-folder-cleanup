@@ -98,6 +98,17 @@ if ($RootFull.Length -gt 3 -or $RootFull -notmatch '^[A-Za-z]:[\\/]$') {
     if ($RootFull -ne '/') { $RootFull = $RootFull.TrimEnd('\', '/') }
 }
 if (-not (Test-Path -LiteralPath $RootFull -PathType Container)) { throw "Root is not a directory: $RootFull" }
+# The walk's own spelling of the root. On Windows, .NET can hand back
+# enumerated paths with 8.3 short names expanded (C:\Users\RUNNER~1 becomes
+# C:\Users\runneradmin), so Substring($RootFull.Length) would cut the wrong
+# number of characters and push every file one bogus folder deeper. Take the
+# prefix from what enumeration actually returns; Get-RootTail accepts either.
+$RootDirInfo = [System.IO.DirectoryInfo]::new($RootFull)
+$RootWalk = $RootDirInfo.FullName
+try {
+    $firstEntry = $RootDirInfo.EnumerateFileSystemInfos() | Select-Object -First 1
+    if ($firstEntry) { $RootWalk = [System.IO.Path]::GetDirectoryName($firstEntry.FullName) }
+} catch { }
 
 $InstructionNames = @(
     'agents.md', 'claude.md', 'readme.md', 'readme_first.md', 'read_me_first.md',
@@ -145,9 +156,17 @@ function Test-NoiseSegment([string]$seg) {
 }
 
 function Write-Section($t) { Write-Host ""; Write-Host "== $t ==" -ForegroundColor Cyan }
-function Get-RelSlash($full) { $full.Substring($RootFull.Length).TrimStart('\', '/').Replace('\', '/') }
+function Get-RootTail([string]$full) {
+    foreach ($prefix in @($RootWalk, $RootFull)) {
+        if ($prefix -and $full.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $full.Substring($prefix.Length).TrimStart('\', '/').Replace('\', '/')
+        }
+    }
+    return $full.Replace('\', '/')
+}
+function Get-RelSlash($full) { Get-RootTail $full }
 function Get-Short($full) {
-    $tail = $full.Substring($RootFull.Length).TrimStart('\', '/').Replace('\', '/')
+    $tail = Get-RootTail $full
     if ($tail) { './' + $tail } else { '.' }
 }
 
@@ -334,7 +353,7 @@ $reparseDirs = [System.Collections.Generic.List[System.IO.DirectoryInfo]]::new()
 $emptyFolders = [System.Collections.Generic.List[System.IO.DirectoryInfo]]::new()
 $unreadableDirs = [System.Collections.Generic.List[object]]::new()
 $walk = [System.Collections.Generic.Stack[System.IO.DirectoryInfo]]::new()
-$walk.Push([System.IO.DirectoryInfo]::new($RootFull))
+$walk.Push($RootDirInfo)
 while ($walk.Count) {
     $dir = $walk.Pop()
     try { $entries = @($dir.EnumerateFileSystemInfos()) }
@@ -344,7 +363,7 @@ while ($walk.Count) {
         $unreadableDirs.Add([pscustomobject]@{ Path = $dir.FullName; Why = $inner.GetType().Name })
         continue
     }
-    if ($entries.Count -eq 0 -and $dir.FullName -ne $RootFull) { $emptyFolders.Add($dir) }
+    if ($entries.Count -eq 0 -and -not [object]::ReferenceEquals($dir, $RootDirInfo)) { $emptyFolders.Add($dir) }
     foreach ($e in $entries) {
         if ($e -is [System.IO.DirectoryInfo]) {
             $allFolderItems.Add($e)
