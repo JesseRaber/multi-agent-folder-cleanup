@@ -209,6 +209,8 @@ class FullReportParityTests(unittest.TestCase):
     """DS#8: the two helpers must print the same report, apart from the
     Windows-only placeholder section and the flag spelling."""
 
+    maxDiff = None  # print the whole report diff when CI fails on another platform
+
     def test_reports_match_line_for_line(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
