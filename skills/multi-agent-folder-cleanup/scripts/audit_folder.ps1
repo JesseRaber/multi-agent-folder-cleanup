@@ -793,7 +793,7 @@ if ($instr.Count) {
     $instr | ForEach-Object { Write-Host ("  {0:yyyy-MM-dd}  {1}" -f $_.LastWriteTime, (Get-Short $_.FullName)) }
     # Root level only, like audit_folder.py: nested files legitimately scope a subtree.
     $rootAgentFiles = @($instr | Where-Object {
-            $_.Name.ToLower() -ne 'readme.md' -and $_.DirectoryName.TrimEnd('\', '/') -eq $RootFull.TrimEnd('\', '/') })
+            $_.Name.ToLower() -ne 'readme.md' -and -not (Get-RelSlash $_.FullName).Contains('/') })
     if ($rootAgentFiles.Count -gt 1) {
         Write-Host "  Multiple root-level agent-instruction files - check for conflicting scope. Record the conflict; resolve none unilaterally." -ForegroundColor Yellow
     }
