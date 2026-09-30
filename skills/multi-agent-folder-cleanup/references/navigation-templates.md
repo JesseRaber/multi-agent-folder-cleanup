@@ -1,6 +1,6 @@
 # Navigation Templates
 
-Read this only when creating or reviewing navigation files. Never create these during an Audit.
+Read this only when creating or reviewing navigation files. Do not create cleanup navigation during an Audit. Required continuity recording follows the adopted project policy independently.
 
 Shared rules:
 
@@ -8,7 +8,7 @@ Shared rules:
 - **State verification.** Each claim carries `verified` / `unverified` / `superseded`. Agents downstream cannot re-derive this.
 - **No secrets.** No keys, tokens, connection strings, or credential paths — not even redacted placeholders that hint at location.
 - **Relative paths only**, so the tree survives a move or a re-sync.
-- **One authority per topic.** If two files could both answer a question, the navigation must say which one wins.
+- **Route to evidenced authority.** Summarize the adopted rules and their scopes without inventing precedence. Folder placement, status labels and navigation tables do not confer authority.
 
 ---
 
@@ -26,11 +26,11 @@ Shared rules:
 4. `INDEX.md` — full map of the tree
 
 ## Ground rules for agents
-- `authority/` governs. If your analysis conflicts with it, flag the conflict; do not overwrite.
+- Follow the adopted instructions identified in `AUTHORITY.md`; verify their adoption and scope. Folder placement alone does not make a document governing.
 - `backlog/` is proposed, not real. Never cite it as current state.
-- `history/` is superseded. Read for context only.
+- `history/` preserves prior material. Verify which claims were actually superseded; history labels do not retire active decisions.
 - `mirrors/` is read-only and externally owned. Do not modify.
-- New material arrives in `inbox/` and is untriaged until classified.
+- New material arrives in `inbox/` and remains unreviewed until assessed. Classification alone does not adopt it as authority.
 
 Last updated: YYYY-MM-DD
 ```
@@ -69,10 +69,7 @@ Nothing enters "Verified true now" on the strength of a document that says it. O
 | <topic> | `authority/<file>` | <what it does and does not cover> | YYYY-MM-DD |
 
 ## Conflict resolution
-1. Owner direction in `STATUS.md` overrides all documents.
-2. `authority/` overrides `current/`.
-3. `current/` overrides `backlog/` and `history/`.
-4. Anything in `inbox/` carries no authority until classified.
+Follow the host instruction hierarchy, applicable explicit owner directions and established scoped project policies. Link their adoption evidence. `STATUS.md` summarizes current state; it does not create authority. Folder names and classification do not establish precedence or adoption. Record unresolved conflicts without choosing a winner by recency.
 
 ## Known conflicts
 - <doc A> vs <doc B> on <topic> — unresolved, needs owner decision
@@ -119,4 +116,4 @@ The index must describe **final** paths. An index still showing proposed paths m
 `history/handoffs/` — do not treat as current.
 ```
 
-Exactly one master handoff at the root. Every prior handoff moves to `history/handoffs/` with a dated filename. Two live handoffs is the same failure as two live authorities.
+Identify the current handoff and retained sources in navigation. Preserve the established location; moving prior handoffs requires approved paths. Multiple records need clear scope and provenance, not automatic relocation or invented authority.

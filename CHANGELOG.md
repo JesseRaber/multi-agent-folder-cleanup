@@ -4,6 +4,22 @@
 
 - Nothing yet.
 
+## 1.3.0 - 2026-09-30
+
+- Added `verify_move.py review` to render exact CSV/JSON execution pairs, ordinal IDs, raw-map and resolved-pairs SHA-256 digests, map location and row count. Optional proposal receipts identify plans; they do not prove owner approval.
+- Added `--approval` guards to preflight, baseline and verification, and `preflight --baseline` source checks immediately before agent-run movement. New baselines retain map identity; evidence outputs refuse overwrite. Legacy unguarded commands remain supported, but do not meet the updated execution protocol.
+- Required complete proposed navigation patches, staging/removal paths and separated owner choices before approval. No automatic movement engine was added.
+- Replaced automatic target restoration with evidence preservation and reconciliation of intervening contributions before authorized recovery.
+- Clarified evidenced instruction adoption, scoped policies and actual project continuity obligations, including every-request logging and provenance/safe-save fallbacks. Aligned navigation examples so classification and folder names do not create authority.
+- Bundled optional reusable Project Rules 3.0.0 with a separate adoption/merge guide in every skill package. Installing the skill does not adopt or overwrite project policies.
+- Added focused helper regression tests and isolated behavioral evaluations. These address preventable failure modes from inspected wording and one guided Gemini test family; they do not establish universal model/host compatibility.
+
+### Upgrade notes
+
+- New proposals use generated receipts; changing map bytes or relocating the map requires a fresh review/approval. Retained legacy baselines remain verifiable but cannot be receipt-bound retroactively.
+- Use new baseline/receipt filenames; creation refuses existing files to preserve evidence.
+- Source/map checks remain point-in-time; exclusive writers, cloud state and actual authorization must be established separately.
+
 ## 1.2.0 - 2026-09-29
 
 - Added portfolio-root auditing, strict retrieved-path validation, count-scope labels, documentary-versus-operational state, and intentional-pointer versus divergent-control classification.

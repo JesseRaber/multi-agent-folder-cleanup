@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """Move-map verification for multi-agent folder cleanup.
 
-Never moves, copies, or deletes anything. It only reads a move map, hashes
-files, and reports. Exits nonzero on any condition that should stop a move.
+Never moves, copies, or deletes target files. It reads maps, hashes files,
+reports, and creates explicitly requested new proposal/baseline evidence.
+Exits nonzero on any measured condition that should stop a move.
 
 Move map: CSV with `source,target` (header optional) or JSON list of
 {"source": ..., "target": ...}.
 
-    python verify_move.py baseline  --map moves.csv --out /tmp/baseline.json
-    python verify_move.py preflight --map moves.csv --path-threshold 240
-    python verify_move.py verify    --baseline /tmp/baseline.json [--stage DIR]
+    python verify_move.py review --map moves.csv --approval-out /tmp/proposal.json
+    python verify_move.py preflight --map moves.csv --approval /tmp/proposal.json
+    python verify_move.py baseline --map moves.csv --approval /tmp/proposal.json --out /tmp/baseline.json
+    python verify_move.py preflight --map moves.csv --approval /tmp/proposal.json --baseline /tmp/baseline.json
+    python verify_move.py verify --baseline /tmp/baseline.json [--stage DIR] [--approval /tmp/proposal.json]
+
+A proposal receipt identifies a plan; it does not prove owner consent.
+Checks do not lock other writers. Legacy unguarded commands remain supported.
 
 Write the baseline OUTSIDE the folder being reorganized.
 
@@ -25,6 +31,8 @@ leaves the source in place is a dual tree, not a move. Pass
 import argparse
 import csv
 import hashlib
+import html
+import io
 import json
 import os
 import sys
@@ -57,12 +65,11 @@ def _resolve(value, base):
     return os.path.abspath(value if os.path.isabs(value) else os.path.join(base, value))
 
 
-def load_map(path):
+def _parse_map(path, data):
     base = os.path.dirname(os.path.abspath(path))
     if path.lower().endswith(".json"):
         # utf-8-sig: tolerate a byte-order mark from Windows editors.
-        with open(path, encoding="utf-8-sig") as fh:
-            rows = json.load(fh)
+        rows = json.loads(data.decode("utf-8-sig"))
         if isinstance(rows, dict):
             rows = rows.get("pairs") or rows.get("moves") or []
         try:
@@ -76,7 +83,7 @@ def load_map(path):
     pairs = []
     # utf-8-sig: Excel's "CSV UTF-8" writes a BOM, which used to turn the
     # header into a bogus 'U+FEFF + source' pair and fail preflight.
-    with open(path, newline="", encoding="utf-8-sig") as fh:
+    with io.StringIO(data.decode("utf-8-sig"), newline="") as fh:
         for row in csv.reader(fh):
             if len(row) < 2:
                 continue
@@ -87,6 +94,90 @@ def load_map(path):
     if not pairs:
         sys.exit(f"No source,target pairs found in {path}")
     return pairs
+
+
+def pairs_digest(pairs):
+    # Include ordered, resolved paths; raw bytes alone do not bind relative paths.
+    encoded = json.dumps(pairs, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def read_plan(path):
+    path = os.path.abspath(path)
+    with open(path, "rb") as fh:
+        data = fh.read()
+    pairs = _parse_map(path, data)
+    identity = {"schema_version": 1, "map_path": path,
+                "map_sha256": hashlib.sha256(data).hexdigest(),
+                "resolved_pairs_sha256": pairs_digest(pairs), "row_count": len(pairs)}
+    return pairs, identity
+
+
+def load_map(path):
+    return read_plan(path)[0]
+
+
+def check_approval(identity, path):
+    if not path:
+        return
+    with open(path, encoding="utf-8") as fh:
+        receipt = json.load(fh)
+    if not isinstance(receipt, dict) or any(receipt.get(k) != v for k, v in identity.items()):
+        sys.exit("APPROVAL MISMATCH — map bytes, location, resolved paths or row count changed. "
+                 "Stop and obtain approval of a new generated review.")
+
+
+def check_plan_unchanged(path, identity):
+    if read_plan(path)[1] != identity:
+        sys.exit("MAP CHANGED during this check — stop and review again.")
+
+
+def baseline_identity(baseline):
+    identity = baseline.get("map_identity")
+    if identity and (identity.get("row_count") != len(baseline["pairs"]) or
+                     identity.get("resolved_pairs_sha256") != pairs_digest(
+                         [(e["source"], e["target"]) for e in baseline["pairs"]])):
+        sys.exit("BASELINE PLAN MISMATCH — baseline paths differ from its recorded plan.")
+    return identity
+
+
+def check_baseline_sources(path, identity):
+    with open(path, encoding="utf-8") as fh:
+        baseline = json.load(fh)
+    if baseline_identity(baseline) != identity:
+        sys.exit("BASELINE PLAN MISMATCH — use the baseline for this approved plan.")
+    for entry in baseline["pairs"]:
+        src = entry["source"]
+        if not os.path.isfile(src) or sha256(src) != entry["sha256"]:
+            sys.exit(f"SOURCE CHANGED since baseline: {src}. Stop; preserve staging and reconcile.")
+
+
+def markdown_path(value):
+    # HTML code cells preserve backslashes/backticks and escape table delimiters.
+    return "<code>" + html.escape(value).replace("|", "&#124;").replace(
+        "\r", "&#13;").replace("\n", "&#10;") + "</code>"
+
+
+def cmd_review(args):
+    pairs, identity = read_plan(args.map)
+    check_plan_unchanged(args.map, identity)
+    if args.approval_out:
+        # A receipt identifies a proposal; its existence is not human approval.
+        with open(args.approval_out, "x", encoding="utf-8") as fh:
+            json.dump(identity, fh, indent=2)
+            fh.write("\n")
+    print("# PROPOSED move-map review — not yet approved")
+    print(f"Map: {markdown_path(identity['map_path'])}")
+    print(f"SHA-256: {identity['map_sha256']}")
+    print(f"Resolved-pairs SHA-256: {identity['resolved_pairs_sha256']}")
+    print(f"Rows: {identity['row_count']}")
+    print("\n| ID | Source (absolute) | Target (absolute) |")
+    print("|---|---|---|")
+    for number, (src, dst) in enumerate(pairs, 1):
+        print(f"| M{number:03d} | {markdown_path(src)} | {markdown_path(dst)} |")
+    print("\nIDs are ordinal within this exact plan. Owner decisions and non-move patches "
+          "must be reviewed separately. A receipt does not authorize execution.")
+    return 0
 
 
 def common_parent(paths):
@@ -144,7 +235,12 @@ def is_placeholder(path):
 
 
 def cmd_preflight(args):
-    pairs = load_map(args.map)
+    pairs, identity = read_plan(args.map)
+    check_approval(identity, args.approval)
+    if args.baseline:
+        if not args.approval:
+            sys.exit("A pre-move baseline check requires --approval.")
+        check_baseline_sources(args.baseline, identity)
     problems = 0
     target_root = common_parent([t for _, t in pairs])
 
@@ -204,6 +300,7 @@ def cmd_preflight(args):
             print(f"      <- {s}")
         problems += 1
 
+    check_plan_unchanged(args.map, identity)
     if problems:
         print(f"\nPREFLIGHT FAILED — {problems} condition(s) must be resolved before moving.")
         if not can_check:
@@ -223,7 +320,8 @@ def cmd_preflight(args):
 
 
 def cmd_baseline(args):
-    pairs = load_map(args.map)
+    pairs, identity = read_plan(args.map)
+    check_approval(identity, args.approval)
     out = os.path.abspath(args.out)
     source_root = common_parent([s for s, _ in pairs])
     target_root = common_parent([t for _, t in pairs])
@@ -252,8 +350,9 @@ def cmd_baseline(args):
                         "size": os.path.getsize(src), "sha256": digest})
 
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    with open(out, "w", encoding="utf-8") as fh:
-        json.dump({"target_root": target_root, "pairs": entries}, fh, indent=2)
+    check_plan_unchanged(args.map, identity)
+    with open(out, "x", encoding="utf-8") as fh:
+        json.dump({"target_root": target_root, "map_identity": identity, "pairs": entries}, fh, indent=2)
     print(f"Baseline written: {out}  ({len(entries)} files hashed)")
     return 0
 
@@ -261,6 +360,11 @@ def cmd_baseline(args):
 def cmd_verify(args):
     with open(args.baseline, encoding="utf-8") as fh:
         baseline = json.load(fh)
+    identity = baseline_identity(baseline)
+    if args.approval:
+        if not identity:
+            sys.exit("Legacy baseline has no map identity; cannot bind --approval.")
+        check_approval(identity, args.approval)
     entries = baseline["pairs"]
     # Baselines written before target_root was recorded still verify: recompute it.
     target_root = baseline.get("target_root") or common_parent(
@@ -326,20 +430,32 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    r = sub.add_parser("review", help="Render the exact map and optionally save its proposal identity")
+    r.add_argument("--map", required=True)
+    r.add_argument("--approval-out", help="New receipt path; never overwrites an existing file")
+    r.set_defaults(fn=cmd_review)
+
     p = sub.add_parser("preflight"); p.add_argument("--map", required=True)
+    p.add_argument("--approval", help="Receipt identifying the owner-approved review")
+    p.add_argument("--baseline", help="Also require unchanged baselined sources before moving")
     p.add_argument("--path-threshold", type=int, default=240); p.set_defaults(fn=cmd_preflight)
 
     b = sub.add_parser("baseline"); b.add_argument("--map", required=True)
+    b.add_argument("--approval", help="Receipt identifying the owner-approved review")
     b.add_argument("--out", required=True); b.set_defaults(fn=cmd_baseline)
 
     v = sub.add_parser("verify"); v.add_argument("--baseline", required=True)
     v.add_argument("--stage")
+    v.add_argument("--approval", help="Bind verification to the approved plan identity")
     v.add_argument("--allow-source-present", action="store_true",
                    help="Final verify of an approved COPY: do not fail when sources remain.")
     v.set_defaults(fn=cmd_verify)
 
     args = ap.parse_args()
-    sys.exit(args.fn(args))
+    try:
+        sys.exit(args.fn(args))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        sys.exit(f"CHECK FAILED — {exc.__class__.__name__}: {exc}")
 
 
 if __name__ == "__main__":
