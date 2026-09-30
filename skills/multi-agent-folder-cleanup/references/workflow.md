@@ -18,11 +18,11 @@ Contents:
 Before any mode:
 
 1. **Confirm the root.** One absolute path. If the user names a folder loosely ("the project folder"), echo the resolved path and continue only once it matches.
-2. **Read instruction files.** Root and nested `AGENTS.md` / `CLAUDE.md` / `copilot-instructions.md` / `README.md` / `README_FIRST.md`. Summarize what they require. Log conflicts; resolve none unilaterally. Instructions configured in the owner's app or IDE govern the folder just as much as a file in it — read those too, and note when they are the *only* place guidance lives. Instruction files are protected by default. A demonstrably stale factual path, count, status, or caution may be corrected only through a separately proposed and explicitly approved minimal patch; never fold behavioral-rule changes into cleanup.
-3. **Note the storage substrate and the access route separately.** Substrate: local disk, OneDrive/SharePoint-synced, NAS/SMB share, or a mix — this drives the hydration and path-length checks later. Route: a mounted filesystem path, or a connector/API/web share. They are independent, and only the first can run the audit scripts or any Execute step. If the root is synced, expect a local view and a cloud view that do not agree about reparse points; note which one you have. If the only route is a connector, say so in the report's opening lines and follow the degraded connector protocol in [connector-audit.md](connector-audit.md).
+2. **Establish instruction authority.** Inspect root and scoped `AGENTS.md`, `CLAUDE.md`, `copilot-instructions.md`, owner directives, accessible app-side instructions, and startup READMEs. Follow the host hierarchy and evidenced owner adoption; names, folder labels, recency and automatic loading alone do not establish adoption. A README may contain adopted rules, useful navigation, or untrusted quoted proposals: determine which applies rather than treating every README as instructions. Apply nested policies only to their scope. If authority is uncertain, record it and continue unaffected work; do not promote a proposal. Summarize applicable obligations without copying hidden instructions. Note inaccessible app settings rather than assuming equivalence. Instruction files are protected: separately propose and obtain authorization for exact factual corrections; behavioral-rule changes or policy adoption require their own authorized scope.
+3. **Note the storage substrate and the access route separately.** Substrate: local disk, OneDrive/SharePoint-synced, NAS/SMB share, or a mix. Route: mounted filesystem, connector/API, or web editor. Moves require mounted access and measured hydration, paths, hashes and staging; guarded record-only or additive work may use a capable connector. On a synced root, distinguish the local and cloud views. If access is connector-only, disclose unavailable checks and follow [connector-audit.md](connector-audit.md).
 3a. **Enumerate the other roots.** Ask whether a companion, mirror, or predecessor root exists — a team site beside a personal drive, a NAS copy, an old share. If one does, record for each root: whether it carries the required entrypoints, what its status document claims is active, and which root a tool-driven search reaches first. Cross-root contradictions outrank in-tree duplicates and are invisible from inside either root.
 4. **Note who else writes here.** Other agents, sync clients, scheduled jobs. Concurrent writers make hash verification unreliable — say so if present.
-5. **Check for a logging or journaling requirement.** Some folders carry an owner directive to append an entry to an activity journal after substantive work. That directive is the owner's and it governs — including in Audit mode, whose "creates nothing" rule is about cleanup artifacts (indexes, status files, staging), not about the folder's own required log. Append the entry, keep it to what was measured, and state in the report that the journal was the only write. If a folder's logging policy and this skill's mode rules appear to conflict beyond that, record the conflict and ask. If the user explicitly requires read-only work, or the access route cannot append without replacement and immediate verification, do not write; provide the exact owed entry instead. Measure journal size and flag the configured rotation threshold (default 100 KB) without rotating unless approved.
+5. **Discover the actual continuity requirements.** Follow the adopted project's request coverage, session identity, writer ownership, destination, provenance and safe-save requirements; do not assume substantive-only journaling or invent a new logging policy. Required recording applies in Audit and Plan too. Record routine questions when the project requires every request. Preserve populated records and existing paths. A retrospective reconstruction must say when it was recorded and what source it summarizes; related chats are not proven parent/fork lineage. Continuity writes do not authorize cleanup artifacts. If writing is explicitly prohibited, unavailable or unsafe, supply the exact owed checkpoint and disclose the reason. A desire to keep a test pristine is not a safe-save limitation; retain the immutable test baseline and record permitted continuity deltas separately. Never simulate append by replacing a shared record without full-content and coordination safeguards. A timestamp, hash or readback verifies content, not exclusive writer ownership. Flag the configured journal-size threshold (default 100 KB); rotation still requires authorization.
 6. **Check repository state without changing it.** If the root is in a Git worktree, record tracked, modified, and untracked paths that overlap the proposed map. Git operations remain out of scope unless separately authorized; never clean or reset a dirty tree as part of folder organization.
 
 ---
@@ -52,7 +52,7 @@ Run the bundled audit script, or gather equivalently:
 
 Run `--suggest-excludes` first to see the noise clusters, confirm them, then re-run with `--exclude`. Excluded files are still counted and reported by pattern, and the report must say how many were excluded and that they were not classified. Never silently drop them from the totals.
 
-Noise is **not** a deletion target. It goes to `history/` or stays where it is unless the owner separately approves removal naming the paths.
+Noise is **not** a deletion target. Leave it in place or propose an appropriate generated-state location; do not classify it as historical evidence. Moves and removals still need their own approved paths.
 
 ### B2. Verify claims against artifacts
 
@@ -77,7 +77,7 @@ The point of the audit. Typical findings, in rough order of damage:
 - Two or more documents that each look authoritative and disagree
 - An index pointing at paths that no longer exist
 - **Entrypoints the folder's own instructions require, that do not exist.** Read every instruction file — including app-side or tool-side project instructions the owner has configured outside the folder — and check that each file it tells an agent to read is actually on disk. A folder whose instructions open with "first read `README_FIRST.md`, `PROJECT_ROADMAP_STATUS.md` and `CHAT_INDEX.md`" when none of the three exists sends every agent into a guess on its first move. This outranks most duplicate problems: a duplicate makes an agent pick wrong, a missing entrypoint makes it pick blind.
-- **Zero instruction files anywhere in the tree.** If no `AGENTS.md`, `CLAUDE.md`, `README.md` or equivalent exists, all agent guidance lives outside the folder in per-tool settings — invisible to the next agent and unversioned. Report it as a finding even though nothing on disk is wrong.
+- **No discoverable adopted project guidance.** Distinguish absent files from missing adoption evidence or inaccessible app settings. A README alone does not prove either adoption or lack of rules. Report the available guidance, authority evidence and limitations; do not invent external instructions.
 - **One filename, several different documents.** The inverse of a duplicate, and more dangerous: identical copies are at least interchangeable, whereas six different `research_report.md` files mean any citation by filename alone is ambiguous and any grep returns the wrong one. `--hash-files` reports this separately from identical-content groups.
 - **A companion root whose status document names a different root as active.** Two roots, one filename, opposite claims, and nothing inside either one that reveals the conflict. Report which root each declares active, whether the companion has any entrypoints at all, and which one org-wide search reaches first.
 - **An append-only journal too large to read.** Past roughly 100 KB, "read the tail" stops being executable through most access routes. Report the size and propose rotation; do not restructure it in Audit mode.
@@ -120,24 +120,33 @@ Bucket 8 needs a named home or it leaks back into `history/` and gets preserved 
 
 Justify each departure from the user's existing names. If their tree already works, propose fewer changes rather than a prettier scheme.
 
-### C2. Literal move map
+### C2. Exact plan and complete approval package
 
-A table with one row per file or per explicitly enumerated folder. No wildcards.
+Resolve owner choices before building executable rows. Put uncertain disposition, canonical ownership and unsupported historical/redundant labels in a separate decision list; excluded rows are not approved moves. Do not nest an installable archive inside its unpacked skill tree merely for tidiness. Preserve packaging usability and the project's existing vocabulary.
 
-| # | Source (absolute) | Target (absolute) | Bucket | Reason |
-|---|---|---|---|---|
+For moves, enumerate files in a CSV (`source,target`, optional later columns) or JSON map; expand proposed folders to their actual files. No wildcards. Generate the approval view from the exact map using the same parser as preflight:
 
-Then compute and report:
+```bash
+python scripts/verify_move.py review --map /safe/plan/moves.csv \
+  --approval-out /safe/plan/proposal.json > /safe/plan/review.md
+python scripts/verify_move.py preflight --map /safe/plan/moves.csv
+```
 
-- **Collisions:** any two sources mapping to one target — must be zero before approval
-- **Path length:** longest resulting path, and every target over 240 characters
-- **Unmapped files:** anything in the root not appearing in the map, listed explicitly
-- **Untouched by design:** mirrors, archives, instruction files
+Use new session-owned output paths. The generated view contains ordinal row IDs, resolved absolute paths, raw map SHA-256, resolved-pairs SHA-256 and row count. Present that view directly; do not hand-retype a second table. Reasons/classification may be supplied separately keyed to those IDs. A receipt identifies a proposal; creating it is not human approval. Paths containing Markdown delimiters are escaped by the renderer.
 
-### C3. Ask for approval on the map itself
+Include the following in the separately versioned **PROPOSED** approval package before asking:
 
-Approval must reference the specific map, not the idea. "Yes, run the map as written" is approval. "Sounds good" is not — ask again, naming what you would do first.
+- Generated move view and exact map/receipt paths, digests and count; collision, existing-target, missing-source, path-length and hydration results with their measured scope.
+- Untouched files, unmapped files and unresolved decisions; decisions affecting any retained row block execution of that row or the whole plan when dependent.
+- Exact factual patches to navigation/status/handoffs, including warning preservation and full reconciliation of affected current-state claims. Name protected instruction-file patches separately. A promised future rewrite is not an approval package.
+- Exact baseline, staging and evidence locations, staging copy/removal scope, and any source-folder removals. List potentially empty parents by path; an empty folder is not automatically approved for deletion. Disclose any staging inside a synced root.
+- Required continuity writes and their policy source, kept distinct from cleanup approval. Preserve the original test baseline; do not refresh it silently after a run.
 
+### C3. Bind owner approval to the presented package
+
+Record the owner's authorization and its scope in the session record, identifying the generated review's map path, both digests and row count, plus the version/digest of the non-move patch/staging/removal package. Clear approval of the presented package is sufficient; do not demand magic wording or repeat established permission. If scope is ambiguous, ask narrowly before the dependent action.
+
+Use the corresponding proposal receipt as `--approval` after that authorization. The helper checks plan identity, not whether a human actually approved it. Recheck immediately before execution. A changed map, relocated relative map, changed resolved paths or changed non-move patches require a revised review and approval of the changed scope. Approval does not excuse failed safety checks.
 ---
 
 ## D. Execute mode
@@ -155,13 +164,13 @@ Preconditions: an approved literal map, zero collisions, no target over the path
 - Confirm free space ≥ 2× the total size being moved (staging holds a second copy).
 - Confirm no other agent or job is mid-write.
 
-Run `scripts/verify_move.py preflight --map moves.csv`. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
+Run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json`. Unguarded preflight remains available for planning; execution must use the approved receipt. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
 
 ### D1. Baseline hashes
 
-Hash every source file (SHA-256): `scripts/verify_move.py baseline --map moves.csv --out <scratch>/baseline.json`.
+Hash every source file (SHA-256): `scripts/verify_move.py baseline --map moves.csv --approval <scratch>/proposal.json --out <scratch>/baseline.json`. The new baseline records plan identity and resolved pairs; it never overwrites an existing baseline. Keep the receipt and baseline immutable.
 
-Save the baseline to a scratch location **outside** the target root, e.g. `%TEMP%\cleanup-baseline-<timestamp>.json`. Nothing about the audit trail should live inside the folder being reorganized — the script refuses to write it there. Keep the baseline until the session is fully closed out; it is the only way to reconstruct what was where if something goes wrong later.
+Save the baseline to a scratch location **outside** the target root, e.g. `%TEMP%\cleanup-baseline-<timestamp>.json`. Move-map receipts, reviews and recovery baselines belong outside the source/target trees being reorganized; the baseline command refuses an in-tree destination. Required project session logs retain their adopted destination and are recorded as continuity deltas, not moved as test evidence. Keep the baseline until the session is fully closed out; it is the only way to reconstruct what was where if something goes wrong later.
 
 ### D2. Copy to labeled staging
 
@@ -169,11 +178,13 @@ Copy — do not move — into a clearly labeled staging folder, e.g. `_STAGING_<
 
 ### D3. Verify staging
 
-`scripts/verify_move.py verify --baseline <scratch>/baseline.json --stage <staging-dir>`
+`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json --stage <staging-dir>`
 
 Any mismatch or missing file: stop, report, change nothing further.
 
 ### D4. Move — no pause
+
+Immediately before movement, run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json --baseline <scratch>/baseline.json` and recheck the separately approved patches/staging/removal package under adequate writer coordination. This compares plan identity and current source hashes to the baseline. A successful check is point-in-time evidence, not an atomic lock or proof of idle cloud sync. All helpers remain non-mutating against the target; the agent performs the separately authorized moves from the approved baseline's resolved pairs, not a freshly invented or retyped list.
 
 Execute the exact approved list in one uninterrupted pass. **Do not add a discretionary approval pause between already approved paths.** A partially executed move is the dual-tree failure the whole protocol exists to prevent. However, a failed safety check, changed source, missing file, collision, hash mismatch, or newly required action outside the map is a stop condition: preserve staging, stop at the safest recoverable boundary, and report the exact partial state.
 
@@ -181,7 +192,7 @@ This is consistent with normal consent practice rather than an exception to it: 
 
 ### D5. Verify final
 
-`scripts/verify_move.py verify --baseline <scratch>/baseline.json`
+`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json`
 
 Final verify also fails when a source file still exists: a verified target plus a surviving source is a copy, which is the dual-tree state this protocol prevents. Use `--allow-source-present` only when the approved plan was explicitly a copy.
 
@@ -201,7 +212,7 @@ Nothing here deletes user content. If a step seems to require deleting a documen
 
 ### D7. Update navigation
 
-Rewrite `INDEX.md` and any path-bearing navigation to the final paths — never to proposed paths. Update `STATUS.md` and the master handoff with verified facts only. Instruction files remain untouched unless the owner separately approved an exact factual correction under A2; list any such intended edit explicitly in the verification block.
+Apply the exact navigation/current-state patches approved in C2 to the verified final paths. Re-read and coordinate shared writes; preserve warnings and unrelated contributions. If the live context differs, stop the affected patch and reconcile rather than inventing a broader rewrite. Use verified facts only. Cleanup remains incomplete while required post-move navigation is unresolved. Instruction files remain untouched unless the owner separately approved an exact factual correction under A2; list any such intended edit explicitly in the verification block.
 
 ### D8. Record-only Execute
 
@@ -278,6 +289,9 @@ Close every move Execute run with this exact block, filled from measurements rat
 
 ```
 VERIFICATION
+- Approved map SHA-256:        <digest>
+- Resolved-pairs SHA-256:      <digest>
+- Pre-move source check:       passed / failed / NOT CHECKED
 - Files in approved map:        N
 - Files moved:                  N
 - Hash-verified at target:      N
@@ -320,8 +334,8 @@ A record-only run is incomplete if any intended fact is unverified, any stale ta
 ## F. Failure recovery
 
 - **Hash mismatch at staging:** source is being written concurrently, or the copy failed. Do not proceed. Report the specific file.
-- **Hash mismatch at target:** restore that file from staging (staging is still intact at this point — this is why D6 comes last). Report.
-- **Move interrupted:** the folder is now in a dual state. Do not start a new plan. Reconcile first: list every mapped file, determine whether it sits at source, target, or both, and finish or reverse the exact remainder.
+- **Hash mismatch at target:** stop dependent writes and staging cleanup. Preserve the current target and staged recovery evidence within authorized, non-secret scope. Record source/target/staging hashes and partial state, then reconcile intervening contributions with the responsible writer. Never automatically overwrite the target from staging: staging may predate newer work. Restore, merge or reverse only the exact reconciled recovery action within existing authorization; request narrowly scoped approval when recovery would exceed it.
+- **Move interrupted:** preserve staging and reconcile every approved pair against the baseline and any newer contributions. List whether each file is at source, target or both. Resume or reverse only a reconciled authorized remainder; never infer that a rollback may overwrite later edits.
 - **Placeholder discovered mid-move:** a placeholder here means D0's hydration precondition was false, so the environment is not the one the approval assumed. Skip that file and immediately re-check hydration across the *remaining* sources before touching them. If it is isolated, finish the approved remainder and report the one file as unmoved — a completed map minus one known file is a smaller dual state than a map abandoned halfway. If others are also dehydrated, the sync client is actively reclaiming files underneath you and every subsequent hash is untrustworthy: stop at the safest recoverable boundary, preserve staging, and report the exact source/target/staging state of every mapped file. Reconcile before resuming or reversing the approved remainder.
 
 ---
@@ -355,6 +369,6 @@ A record-only run is incomplete if any intended fact is unverified, any stale ta
  concurrent writers that make hashes point-in-time only>
 ```
 
-**Plan report:** proposed tree, literal move map, collision/path-length/unmapped counts, explicit approval request.
+**Plan report:** proposed tree, generated map review with both digests/count and complete C2 patch/staging/removal package, separated owner decisions, measured checks and an approval request tied to that version.
 
 **Execute report:** outcome first, then the verification block matching the move or record-only subtype, then optional follow-up work in a clearly separate section.

@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.2.0` — see `CHANGELOG.md`.
+`1.3.0` — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.2.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.3.0**.
 
 ## Install
 
@@ -60,15 +60,26 @@ skills/multi-agent-folder-cleanup/
   references/connector-audit.md   connector evidence and safe cloud-edit boundaries
   references/portfolio-audit-template.md  multi-project audit matrix
   references/navigation-templates.md
+  references/project-rules/       optional separately adopted rules template
 packaging/                       per-host install docs and release notes
 tests/                           package, regression, and Python/PowerShell parity tests
 .github/workflows/ci.yml         pull-request and main validation
 .github/workflows/release.yml    tagged package build and publication
 ```
 
-The skill folder is the workflow authority. Plugin manifests and release files package it without duplicating the instructions.
+The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
 
-## What v1.2.0 adds
+## What v1.3.0 adds
+
+- Generated move reviews with map/resolved-path digests, approval-receipt guards and baseline source checks before execution.
+- Complete upfront navigation, staging and removal scope; separated unresolved owner choices.
+- Recovery that preserves newer contributions rather than automatically restoring staged copies.
+- Evidenced instruction adoption and actual per-project continuity requirements.
+- An optional [Project Rules 3.0.0 package](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md), included in every install archive. Skill use does not adopt it.
+
+These address preventable failure modes observed in one model/project and inspected workflow wording. They are not proof of model-wide failure or universal safe execution.
+
+## Retained v1.2.0 capabilities
 
 - Portfolio-root audits with count-scope and entrypoint matrices.
 - Strict full-path validation for connector and enterprise-search results.
@@ -95,10 +106,14 @@ python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
   --journal-threshold-kb 100 --detect-pointers \
   --expected-upload-manifest expected-files.csv
 
+python skills/multi-agent-folder-cleanup/scripts/verify_move.py review \
+  --map moves.csv --approval-out proposal.json > review.md
+# After owner approval of that exact review and the complete non-move package:
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py preflight \
-  --map moves.csv --path-threshold 240
+  --map moves.csv --approval proposal.json --path-threshold 240
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
-  --map moves.csv --out /safe/audit/baseline.json
+  --map moves.csv --approval proposal.json --out /safe/audit/baseline.json
+# Recheck with preflight --approval proposal.json --baseline /safe/audit/baseline.json before moving.
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
   --baseline /safe/audit/baseline.json
 ```

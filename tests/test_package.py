@@ -48,7 +48,7 @@ class PackageTests(unittest.TestCase):
 
     def test_reference_links_resolve_and_no_section_numbers(self) -> None:
         # SKILL.md has no numbered sections; "SKILL.md §3" style pointers rot.
-        for doc in sorted((SKILL.parent / "references").glob("*.md")):
+        for doc in sorted((SKILL.parent / "references").rglob("*.md")):
             text = doc.read_text(encoding="utf-8")
             with self.subTest(doc=doc.name):
                 self.assertNotRegex(text, r"SKILL\.md\s*§")

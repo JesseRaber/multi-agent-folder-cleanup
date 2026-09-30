@@ -13,7 +13,7 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.2.0.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.3.0.
 > Read `references/workflow.md` before any Audit, Plan, or Execute run.
 > Never move or delete anything without an explicitly approved move map.
 
@@ -73,7 +73,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.2.0**.
+**Loaded Multi-Agent Folder Cleanup v1.3.0**.
 
 ---
 
@@ -106,3 +106,7 @@ If a downloaded copy of this skill ever disagrees with
 current and the download is not.
 
 MIT licensed - see `LICENSE`.
+
+## Optional project rules
+
+The skill includes `references/project-rules/AGENTS.proposed.md` and `ADOPTION.md`. They are a versioned copyable template and adoption guide, not active project instructions. Installing this skill does not install those rules. For a named project, obtain separate owner adoption and merge existing policies/records as described in the guide.

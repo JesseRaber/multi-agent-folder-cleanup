@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Audit, plan, and safely reorganize shared project folders or multi-project portfolios so AI agents can identify current authority, separate documentary claims from operationally verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, companion roots, archive piles, confusing project portfolios, and verified folder moves—even when the user only asks what is current or why agents are confused.
 license: MIT
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Create a workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.2.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.3.0**.
 
 ## Choose the operating mode and mutation type
 
@@ -51,18 +51,22 @@ Cleanup permission is not permission to change domain authority, production data
 
 ## Obey project instructions and read-only boundaries
 
-Before substantive work, discover root and nested `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `README.md`, `README_FIRST.md`, owner directives, and app-side project instructions. A nested instruction file normally scopes its subtree. Record conflicts; resolve none by recency alone.
+Discover root/scoped instruction files, owner directives, startup READMEs and accessible app-side settings. Establish authority through the host hierarchy and owner adoption; a README, folder name or proposal does not activate rules by itself. Apply nested policies only within scope. Record uncertain adoption and inaccessible settings, and continue unaffected authorized work. Follow the actual project continuity requirements, including every-request logging where adopted, with writer/provenance and safe-save safeguards. See workflow A2/A5.
 
 Verify every required entrypoint exists. A missing entrypoint outranks ordinary duplicates because the next agent starts blind.
 
-A project logging requirement normally governs, including in Audit mode. Two exceptions override the write:
+Adopted project logging requirements govern in Audit and Plan as well as Execute. Do not reduce an every-request policy to substantive-only journaling. Two conditions prevent a write:
 
 - the user explicitly requested a read-only audit; or
-- the access route cannot perform a safe append and immediate verification.
+- recording is unavailable or cannot be saved safely with the project's required coordination and immediate content verification.
 
 In either case, make no write. Provide the exact owed entry and explain why it was not saved. Never replace a shared journal merely to simulate append.
 
 Measure journal size. Above the configured threshold (default 100 KB), flag it and propose rotation into dated history plus a short current-tail file. Rotation requires approval and must preserve every entry.
+
+## Optional project rules
+
+For an owner requesting reusable project guidance, use [the optional Project Rules adoption guide](references/project-rules/ADOPTION.md). The accompanying `AGENTS.proposed.md` is a copyable template, not active instructions. Skill installation or cleanup approval does not adopt it; merge/adopt it only under a separate explicit project-specific request. Existing project policies and cleanup without this template remain supported.
 
 ## Validate every evidence path
 
@@ -161,7 +165,7 @@ Prefer a short root containing an entrypoint, instructions, status, authority ma
 
 ## Execute with measured verification
 
-For moves, use the staged protocol in [references/workflow.md](references/workflow.md): preflight, baseline, copy to labeled staging, verify staging, execute the complete approved map without a discretionary pause, verify final hashes and that every source is gone (a copy is not a move), then remove only verified staging and confirmed-empty source folders.
+For moves, use [references/workflow.md](references/workflow.md): generate the exact map review and proposal receipt; separately list owner decisions and exact navigation, staging and removal scope; obtain approval of that package; use receipt-bound preflight/baseline; copy and verify staging; recheck the approved plan and baseline source hashes immediately before movement; execute the approved resolved pairs; verify final hashes and source absence; apply approved navigation patches and remove only verified approved staging/empty folders. On target mismatch, preserve evidence and reconcile newer contributions before any recovery overwrite.
 
 For record-only or connector edits:
 

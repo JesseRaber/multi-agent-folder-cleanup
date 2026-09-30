@@ -106,6 +106,9 @@ jobs:
       - name: Compile Python scripts
         run: python3 -m compileall -q skills/multi-agent-folder-cleanup/scripts tests
 
+      - name: Run regression and parity tests
+        run: python3 -m unittest discover -s tests -v
+
       - name: Parse PowerShell script
         shell: pwsh
         run: |
@@ -209,6 +212,27 @@ jobs:
           test -f /tmp/x/openai/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup/agents/openai.yaml
           test -f /tmp/x/claude/multi-agent-folder-cleanup/.claude-plugin/plugin.json
           test -f /tmp/x/claude/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup/SKILL.md
+
+          # Every packaged skill file, including optional rules, must match source.
+          python3 - <<'EOF'
+          from pathlib import Path
+          source = Path('skills/multi-agent-folder-cleanup')
+          roots = [Path('/tmp/x/portable/multi-agent-folder-cleanup'),
+                   Path('/tmp/x/skill/multi-agent-folder-cleanup'),
+                   Path('/tmp/x/openai/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup'),
+                   Path('/tmp/x/claude/multi-agent-folder-cleanup/skills/multi-agent-folder-cleanup')]
+          files = [p for p in source.rglob('*') if p.is_file()
+                   and '__pycache__' not in p.parts and p.suffix != '.pyc']
+          for root in roots:
+              expected = {p.relative_to(source) for p in files}
+              actual = {p.relative_to(root) for p in root.rglob('*') if p.is_file()}
+              if actual != expected:
+                  raise SystemExit(f'Packaged skill file list differs: {root}')
+              for p in files:
+                  if (root / p.relative_to(source)).read_bytes() != p.read_bytes():
+                      raise SystemExit(f'Packaged bytes differ: {root / p.relative_to(source)}')
+          print(f'All {len(files)} skill files match source in all four packages')
+          EOF
 
           if find /tmp/x -name __pycache__ | grep -q .; then
             echo "__pycache__ leaked into a package"; exit 1

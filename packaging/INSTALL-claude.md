@@ -76,7 +76,7 @@ A loaded skill answers with **Mode: Audit** on the first line and offers a
 read-only inventory before proposing anything. If it starts suggesting a folder
 tree immediately, the skill did not load.
 
-The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v1.2.0**.
+The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v1.3.0**.
 
 Portfolio smoke test:
 
@@ -113,3 +113,7 @@ If this copy ever disagrees with
 current and this download is not.
 
 MIT licensed - see `LICENSE`.
+
+## Optional project rules
+
+The skill includes `references/project-rules/AGENTS.proposed.md` and `ADOPTION.md`. They are a versioned copyable template and adoption guide, not active project instructions. Installing this skill does not install those rules. For a named project, obtain separate owner adoption and merge existing policies/records as described in the guide.

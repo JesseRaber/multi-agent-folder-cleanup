@@ -59,13 +59,27 @@ pwsh -File scripts/audit_folder.ps1 -Root <portfolio> `
 
 Journal reporting flags journal-like files at or above the threshold. Entrypoint checks are grounded only in the direct root. Portfolio mode reports immediate children and root-level counts without determining authority. Pointer detection is conservative and advisory. An expected-upload manifest may be a line list or CSV with `path` and optional `size` and `sha256`; it verifies listed files but authorizes nothing.
 
-## Verify an approved move map
+## Review and verify a move map
 
 ```bash
-python scripts/verify_move.py preflight --map moves.csv --path-threshold 240
-python scripts/verify_move.py baseline --map moves.csv --out /safe/audit/baseline.json
-python scripts/verify_move.py verify --baseline /safe/audit/baseline.json --stage /safe/staging
-python scripts/verify_move.py verify --baseline /safe/audit/baseline.json
+python scripts/verify_move.py review --map /safe/plan/moves.csv \
+  --approval-out /safe/plan/proposal.json > /safe/plan/review.md
+# Planning preflight may be unguarded. After owner approval of the generated view:
+python scripts/verify_move.py preflight --map /safe/plan/moves.csv --approval /safe/plan/proposal.json
+python scripts/verify_move.py baseline --map /safe/plan/moves.csv \
+  --approval /safe/plan/proposal.json --out /safe/plan/baseline.json
+python scripts/verify_move.py verify --baseline /safe/plan/baseline.json \
+  --approval /safe/plan/proposal.json --stage /safe/staging
+# Immediately before the agent performs the approved moves:
+python scripts/verify_move.py preflight --map /safe/plan/moves.csv \
+  --approval /safe/plan/proposal.json --baseline /safe/plan/baseline.json
+python scripts/verify_move.py verify --baseline /safe/plan/baseline.json --approval /safe/plan/proposal.json
 ```
 
-Run preflight first; `baseline` refuses a missing source. Relative map paths resolve against the map file's folder. Final `verify` fails while any source still exists (a copy is not a move); pass `--allow-source-present` only for an approved copy. Treat nonzero verification as a stop condition. Run preflight with Windows-native Python for OneDrive; elsewhere hydration remains unchecked. Keep the baseline outside source and target trees. Staging mirrors final relative paths so same-named files cannot overwrite each other.
+`review` renders CSV or JSON through the same parser used by preflight/baseline. It prints the map's absolute location, raw-byte SHA-256, ordered resolved-pairs SHA-256, row count and ordinal row IDs. Relative paths resolve against the map file's folder, not the current directory. Both digests and that location bind the proposal; relocating a relative map requires a new review even if the raw bytes match. Review output is a proposal, not permission; record the actual owner authorization separately.
+
+`--approval` rejects changed bytes, location, resolved pairs or count. New baselines retain that identity. `preflight --baseline` additionally checks current source hashes and requires `--approval`; use it before moving, not after a partial move. Baselines and proposal receipts use exclusive creation and never overwrite prior evidence. Unguarded preflight/baseline and legacy baseline verification remain supported for earlier callers; they do not satisfy the new skill execution contract. A legacy baseline cannot be bound to a receipt after the fact.
+
+The helpers do not move files, prove human consent, guard separately proposed content patches, lock other writers, or verify cloud idle/sync state. Checks are point-in-time. Recheck changed scope and reconcile partial runs before resuming. Do not regenerate a receipt to bypass a mismatch. Final verify fails while any source remains; `--allow-source-present` is only for an approved copy. Preserve staging on failure and reconcile newer targets before authorized recovery.
+
+Run Windows-native preflight for OneDrive; elsewhere hydration remains unchecked. Keep proposal/review/baseline outputs outside the trees being moved, using new session-owned paths. Staging mirrors final relative paths. Required project continuity records keep their adopted location.
