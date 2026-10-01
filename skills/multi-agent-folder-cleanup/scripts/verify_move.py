@@ -38,6 +38,8 @@ import os
 import sys
 from collections import Counter, defaultdict
 
+VERSION = "1.4.0"  # must equal SKILL.md metadata.version
+
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 
 
@@ -428,6 +430,7 @@ def main():
     _safe_stdout()
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"verify_move.py {VERSION}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     r = sub.add_parser("review", help="Render the exact map and optionally save its proposal identity")

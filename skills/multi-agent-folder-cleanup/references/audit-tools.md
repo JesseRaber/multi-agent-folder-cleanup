@@ -39,6 +39,58 @@ Coverage is disclosed, never assumed. A directory the helper cannot read is list
 
 These are structural findings, not authority decisions. A suggested exclusion is not permission to remove. A claim-name match is a file to open, not a current-state verdict. A credential-name match is a warning, not proof of a secret. Identical hashes do not select a canonical copy. A reparse point is skipped, not assessed; check the cloud view separately.
 
+## Check the helper version first
+
+```bash
+python scripts/audit_folder.py --version     # audit_folder.py 1.4.0
+python scripts/verify_move.py --version      # verify_move.py 1.4.0
+pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.4.0
+```
+
+Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
+
+## Keep the report small (v1.4)
+
+```bash
+python scripts/audit_folder.py --root <root> --brief \
+  --entrypoint AGENTS.md --entrypoint AI_CONTEXT/PROJECT_QUICK_CONTEXT.md \
+  --index-coverage AI_CONTEXT/SESSION_INDEX.md=AI_CONTEXT/SESSIONS \
+  --host-root 'C:\Users\me\OneDrive - Org\Projects\Thing'
+python scripts/audit_folder.py --root <root> --hash-files --out /safe/outside/report.txt
+```
+
+```powershell
+pwsh -File scripts/audit_folder.ps1 -Root <root> -Brief `
+  -EntryPoint 'AGENTS.md','AI_CONTEXT/PROJECT_QUICK_CONTEXT.md' `
+  -IndexCoverage 'AI_CONTEXT/SESSION_INDEX.md=AI_CONTEXT/SESSIONS'
+pwsh -File scripts/audit_folder.ps1 -Root <root> -HashFiles -Out C:\Temp\report.txt
+```
+
+- `--brief` caps every list at 10 lines (duplicate groups at 3 paths).
+- `--out FILE` writes the full report to a new file outside the root and prints only **Summary** and **Findings at a glance**. Read the glance block first, then open only the sections it points to. The file is never overwritten.
+- Every report ends with **Findings at a glance**: counts only, never a verdict.
+- `--entrypoint` doubles as the **startup read set**: list the project's read order. The helper totals it with the root auto-loaded instruction files and flags a total above `--read-budget-kb` (default 40) and any `AGENTS.md` over 32 KiB (Codex's default `project_doc_max_bytes`).
+- `--index-coverage INDEX=DIR` lists files directly in `DIR` that `INDEX` never mentions by filename, URL-encoded filename or embedded UUID.
+- `--host-root` measures path length as host root + relative path. Use it whenever the folder is mounted under a different prefix than the one OneDrive or Windows enforces.
+
+## Large roots and time limits
+
+- `--suggest-excludes` collapses recurring generated names (`**/__pycache__/**`, `**/node_modules/**`) and reports a Python environment (`pyvenv.cfg`, or three or more `*.dist-info` folders, as left by `pip --target`) as one cluster.
+- `--prune-noise` does not descend into high-confidence generated state: `.git`, `node_modules`, `__pycache__`, virtual environments, `site-packages`, tool caches, browser profiles and the inside of a detected Python environment. Pruned folders are listed and their contents are in no count; say so. Folders named `logs`, `build`, `dist` or `cache` are always walked because they can hold real material.
+- `--max-seconds N` stops the walk and reports how many queued directories were never visited. Use it when the shell enforces a time limit, then narrow the root or add `--prune-noise`.
+- Lists print relative paths; scratch working copies are counted but not listed under claims.
+
+## Know the access route before you run anything
+
+| Route | Shell | Typical limits | Hydration check |
+|---|---|---|---|
+| Windows desktop agent (Codex, Claude Code, Antigravity) | PowerShell and/or Python on Windows | None beyond the agent's own timeout | Yes, with `audit_folder.ps1` or Windows Python |
+| Cloud agent linked to a Windows PC through a bridge | Often Linux over a mounted copy | Per-command time cap; background jobs may be killed; PowerShell may be absent | No; report it as unchecked |
+| Cloud sandbox with uploaded files | Linux | Files are a snapshot, not the live folder | No |
+| Connector or web listing only | None | See [connector-audit.md](connector-audit.md) | No |
+
+Record which route ran, the helper version, the flags, and which checks are therefore unavailable.
+
 ## v1.2 advisory checks
 
 ```bash

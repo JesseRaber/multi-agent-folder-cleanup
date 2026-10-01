@@ -4,6 +4,39 @@
 
 - Nothing yet.
 
+## 1.4.0 - 2026-10-01
+
+Changes come from a read-only scan of an 18-project shared portfolio used by Claude, Codex, Antigravity/Gemini and other agents (findings in the owner's project records, 2026-10-01).
+
+### Token and time efficiency
+
+- Split `references/workflow.md` into `preconditions.md`, `audit-mode.md`, `plan-mode.md`, `execute-moves.md` and `execute-records.md`. `workflow.md` is now a short router; section labels (A1–G) are unchanged. An Audit run reads about 15 KB instead of 35 KB.
+- `audit_folder.py` / `audit_folder.ps1`: `--brief` / `-Brief` caps every list at 10 lines; `--out` / `-Out` writes the full report to a new file outside the root and prints only Summary and the new **Findings at a glance** block. Every report now ends with that block.
+- Suggested exclusions collapse recurring names to one `**/name/**` pattern and report a Python environment (`pyvenv.cfg`, or three or more `*.dist-info` folders, as from `pip --target`) as one cluster. Previously a 1.3 GB vendored install produced 20 fragment patterns and was never named.
+- `--prune-noise` / `-PruneNoise` leaves high-confidence generated state unwalked and lists it; `--max-seconds` / `-MaxSeconds` stops the walk and discloses unvisited directories. Both are reported as coverage gaps.
+- Lists print relative paths; scratch working copies are counted but not listed as claims.
+
+### Multi-agent checks
+
+- **Startup read set** section: root auto-loaded instruction files plus `--entrypoint` files, totalled against `--read-budget-kb` (default 40).
+- `AGENTS.md` over 32 KiB is flagged: Codex reads 32 KiB by default and drops the rest silently.
+- Instruction files are split into auto-loaded names and README/startup files. Auto-loaded names inside incoming, history, archive, scratch, backup, staging, proposed or skill-copy folders are flagged as live-loading names in non-governing locations.
+- `--index-coverage INDEX=DIR` / `-IndexCoverage` lists files directly in a folder that its index never mentions (by name, URL-encoded name or UUID).
+- **Embedded skill copies** section lists every `SKILL.md` and `.skill` with name and version and counts names with several copies.
+- **Possible orphaned temporary files** section: Info-ZIP `zi??????` temp names, Office `~$` files, LibreOffice locks, `.tmp`/`.temp`/`.partial`/`.crdownload`, and extensionless files with archive magic bytes (8-byte read; cloud-only placeholders are skipped).
+- `--host-root` / `-HostRoot` measures path length as the real host path plus the relative path, for folders mounted under another prefix. The report states what it measured against.
+- `--version` on `audit_folder.py` and `verify_move.py`, `-Version` on `audit_folder.ps1`; a test pins all three to the SKILL.md version so mixed installs are detectable.
+
+### Parity and packaging
+
+- PowerShell sorts with ordinal composite keys so ties and punctuation order exactly like Python; unified "... and N more" wording, identical-group header and per-group overflow lines. A new parity suite compares full reports with every new option, `--brief`/`--prune-noise`, and `--out` summaries.
+- Release builds two more assets: `-gemini-apps.zip` (skill without `audit_folder.ps1`, `agents/openai.yaml` and `references/project-rules/`, which the Gemini Apps uploader rejects) and `-project-rules.zip`.
+
+### Behavior changes to review when upgrading
+
+- Report section changes: path-length lines are relative and preceded by `Measured against:`; "Instruction files found" lists auto-loaded names and README files separately; new sections appear in every report. Scripts that parse the old text may need updating.
+- Links to `references/workflow.md` still resolve, but it is now a router; read `preconditions.md` and the mode file.
+
 ## 1.3.0 - 2026-09-30
 
 - Added `verify_move.py review` to render exact CSV/JSON execution pairs, ordinal IDs, raw-map and resolved-pairs SHA-256 digests, map location and row count. Optional proposal receipts identify plans; they do not prove owner approval.

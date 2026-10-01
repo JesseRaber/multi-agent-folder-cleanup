@@ -22,7 +22,8 @@ VERIFY_MOVE = SKILL_ROOT / "scripts/verify_move.py"
 class V12FeatureTests(unittest.TestCase):
     def test_guidance_covers_observed_failure_modes(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        workflow = (SKILL_ROOT / "references/workflow.md").read_text(encoding="utf-8")
+        workflow = "\n".join(p.read_text(encoding="utf-8")
+                             for p in sorted((SKILL_ROOT / "references").glob("*.md")))
         connector = (SKILL_ROOT / "references/connector-audit.md").read_text(encoding="utf-8")
         portfolio = (SKILL_ROOT / "references/portfolio-audit-template.md").read_text(encoding="utf-8")
         combined = "\n".join((skill, workflow, connector, portfolio)).lower()

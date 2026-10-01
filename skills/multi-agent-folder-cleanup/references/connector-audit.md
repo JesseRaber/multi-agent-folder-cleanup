@@ -52,9 +52,9 @@ Classify each pair as identical duplicate, intentional pointer, divergent compet
 
 ## Connector-safe execution
 
-For record-only changes, use `workflow.md` D9. Do not edit from a search snippet or virtualized viewport. Require complete current document state, a service version/fingerprint, exact-context matching, and reopen-after-save verification.
+For record-only changes, use D9 in [execute-records.md](execute-records.md). Do not edit from a search snippet or virtualized viewport. Require complete current document state, a service version/fingerprint, exact-context matching, and reopen-after-save verification.
 
-For additive intake, use `workflow.md` D10. Upload only the approved manifest to an incoming/quarantine location. Wait for completion and reopen the folder: multi-file uploads may succeed partially. Compare filenames and counts before any retry.
+For additive intake, use D10 in [execute-records.md](execute-records.md). Upload only the approved manifest to an incoming/quarantine location. Wait for completion and reopen the folder: multi-file uploads may succeed partially. Compare filenames and counts before any retry.
 
 ## Privacy and claim-family handling
 

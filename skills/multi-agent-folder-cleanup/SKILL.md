@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Audit, plan, and safely reorganize shared project folders or multi-project portfolios so AI agents can identify current authority, separate documentary claims from operationally verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, companion roots, archive piles, confusing project portfolios, and verified folder moves—even when the user only asks what is current or why agents are confused.
 license: MIT
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Create a workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.3.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.4.0**.
 
 ## Choose the operating mode and mutation type
 
@@ -29,7 +29,7 @@ Execute has three mutation types:
 2. **Record-only execution** — approved exact factual patches to navigation/current-state records; connector or web editing is allowed only when the complete current document can be guarded, patched, reopened, and verified.
 3. **Additive-intake execution** — approved creation of a new non-governing incoming/quarantine package; it never promotes, replaces, moves, or overwrites existing authority.
 
-Read [references/workflow.md](references/workflow.md) before any run. Read [references/audit-tools.md](references/audit-tools.md) when a filesystem is mounted. Read [references/connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search, or web listings. Read [references/portfolio-audit-template.md](references/portfolio-audit-template.md) when the root contains multiple projects. Read [references/navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files.
+Read [references/preconditions.md](references/preconditions.md) before any run, then only the file for the mode: [audit-mode.md](references/audit-mode.md), [plan-mode.md](references/plan-mode.md), [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md). Read [references/audit-tools.md](references/audit-tools.md) when a filesystem is mounted. Read [references/connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search, or web listings. Read [references/portfolio-audit-template.md](references/portfolio-audit-template.md) when the root contains multiple projects. Read [references/navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files.
 
 ## Keep authorization narrow
 
@@ -51,7 +51,7 @@ Cleanup permission is not permission to change domain authority, production data
 
 ## Obey project instructions and read-only boundaries
 
-Discover root/scoped instruction files, owner directives, startup READMEs and accessible app-side settings. Establish authority through the host hierarchy and owner adoption; a README, folder name or proposal does not activate rules by itself. Apply nested policies only within scope. Record uncertain adoption and inaccessible settings, and continue unaffected authorized work. Follow the actual project continuity requirements, including every-request logging where adopted, with writer/provenance and safe-save safeguards. See workflow A2/A5.
+Discover root/scoped instruction files, owner directives, startup READMEs and accessible app-side settings. Establish authority through the host hierarchy and owner adoption; a README, folder name or proposal does not activate rules by itself. Apply nested policies only within scope. Record uncertain adoption and inaccessible settings, and continue unaffected authorized work. Follow the actual project continuity requirements, including every-request logging where adopted, with writer/provenance and safe-save safeguards. See preconditions A2/A5.
 
 Verify every required entrypoint exists. A missing entrypoint outranks ordinary duplicates because the next agent starts blind.
 
@@ -121,9 +121,9 @@ A divergent control artifact—authority map, exclusion register, schema, allowl
 
 ## Inventory against artifacts, not names
 
-With a mounted filesystem, run the deterministic helper described in [references/audit-tools.md](references/audit-tools.md). With connector-only access, follow [references/connector-audit.md](references/connector-audit.md) and disclose the downgrade.
+With a mounted filesystem, run the deterministic helper described in [references/audit-tools.md](references/audit-tools.md). First confirm `--version` equals this skill's version; a mismatch is a mixed install whose documented checks may not exist. Prefer `--brief` or `--out` and read **Findings at a glance** before any detail section. With connector-only access, follow [references/connector-audit.md](references/connector-audit.md) and disclose the downgrade.
 
-Inventory substantive documents, archives, handoffs, transcripts, datasets, scripts, outputs, mirrors, generated state, duplicate groups, required entrypoints, indexes in both directions, reparse points, case-mismatched references, and credential-name hints.
+Inventory substantive documents, archives, handoffs, transcripts, datasets, scripts, outputs, mirrors, generated state, duplicate groups, required entrypoints, indexes in both directions, reparse points, case-mismatched references, and credential-name hints. Also measure what makes shared folders expensive or misleading for agents: the startup read set (flag `AGENTS.md` over 32 KiB, which Codex truncates), live-loading instruction names inside incoming/history/scratch folders, embedded skill copies at different versions, orphaned temp files from interrupted writes, and files their index never mentions.
 
 For large roots, let the helper produce exhaustive structural results. Read in full only instructions, authority/current-state claims, handoffs, and representative duplicate candidates. Mark all metadata-only classifications explicitly.
 
@@ -165,7 +165,7 @@ Prefer a short root containing an entrypoint, instructions, status, authority ma
 
 ## Execute with measured verification
 
-For moves, use [references/workflow.md](references/workflow.md): generate the exact map review and proposal receipt; separately list owner decisions and exact navigation, staging and removal scope; obtain approval of that package; use receipt-bound preflight/baseline; copy and verify staging; recheck the approved plan and baseline source hashes immediately before movement; execute the approved resolved pairs; verify final hashes and source absence; apply approved navigation patches and remove only verified approved staging/empty folders. On target mismatch, preserve evidence and reconcile newer contributions before any recovery overwrite.
+For moves, use [references/execute-moves.md](references/execute-moves.md): generate the exact map review and proposal receipt; separately list owner decisions and exact navigation, staging and removal scope; obtain approval of that package; use receipt-bound preflight/baseline; copy and verify staging; recheck the approved plan and baseline source hashes immediately before movement; execute the approved resolved pairs; verify final hashes and source absence; apply approved navigation patches and remove only verified approved staging/empty folders. On target mismatch, preserve evidence and reconcile newer contributions before any recovery overwrite.
 
 For record-only or connector edits:
 
@@ -180,6 +180,6 @@ A successful click, upload selection, or save message is not proof. Verify the r
 
 ## Finish with proof
 
-Close with the matching verification block from [references/workflow.md](references/workflow.md). Report outcome first, measurements second, limitations third, and optional follow-up separately.
+Close with the matching verification block from [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md). Report outcome first, measurements second, limitations third, and optional follow-up separately.
 
 A run is incomplete if any required fact, file, upload, final path, stale-claim removal, protected-file invariant, or concurrent-write conflict remains unverified. Never describe a production system, dataset, or folder as ready solely because cleanup succeeded.

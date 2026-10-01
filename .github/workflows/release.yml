@@ -185,6 +185,20 @@ jobs:
           # Skill-only upload shape (Claude.ai, Opal, other skill uploaders): the
           # skill folder and nothing else at the ZIP root.
           (cd build/portable && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-skill.zip" multi-agent-folder-cleanup)
+          # Gemini Apps skill uploader: rejects .ps1 and .yaml file types and the
+          # nested optional project-rules folder fails its security scan. Same
+          # skill otherwise; the Windows hydration check is unavailable there.
+          mkdir -p build/gemini
+          cp -r "$SRC" build/gemini/multi-agent-folder-cleanup
+          rm -f build/gemini/multi-agent-folder-cleanup/scripts/audit_folder.ps1
+          rm -rf build/gemini/multi-agent-folder-cleanup/agents build/gemini/multi-agent-folder-cleanup/references/project-rules
+          cp LICENSE build/gemini/multi-agent-folder-cleanup/LICENSE.txt
+          find build/gemini -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+          (cd build/gemini && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-gemini-apps.zip" multi-agent-folder-cleanup)
+          # Optional Project Rules on their own, for hosts that cannot take them nested.
+          mkdir -p build/rules
+          cp -r "$SRC/references/project-rules" build/rules/project-rules
+          (cd build/rules && zip -qr "../../dist/multi-agent-folder-cleanup-$VERSION-project-rules.zip" project-rules)
           (cd dist && sha256sum *.zip > SHA256SUMS.txt)
 
           echo "--- built ---"
@@ -230,6 +244,32 @@ jobs:
                       raise SystemExit(f'Packaged bytes differ: {root / p.relative_to(source)}')
           print(f'All {len(files)} skill files match source in all four packages')
           EOF
+
+          mkdir -p /tmp/x/gemini /tmp/x/rules
+          unzip -q "dist/multi-agent-folder-cleanup-$VERSION-gemini-apps.zip" -d /tmp/x/gemini
+          unzip -q "dist/multi-agent-folder-cleanup-$VERSION-project-rules.zip" -d /tmp/x/rules
+          python3 - <<'EOF'
+          from pathlib import Path
+          source = Path('skills/multi-agent-folder-cleanup')
+          gem = Path('/tmp/x/gemini/multi-agent-folder-cleanup')
+          omitted = lambda p: (p.suffix in ('.ps1', '.yaml') or 'project-rules' in p.parts
+                               or p.parts[0] == 'agents')
+          files = [p.relative_to(source) for p in source.rglob('*') if p.is_file()
+                   and '__pycache__' not in p.parts and p.suffix != '.pyc']
+          expected = {p for p in files if not omitted(p)} | {Path('LICENSE.txt')}
+          actual = {p.relative_to(gem) for p in gem.rglob('*') if p.is_file()}
+          if actual != expected:
+              raise SystemExit(f'gemini-apps file list differs: {sorted(map(str, actual ^ expected))}')
+          for p in expected - {Path('LICENSE.txt')}:
+              if (gem / p).read_bytes() != (source / p).read_bytes():
+                  raise SystemExit(f'gemini-apps bytes differ: {p}')
+          rules = Path('/tmp/x/rules/project-rules')
+          for p in (source / 'references/project-rules').iterdir():
+              if (rules / p.name).read_bytes() != p.read_bytes():
+                  raise SystemExit(f'project-rules bytes differ: {p.name}')
+          print(f'gemini-apps: {len(expected)} files verified; project-rules verified')
+          EOF
+          python3 /tmp/x/gemini/multi-agent-folder-cleanup/scripts/audit_folder.py --root /tmp/tf > /dev/null
 
           if find /tmp/x -name __pycache__ | grep -q .; then
             echo "__pycache__ leaked into a package"; exit 1
