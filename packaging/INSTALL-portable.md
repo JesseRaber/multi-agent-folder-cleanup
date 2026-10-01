@@ -13,8 +13,9 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.3.0.
-> Read `references/workflow.md` before any Audit, Plan, or Execute run.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.4.0.
+> Read `references/preconditions.md` before any run, then only the file for the
+> mode: `audit-mode.md`, `plan-mode.md`, `execute-moves.md` or `execute-records.md`.
 > Never move or delete anything without an explicitly approved move map.
 
 ---
@@ -27,7 +28,8 @@ interface or configured skills directory. For distribution across supported
 ChatGPT and Codex surfaces, use the native `-openai.zip` plugin package.
 
 Custom GPT / Project without a skill ZIP: upload `SKILL.md`,
-`references/workflow.md`, and `references/navigation-templates.md` as knowledge
+`references/preconditions.md`, `references/audit-mode.md`,
+`references/plan-mode.md` and `references/navigation-templates.md` as knowledge
 files and paste the instruction block above.
 
 ---
@@ -73,7 +75,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.3.0**.
+**Loaded Multi-Agent Folder Cleanup v1.4.0**.
 
 ---
 
