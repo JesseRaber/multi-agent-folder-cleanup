@@ -1,6 +1,7 @@
-# Install - Multi-Agent Folder Cleanup (Claude)
+# Install - Multi-Agent Folder Cleanup (Claude Code plugin)
 
-Two ways to install, depending on which Claude surface you use.
+This ZIP is the **Claude Code plugin**. For the Claude app skill uploader, use
+`-UNIVERSAL-skill.zip` instead (section B).
 
 ---
 
@@ -51,18 +52,11 @@ Code install. Report anything that fails.
 
 ---
 
-## B. Claude.ai / Claude app - skill upload
+## B. Claude app - skill upload
 
-Upload the `-skill.zip` asset from the same release. It contains only the
-`multi-agent-folder-cleanup/` skill folder (`SKILL.md`, `agents/`, `scripts/`,
-`references/`) and nothing else, which is the shape the skill uploader expects.
-
-1. Download `multi-agent-folder-cleanup-<version>-skill.zip`.
-2. Settings -> Capabilities -> Skills -> Upload skill.
-
-To build it yourself, zip the folder `skills/multi-agent-folder-cleanup/` so the
-ZIP contains that one folder. Do not upload the `-portable` or `-claude`
-archives: they carry `INSTALL.md`, `LICENSE` and plugin files at the top level.
+Do not upload this ZIP to the Claude app: the uploader rejects plugin manifests
+and a nested `SKILL.md`. Download `multi-agent-folder-cleanup-<version>-UNIVERSAL-skill.zip`
+from the same release and upload it under Settings -> Capabilities -> Skills.
 
 ---
 

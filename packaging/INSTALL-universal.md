@@ -1,7 +1,19 @@
 # Install - Multi-Agent Folder Cleanup
 
-Portable standalone Agent Skill package. Use the separate `-openai.zip` when
-testing or distributing the native ChatGPT and Codex plugin form.
+Universal skill package: the `multi-agent-folder-cleanup/` skill folder, with
+this guide and the license inside it. Use it for every skill uploader or skills
+folder unless the table below names a host-specific package.
+
+| Your AI app | Download |
+|---|---|
+| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, Copilot, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
+| Claude Code `/plugin install` (not the Claude app uploader) | `…-claude-code-plugin.zip` |
+| Codex / ChatGPT plugin marketplace | `…-codex-chatgpt-plugin.zip` |
+| Gemini Apps skill upload | `…-gemini-apps-only.zip` |
+| Opal skill import | `…-opal-only.zip` |
+| Optional Project Rules template only | `…-project-rules-optional.zip` |
+
+Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can use the repository directly.
 
 The folder `multi-agent-folder-cleanup/` **is** the skill. Keep it intact -
 `SKILL.md`, `agents/`, `scripts/`, and `references/` must stay together and keep
@@ -25,7 +37,7 @@ When a host has no native skill loader, paste this into its instructions:
 ChatGPT desktop, Codex CLI, and the Codex IDE extension support standalone
 skills. Install `multi-agent-folder-cleanup/` through the host's Skills
 interface or configured skills directory. For distribution across supported
-ChatGPT and Codex surfaces, use the native `-openai.zip` plugin package.
+ChatGPT and Codex surfaces, use the `-codex-chatgpt-plugin.zip` package.
 
 Custom GPT / Project without a skill ZIP: upload `SKILL.md`,
 `references/preconditions.md`, `references/audit-mode.md`,
@@ -52,13 +64,12 @@ Execute run. The skill says this too; it is the most common way a run goes wrong
 
 ---
 
-## Claude.ai (skill upload)
+## Claude app (skill upload)
 
-Upload the `-skill.zip` asset from the same release (it holds only the
-`multi-agent-folder-cleanup/` folder), or zip that folder on its own, under
-Settings -> Capabilities -> Skills. This portable ZIP itself also carries
-`INSTALL.md` and `LICENSE` at the top level, so do not upload it directly. If you want the Claude Code **plugin** form
-instead, use the `-claude` package from the same release.
+Upload this ZIP as it is: Settings -> Capabilities -> Skills -> Upload skill.
+It holds the one `multi-agent-folder-cleanup/` folder, which is the shape the
+uploader expects. For the Claude Code **plugin** form, use
+`-claude-code-plugin.zip` instead; the Claude app uploader rejects plugin files.
 
 ---
 
@@ -107,7 +118,7 @@ If a downloaded copy of this skill ever disagrees with
 <https://github.com/JesseRaber/multi-agent-folder-cleanup>, the repository is
 current and the download is not.
 
-MIT licensed - see `LICENSE`.
+MIT licensed - see `LICENSE.txt`.
 
 ## Optional project rules
 

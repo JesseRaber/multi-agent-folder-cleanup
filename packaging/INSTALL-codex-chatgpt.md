@@ -1,4 +1,6 @@
-# Install - Multi-Agent Folder Cleanup (ChatGPT and Codex)
+# Install - Multi-Agent Folder Cleanup (Codex / ChatGPT plugin)
+
+For a standalone skill upload instead of a plugin, use `-UNIVERSAL-skill.zip`.
 
 This archive is a native skills-only OpenAI plugin:
 
