@@ -42,12 +42,16 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python scripts/audit_folder.py --version     # audit_folder.py 1.4.0
-python scripts/verify_move.py --version      # verify_move.py 1.4.0
-pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.4.0
+python scripts/audit_folder.py --version     # audit_folder.py 1.4.1
+python scripts/verify_move.py --version      # verify_move.py 1.4.1
+pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.4.1
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
+
+In v1.4.1, credential-name hints, link traversal and detected cloud placeholders block content reads (hashes, archive inspection, pointer/skill/index/manifest reads). Metadata remains counted. These guards do not identify every secret or prove cloud synchronization. Inline Markdown destinations support balanced parentheses and escaped parentheses; reference-style definitions and full CommonMark parsing remain out of scope. Root-only fallback matches are labeled separately rather than silently treated as document-relative links.
+
+Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. Re-review on a different host; never treat receipt equality as cross-device authorization.
 
 ## Keep the report small (v1.4)
 

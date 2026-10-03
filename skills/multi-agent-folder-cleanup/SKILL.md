@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Audit, plan, and safely reorganize shared project folders or multi-project portfolios so AI agents can identify current authority, separate documentary claims from operationally verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, companion roots, archive piles, confusing project portfolios, and verified folder moves—even when the user only asks what is current or why agents are confused.
 license: MIT
 metadata:
-  version: "1.4.0"
+  version: "1.4.1"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Create a workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.4.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.4.1**.
 
 ## Choose the operating mode and mutation type
 
@@ -124,6 +124,8 @@ A divergent control artifact—authority map, exclusion register, schema, allowl
 With a mounted filesystem, run the deterministic helper described in [references/audit-tools.md](references/audit-tools.md). First confirm `--version` equals this skill's version; a mismatch is a mixed install whose documented checks may not exist. Prefer `--brief` or `--out` and read **Findings at a glance** before any detail section. With connector-only access, follow [references/connector-audit.md](references/connector-audit.md) and disclose the downgrade.
 
 Inventory substantive documents, archives, handoffs, transcripts, datasets, scripts, outputs, mirrors, generated state, duplicate groups, required entrypoints, indexes in both directions, reparse points, case-mismatched references, and credential-name hints. Also measure what makes shared folders expensive or misleading for agents: the startup read set (flag `AGENTS.md` over 32 KiB, which Codex truncates), live-loading instruction names inside incoming/history/scratch folders, embedded skill copies at different versions, orphaned temp files from interrupted writes, and files their index never mentions.
+
+Normally execute the helpers and read their reports; load their implementation only when diagnosing, reviewing or changing the code. Blocked content reads are coverage gaps, never evidence that a file is empty or safe.
 
 For large roots, let the helper produce exhaustive structural results. Read in full only instructions, authority/current-state claims, handoffs, and representative duplicate candidates. Mark all metadata-only classifications explicitly.
 

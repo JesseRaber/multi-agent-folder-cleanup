@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.4.0` — see `CHANGELOG.md`.
+`1.4.1` — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.4.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.4.1**.
 
 ## Install
 
@@ -75,6 +75,10 @@ tests/                           package, regression, and Python/PowerShell pari
 ```
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
+
+## What v1.4.1 fixes
+
+Blocks credential-hinted, linked and cloud-only content reads; fixes balanced-parenthesis Markdown links and root-fallback reporting; caps previously uncapped brief lists; rejects linked move paths and baselining placeholders; adds a Windows point-in-time exclusive-read probe. CLI defaults and receipt schema are unchanged. Link checks stop at the audited root, so projects under a linked parent folder still work. See the release notes for verification limits.
 
 ## What v1.4.0 adds
 

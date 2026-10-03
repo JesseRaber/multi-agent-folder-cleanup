@@ -106,7 +106,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.4.0'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.4.1'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -257,6 +257,66 @@ function Test-SecretHintName([string]$name) {
     return $false
 }
 
+function Test-ContentReadAllowed([string]$path) {
+    $cur = [IO.Path]::GetFullPath($path)
+    $inside = $false
+    foreach ($base in @($RootFull, $RootWalk)) {
+        $boundary = $base.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        if ($cur -eq $base -or $cur.StartsWith($boundary, [StringComparison]::OrdinalIgnoreCase)) { $inside = $true }
+    }
+    if (-not $inside) { return $false }
+    $first = $true
+    while ($cur) {
+        # Folders above the chosen root are the owner's location, not traversal.
+        if ($cur.TrimEnd('\', '/') -ieq $RootFull.TrimEnd('\', '/') -or $cur.TrimEnd('\', '/') -ieq $RootWalk.TrimEnd('\', '/')) { break }
+        if (Test-SecretHintName ([IO.Path]::GetFileName($cur))) { return $false }
+        try {
+            $item = Get-Item -LiteralPath $cur -Force -ErrorAction Stop
+            # Cloud-only state matters for the file itself; folders are only
+            # checked for links (OneDrive folders carry recall attributes).
+            if ($item.LinkType -or ($first -and (Test-CloudOnly $item))) { return $false }
+        } catch { return $false }
+        $first = $false
+        $parent = [IO.Path]::GetDirectoryName($cur)
+        if ($parent -eq $cur) { break }
+        $cur = $parent
+    }
+    return $true
+}
+function Assert-ContentRead([string]$path) {
+    if (-not (Test-ContentReadAllowed $path)) { throw 'READ BLOCKED: credential hint, link, or cloud placeholder' }
+}
+function Select-BriefItems {
+    param([Parameter(ValueFromPipeline=$true)]$InputObject)
+    begin { $items = [Collections.Generic.List[object]]::new() }
+    process { $items.Add($InputObject) }
+    end {
+        $items | Select-Object -First (Get-Cap $items.Count)
+        if ($items.Count -gt (Get-Cap $items.Count)) { Write-Line ("  ... and " + ($items.Count - (Get-Cap $items.Count)) + " more") }
+    }
+}
+function Get-MarkdownTargets([string]$text) {
+    foreach ($match in [regex]::Matches($text, '\]\(\s*')) {
+        $start = $match.Index + $match.Length
+        $i = $start
+        if ($i -lt $text.Length -and $text[$i] -eq '<') {
+            $end = $text.IndexOf('>', $i + 1)
+            if ($end -ge 0 -and -not $text.Substring($i, $end - $i).Contains("`n")) { $text.Substring($i, $end - $i + 1) }
+            continue
+        }
+        $depth = 0
+        while ($i -lt $text.Length) {
+            $ch = $text[$i]
+            if ($ch -eq '\' -and $i + 1 -lt $text.Length) { $i += 2; continue }
+            if ($ch -eq '(') { $depth++ }
+            elseif ($ch -eq ')') { if ($depth -eq 0) { break }; $depth-- }
+            elseif ([char]::IsWhiteSpace($ch) -and $depth -eq 0) { break }
+            $i++
+        }
+        if ($i -gt $start -and $depth -eq 0 -and $i -lt $text.Length) { $text.Substring($start, $i - $start) }
+    }
+}
+
 # Same rules as clean_local_reference() in audit_folder.py: <angle target>,
 # optional "title", #fragment, and %XX decoding.
 function Get-CleanReference([string]$value) {
@@ -271,7 +331,7 @@ function Get-CleanReference([string]$value) {
     if ($cleaned.Contains('%')) {
         try { $cleaned = [System.Uri]::UnescapeDataString($cleaned) } catch { }
     }
-    return $cleaned
+    return ($cleaned -replace '\\([()])', '$1')
 }
 
 function Test-ExternalOrNonPath([string]$value) {
@@ -288,8 +348,9 @@ function Test-ExternalOrNonPath([string]$value) {
 # means multi-platform, so report it -- as a review item, not a broken link,
 # because it is not broken on the owner's own machine.
 function Test-CaseExact([string]$full) {
-    $cur = $full
+    $cur = [IO.Path]::GetFullPath($full)
     while ($true) {
+        if ($cur -eq $RootFull -or $cur -eq $RootWalk) { return $true }
         $parent = [System.IO.Path]::GetDirectoryName($cur)
         $leaf = [System.IO.Path]::GetFileName($cur)
         if (-not $parent -or -not $leaf -or $parent -eq $cur) { return $true }
@@ -302,11 +363,16 @@ function Test-CaseExact([string]$full) {
 }
 
 function Get-ResolvedReferencePaths([string]$value, [string]$indexDir) {
-    $candidate = $value.Replace('\', '/').TrimStart('/')
+    $normalized = $value.Replace('\', '/')
+    if ($normalized.StartsWith('//') -or $normalized -match '^[A-Za-z]:/') {
+        if (Test-Path -LiteralPath $normalized) { return $normalized }; return @()
+    }
+    $candidate = $normalized.TrimStart('/')
     $hits = @()
-    foreach ($base in @($indexDir, $RootFull)) {
-        $full = Join-Path $base $candidate
-        if (Test-Path -LiteralPath $full) { $hits += $full }
+    $bases = if ($normalized.StartsWith('/')) { @($RootFull) } else { @($indexDir, $RootFull) }
+    foreach ($base in $bases) {
+        $full = [IO.Path]::GetFullPath((Join-Path $base $candidate))
+        if (Test-Path -LiteralPath $full) { $hits += $full; break }
     }
     return $hits
 }
@@ -319,9 +385,7 @@ function Test-ReferenceCaseMismatch([string]$value, [string]$indexDir) {
 }
 
 function Test-ReferenceResolves([string]$value, [string]$indexDir) {
-    $candidate = $value.Replace('\', '/').TrimStart('/')
-    return ((Test-Path -LiteralPath (Join-Path $indexDir $candidate)) -or
-            (Test-Path -LiteralPath (Join-Path $RootFull $candidate)))
+    return @(Get-ResolvedReferencePaths $value $indexDir).Count -gt 0
 }
 
 # Segment-aware, case-insensitive glob. Identical semantics to glob_regex() in
@@ -372,6 +436,7 @@ function Resolve-InputPath([string]$value) {
 }
 
 function Get-ExpectedManifestRows([string]$path) {
+    Assert-ContentRead $path
     $first = Get-Content -LiteralPath $path -TotalCount 1 -Encoding UTF8 -ErrorAction Stop
     if ($first -match ',' -and $first -match '(?i)path') {
         return @(Import-Csv -LiteralPath $path -Encoding UTF8 | ForEach-Object {
@@ -391,6 +456,7 @@ function Get-ExpectedManifestRows([string]$path) {
 }
 
 function Test-PointerCandidate($file) {
+    if (-not (Test-ContentReadAllowed $file.FullName)) { return $false }
     if ($file.Length -gt 4096) { return $false }
     if (@('.md', '.txt') -notcontains $file.Extension.ToLower()) { return $false }
     try { $text = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 -ErrorAction Stop }
@@ -436,10 +502,12 @@ function Test-HasSegment([string]$relPath, [string]$name) {
     return $false
 }
 function Test-CloudOnly($file) {
-    return [bool](($file.Attributes -band [IO.FileAttributes]::Offline) -or
-        ($file.Attributes.value__ -band 0x40000) -or ($file.Attributes.value__ -band 0x400000))
+    $attrs = [int64]$file.Attributes
+    return [bool](($attrs -band 0x1000) -or ($attrs -band 0x400000) -or
+        (($attrs -band 0x400) -and ($attrs -band 0x40000)))
 }
 function Get-OrphanReason($file) {
+    if (-not (Test-ContentReadAllowed $file.FullName)) { return $null }
     foreach ($rule in $OrphanRules) {
         $hit = if ($rule[2]) { $file.Name -match $rule[0] } else { $file.Name -cmatch $rule[0] }
         if ($hit) { return $rule[1] }
@@ -461,6 +529,7 @@ function Get-OrphanReason($file) {
 }
 function Get-SkillIdentity([string]$path) {
     try {
+        Assert-ContentRead $path
         $fs = [System.IO.File]::OpenRead($path)
         try {
             $buf = New-Object byte[] 8192
@@ -630,7 +699,7 @@ if ($pruned.Count) {
 
 if ($Exclude.Count) {
     Write-Section "Excluded from detail sections (counted, not examined)"
-    foreach ($k in ($excludedCounts.GetEnumerator() | Sort-Ordinal -Key { (Get-DescKey $_.Value) + [char]0 + $_.Key })) {
+    foreach ($k in @($excludedCounts.GetEnumerator() | Sort-Ordinal -Key { (Get-DescKey $_.Value) + [char]0 + $_.Key } | Select-BriefItems)) {
         Write-Line ("  {0,6}  {1}" -f $k.Value, $k.Key)
     }
     Write-Line "  These files were NOT classified. State this in the report." -ForegroundColor Yellow
@@ -683,7 +752,7 @@ ForEach-Object { Write-Line ("  {0,6}  {1}" -f $_.Value, (Get-Short $_.Key)) }
 
 Write-Section "Reparse points not descended (junctions / directory symlinks)"
 if ($reparseDirs.Count) {
-    foreach ($rd in ($reparseDirs | Sort-Ordinal -Key { (Get-Short $_.FullName).ToLower() })) {
+    foreach ($rd in @($reparseDirs | Sort-Ordinal -Key { (Get-Short $_.FullName).ToLower() } | Select-BriefItems)) {
         Write-Line ("  " + (Get-Short $rd.FullName))
         $tgt = @($rd.Target) | Select-Object -First 1
         if (-not $tgt) { $tgt = "<unresolved>" }
@@ -729,9 +798,10 @@ if ($InspectZip) {
     Write-Section "ZIP central directories (no extraction)"
     $memberCap = if ($Brief) { 5 } else { 15 }
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    foreach ($z in ($archives | Where-Object { $_.Extension -eq '.zip' })) {
+    foreach ($z in @($archives | Where-Object { $_.Extension -eq '.zip' } | Select-BriefItems)) {
         Write-Line ("-- " + (Get-Short $z.FullName))
         try {
+            Assert-ContentRead $z.FullName
             $zip = [System.IO.Compression.ZipFile]::OpenRead($z.FullName)
             try {
                 Write-Line ("   entries: " + $zip.Entries.Count)
@@ -797,23 +867,25 @@ if ($HashFiles) {
     $unreadable = [System.Collections.ArrayList]::new()
     $hashes = foreach ($f in $files) {
         try {
+            Assert-ContentRead $f.FullName
             [pscustomobject]@{
                 Path = $f.FullName
                 Name = $f.Name
-                Hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLower()
+                Hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
             }
         }
         catch {
             # Never drop these silently: an unhashed file is a hole in the
             # coverage claim, and on OneDrive it usually means a placeholder
             # or a lock, both of which block an Execute pass.
-            [void]$unreadable.Add($f.FullName)
+            $why = if (Test-ContentReadAllowed $f.FullName) { 'UNREADABLE' } else { 'READ BLOCKED' }
+            [void]$unreadable.Add([pscustomobject]@{ Path = $f.FullName; Why = $why })
         }
     }
 
     if ($unreadable.Count) {
         Write-Section "UNREADABLE - could not hash"
-        $unreadable | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("  " + (Get-Short $_)) }
+        $unreadable | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("  {0,-18} {1}" -f $_.Why, (Get-Short $_.Path)) }
         if ($unreadable.Count -gt (Get-Cap 25)) { Write-Line ("  ... and " + ($unreadable.Count - (Get-Cap 25)) + " more") }
         Write-Line ("  " + $unreadable.Count + " file(s) are not covered by any hash check below. On a synced folder this usually means a cloud placeholder or an open lock. Resolve before any Execute pass.") -ForegroundColor Yellow
     }
@@ -907,7 +979,7 @@ $journalLimit = [int64]$JournalThresholdKB * 1024
 $journals = @($allFiles | Where-Object { $_.Name.ToLower().Contains('journal') -and $_.Length -ge $journalLimit })
 $glance['journals'] = $journals.Count
 if ($journals.Count) {
-    $journals | Sort-Ordinal -Key { (Get-DescKey $_.Length) + [char]0 + (Get-Short $_.FullName).ToLower() } | ForEach-Object {
+    $journals | Sort-Ordinal -Key { (Get-DescKey $_.Length) + [char]0 + (Get-Short $_.FullName).ToLower() } | Select-BriefItems | ForEach-Object {
         Write-Line ("  {0,9}  {1}" -f $_.Length, (Get-Short $_.FullName))
     }
     Write-Line "  Rotation is a proposal only; preserve every entry and require approval."
@@ -916,11 +988,10 @@ else { Write-Line "  none" }
 
 if ($EntryPoint.Count) {
     Write-Section "Expected entrypoints"
-    $missingEntry = 0
-    foreach ($value in $EntryPoint) {
+    $missingEntry = @($EntryPoint | Where-Object { -not (Test-Path -LiteralPath (Resolve-InputPath $_)) }).Count
+    foreach ($value in @($EntryPoint | Select-BriefItems)) {
         $target = Resolve-InputPath $value
         $state = if (Test-Path -LiteralPath $target) { 'PRESENT' } else { 'MISSING' }
-        if ($state -eq 'MISSING') { $missingEntry++ }
         Write-Line ("  {0,-7}  {1}" -f $state, $value)
     }
     Write-Line "  Missing is established against this direct filesystem root only."
@@ -947,7 +1018,7 @@ foreach ($value in $EntryPoint) {
 $readTotal = [int64](($readSet | Measure-Object Size -Sum).Sum)
 $overBudget = $readTotal -gt ([int64]$ReadBudgetKB * 1024)
 if ($readSet.Count) {
-    foreach ($r in $readSet) { Write-Line ("  {0,7:F1} KB  {1}" -f ($r.Size / 1024), $r.Key) }
+    $readSet | Select-BriefItems | ForEach-Object { Write-Line ("  {0,7:F1} KB  {1}" -f ($_.Size / 1024), $_.Key) }
     Write-Line ("  Total: {0:F1} KB (about {1} tokens)" -f ($readTotal / 1024), [int64][Math]::Floor($readTotal / 4))
     if ($overBudget) { Write-Line "  OVER BUDGET: every session pays this before working. Propose a short router plus on-demand detail files; do not delete content." -ForegroundColor Yellow }
 }
@@ -963,7 +1034,7 @@ if ($Portfolio) {
     Write-Line "  Project | Count scope | Root items | Entrypoints present"
     $children = @(Get-ChildItem -LiteralPath $RootFull -Directory -Force -ErrorAction SilentlyContinue | Sort-Ordinal -Key { $_.Name.ToLower() })
     if ($children.Count) {
-        foreach ($child in $children) {
+        foreach ($child in @($children | Select-BriefItems)) {
             $count = @(Get-ChildItem -LiteralPath $child.FullName -Force -ErrorAction SilentlyContinue).Count
             $present = @($checks | Where-Object { Test-Path -LiteralPath (Join-Path $child.FullName $_) })
             $value = if ($present.Count) { $present -join ', ' } else { '(none detected)' }
@@ -978,7 +1049,7 @@ if ($DetectPointers) {
     Write-Section "Possible pointer stubs (advisory; content not authority)"
     $candidates = @($files | Where-Object { Test-PointerCandidate $_ } | Sort-Ordinal -Key { (Get-Short $_.FullName).ToLower() })
     if ($candidates.Count) {
-        $candidates | ForEach-Object { Write-Line ("  " + (Get-Short $_.FullName)) }
+        $candidates | Select-BriefItems | ForEach-Object { Write-Line ("  " + (Get-Short $_.FullName)) }
         Write-Line "  Verify the target exists and that the file contains no independent guidance."
     }
     else { Write-Line "  none" }
@@ -994,31 +1065,40 @@ foreach ($manifestValue in $ExpectedUploadManifest) {
     try { $expected = @(Get-ExpectedManifestRows $manifestPath) }
     catch { Write-Line ("  MANIFEST UNREADABLE: " + $_.Exception.GetType().Name); continue }
     $present = 0; $missing = 0; $sizeBad = 0; $hashBad = 0
+    $script:ManifestDetails = 0
+    function Write-ManifestDetail([string]$message) {
+        $script:ManifestDetails++
+        if (-not $Brief -or $script:ManifestDetails -le 10) { Write-Line $message }
+    }
     foreach ($row in $expected) {
         $target = Resolve-InputPath $row.path
         if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
-            $missing++; Write-Line ("  MISSING        " + $row.path); continue
+            $missing++; Write-ManifestDetail ("  MISSING        " + $row.path); continue
         }
         $present++
         if ($row.size) {
             [int64]$wanted = 0
             if (-not [int64]::TryParse([string]$row.size, [ref]$wanted)) {
-                $sizeBad++; Write-Line ("  BAD SIZE VALUE " + $row.path + " = '" + $row.size + "'")
+                $sizeBad++; Write-ManifestDetail ("  BAD SIZE VALUE " + $row.path + " = '" + $row.size + "'")
             }
             else {
                 $actual = (Get-Item -LiteralPath $target).Length
                 if ($actual -ne $wanted) {
-                    $sizeBad++; Write-Line ("  SIZE MISMATCH  {0} expected={1} actual={2}" -f $row.path, $wanted, $actual)
+                    $sizeBad++; Write-ManifestDetail ("  SIZE MISMATCH  {0} expected={1} actual={2}" -f $row.path, $wanted, $actual)
                 }
             }
         }
         if ($row.sha256) {
-            $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLower()
+            try {
+                Assert-ContentRead $target
+                $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+            } catch { $hashBad++; Write-ManifestDetail ("  HASH UNCHECKED (READ BLOCKED or unreadable) " + $row.path); continue }
             if ($actualHash -ne ([string]$row.sha256).ToLower()) {
-                $hashBad++; Write-Line ("  HASH MISMATCH  " + $row.path)
+                $hashBad++; Write-ManifestDetail ("  HASH MISMATCH  " + $row.path)
             }
         }
     }
+    if ($ManifestDetails -gt (Get-Cap $ManifestDetails)) { Write-Line ("  ... and " + ($ManifestDetails - (Get-Cap $ManifestDetails)) + " more") }
     Write-Line ("  Expected: {0}  Present: {1}  Missing: {2}  Size mismatches: {3}  Hash mismatches: {4}" -f $expected.Count, $present, $missing, $sizeBad, $hashBad)
     Write-Line "  This verifies listed files only; it does not authorize upload, overwrite, or promotion."
 }
@@ -1028,13 +1108,13 @@ foreach ($ip in $IndexPath) {
     Write-Section "Index link check: $ip"
     $idx = Join-Path $RootFull $ip
     if (Test-Path -LiteralPath $idx -PathType Leaf) {
+        if (-not (Test-ContentReadAllowed $idx)) { Write-Line '  READ BLOCKED: index not inspected'; continue }
         # -Encoding UTF8: Windows PowerShell 5.1 otherwise reads BOM-less UTF-8
         # as ANSI and reports every non-ASCII link target as broken.
         $content = Get-Content -LiteralPath $idx -Raw -Encoding UTF8
         if ($null -eq $content) { $content = '' }
-        $mdPattern = '\]\(\s*(<[^>\r\n]+>|[^)\s]+)(?:\s+(?:"[^"]*"|''[^'']*''))?\s*\)'
-        $markdownLinks = @([regex]::Matches($content, $mdPattern) |
-            ForEach-Object { Get-CleanReference $_.Groups[1].Value } |
+        $markdownLinks = @(Get-MarkdownTargets $content |
+            ForEach-Object { Get-CleanReference $_ } |
             Where-Object { -not (Test-ExternalOrNonPath $_) } | Select-Object -Unique)
         $backtickedRefs = @([regex]::Matches($content, '`([^`\r\n]+\.[A-Za-z0-9]{1,8})`') |
             ForEach-Object { Get-CleanReference $_.Groups[1].Value } |
@@ -1048,11 +1128,21 @@ foreach ($ip in $IndexPath) {
         $unresolvedRefs = @($backtickedRefs | Where-Object { -not (Test-ReferenceResolves $_ $idxDir) })
         $brokenTotal += $broken.Count
         Write-Line ("  Markdown links checked: " + $markdownLinks.Count)
+        $fallback = @($markdownLinks | Where-Object {
+            $candidate = $_.Replace('\', '/').TrimStart('/')
+            -not $_.StartsWith('/') -and -not $_.StartsWith('\') -and $_ -notmatch '^[A-Za-z]:' -and
+                -not (Test-Path -LiteralPath (Join-Path $idxDir $candidate)) -and (Test-Path -LiteralPath (Join-Path $RootFull $candidate))
+        })
+        if ($fallback.Count) {
+            Write-Line ("  ROOT-FALLBACK REFERENCES: " + $fallback.Count + " (not document-relative)")
+            $fallback | Select-BriefItems | ForEach-Object { Write-Line "     $_" }
+        }
         if ($broken.Count) {
             Write-Line ("  BROKEN MARKDOWN LINKS: " + $broken.Count) -ForegroundColor Yellow
             $broken | Select-Object -First (Get-Cap $broken.Count) | ForEach-Object { Write-Line "     $_" }
             if ($broken.Count -gt (Get-Cap $broken.Count)) { Write-Line ("     ... and " + ($broken.Count - (Get-Cap $broken.Count)) + " more") }
         }
+        elseif ($fallback.Count) { Write-Line '  document-relative links need repair; see root fallbacks' }
         else { Write-Line "  all Markdown links resolve" }
 
         Write-Line ("  Backticked path references checked: " + $backtickedRefs.Count)
@@ -1068,7 +1158,7 @@ foreach ($ip in $IndexPath) {
             Where-Object { Test-ReferenceCaseMismatch $_ $idxDir })
         if ($caseMismatched.Count) {
             Write-Line ("  CASE-MISMATCHED REFERENCES: " + $caseMismatched.Count + " (review needed)") -ForegroundColor Yellow
-            $caseMismatched | ForEach-Object { Write-Line "     $_" }
+            $caseMismatched | Select-BriefItems | ForEach-Object { Write-Line "     $_" }
             Write-Line "  These resolve only because this filesystem is case-insensitive. They break for an agent on Linux or a case-sensitive volume."
         }
     }
@@ -1088,6 +1178,7 @@ foreach ($pair in $CoveragePairs) {
     $folder = Resolve-InputPath $dirValue
     if (-not (Test-Path -LiteralPath $idx -PathType Leaf)) { Write-Line "  index NOT FOUND: $idxValue"; continue }
     if (-not (Test-Path -LiteralPath $folder -PathType Container)) { Write-Line "  directory NOT FOUND: $dirValue"; continue }
+    if (-not (Test-ContentReadAllowed $idx)) { Write-Line '  READ BLOCKED: coverage index not inspected'; continue }
     $content = Get-Content -LiteralPath $idx -Raw -Encoding UTF8
     if ($null -eq $content) { $content = '' }
     $folderRel = (Get-RelSlash ([System.IO.Path]::GetFullPath($folder))).TrimEnd('/')
@@ -1123,7 +1214,7 @@ $glance['skills'] = @($skills.Count, $multi.Count)
 if ($skills.Count) {
     $skills | Select-Object -First (Get-Cap 40) | ForEach-Object { Write-Line ("  {0}  {1}  {2}" -f $_.Name, $_.Version, (Get-Short $_.Path)) }
     if ($skills.Count -gt (Get-Cap 40)) { Write-Line ("  ... and " + ($skills.Count - (Get-Cap 40)) + " more") }
-    foreach ($g in $multi) {
+    foreach ($g in @($multi | Select-BriefItems)) {
         [string[]]$vers = @($g.Group | ForEach-Object { $_.Version } | Select-Object -Unique)
         [Array]::Sort($vers, [System.StringComparer]::Ordinal)
         Write-Line ("  {0} copies of {1} (versions: {2})" -f $g.Count, $g.Name, ($vers -join ', '))
@@ -1156,9 +1247,9 @@ if ($instr.Count) {
     if ($rootAgentFiles.Count -gt 1) {
         Write-Line "  Multiple root-level agent-instruction files - check for conflicting scope. Record the conflict; resolve none unilaterally." -ForegroundColor Yellow
     }
-    foreach ($mp in $misplaced) { Write-Line ("  LIVE-LOADING NAME IN NON-GOVERNING LOCATION: " + (Get-Short $mp.FullName)) -ForegroundColor Yellow }
+    foreach ($mp in @($misplaced | Select-BriefItems)) { Write-Line ("  LIVE-LOADING NAME IN NON-GOVERNING LOCATION: " + (Get-Short $mp.FullName)) -ForegroundColor Yellow }
     if ($misplaced.Count) { Write-Line "  A host that walks the tree may load these as rules. Propose a non-loading name such as AGENTS.proposed.md; never rename without approval." }
-    foreach ($ov in $oversized) { Write-Line ("  OVER 32 KiB ({0} bytes): {1}" -f $ov.Length, (Get-Short $ov.FullName)) -ForegroundColor Yellow }
+    foreach ($ov in @($oversized | Select-BriefItems)) { Write-Line ("  OVER 32 KiB ({0} bytes): {1}" -f $ov.Length, (Get-Short $ov.FullName)) -ForegroundColor Yellow }
     if ($oversized.Count) { Write-Line "  Codex reads at most 32 KiB of AGENTS.md by default and silently drops the rest. Propose a shorter file that links to on-demand detail." }
 }
 else {
