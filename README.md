@@ -14,22 +14,31 @@ Report as: **Loaded Multi-Agent Folder Cleanup v1.4.1**.
 
 ## Install
 
-Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases):
+Prebuilt packages are attached to each [release](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases). **Which ZIP do I use?**
 
-- `…-openai.zip` — native skills-only plugin for ChatGPT and Codex, with `.codex-plugin/plugin.json`
-- `…-portable.zip` — standalone Agent Skill (with INSTALL.md and LICENSE) for ChatGPT desktop, Codex CLI/IDE, Grok, and compatible local hosts
-- `…-claude.zip` — Claude Code / Claude Desktop plugin layout
-- `…-skill.zip` — the skill folder only, for Claude.ai skill upload and other skill uploaders
-- `…-gemini-apps.zip` — the skill folder for the Gemini Apps skill uploader, without `audit_folder.ps1`, `agents/openai.yaml` and the optional project rules, which that uploader rejects
-- `…-project-rules.zip` — the optional Project Rules template and adoption guide on their own
+| Your AI app | Download |
+|---|---|
+| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, Copilot, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
+| Claude Code `/plugin install` (not the Claude app uploader) | `…-claude-code-plugin.zip` |
+| Codex / ChatGPT plugin marketplace | `…-codex-chatgpt-plugin.zip` |
+| Gemini Apps skill upload | `…-gemini-apps-only.zip` |
+| Opal skill import | `…-opal-only.zip` |
+| Optional Project Rules template only | `…-project-rules-optional.zip` |
 
-Every archive except `-skill.zip` includes its own `INSTALL.md`. Keep the extracted package structure intact.
+Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can use the repository directly.
+
+Host-specific packages leave out what that host rejects:
+
+- `-gemini-apps-only`: no `audit_folder.py`, `audit_folder.ps1`, `agents/openai.yaml` or project rules. Google's upload security scan rejects the audit script's credential-guard code; the package omits it rather than disguising it.
+- `-opal-only`: `SKILL.md` (name and description only in the header) plus `references/*.md`. Opal imports Markdown only, so no scripts.
+
+The universal and plugin packages include an `INSTALL.md`. Keep the extracted structure intact. Releases before v1.5.0 used older names (`-skill`, `-portable`, `-claude`, `-openai`, `-gemini-apps`, `-project-rules`).
 
 ### ChatGPT and Codex
 
 OpenAI distinguishes authoring from distribution: a standalone skill is useful for personal workflows in ChatGPT desktop and Codex, while a plugin is the installable package used to distribute skills across supported ChatGPT and Codex surfaces.
 
-For local development, extract the `-openai.zip`, add its outer folder to a local marketplace, install it, refresh the app, and test it in a new conversation. Publication to the universal plugin directory is a separate OpenAI review step and is not claimed by this repository.
+For local development, extract the `-codex-chatgpt-plugin.zip`, add its outer folder to a local marketplace, install it, refresh the app, and test it in a new conversation. Publication to the universal plugin directory is a separate OpenAI review step and is not claimed by this repository.
 
 For a personal installation in ChatGPT desktop, Codex CLI, or the IDE extension, install the inner `skills/multi-agent-folder-cleanup/` directory as a standalone skill. Its optional OpenAI display metadata lives in `agents/openai.yaml`.
 

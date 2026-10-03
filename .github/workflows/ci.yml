@@ -54,6 +54,8 @@ jobs:
           }
       - name: Run all regression and parity tests
         run: python -m unittest discover -s tests -v
+      - name: Build and verify all install packages
+        run: python3 packaging/build_packages.py "$RUNNER_TEMP/packages" --status "CI check, not published"
 
   windows:
     # The reparse-point, placeholder, PowerShell 5.1 and cp1252 code paths only

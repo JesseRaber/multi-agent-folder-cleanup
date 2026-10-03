@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- Nothing yet.
+- Release ZIPs renamed by audience: `-UNIVERSAL-skill` (replaces `-skill` and `-portable`), `-claude-code-plugin`, `-codex-chatgpt-plugin`, `-gemini-apps-only`, `-opal-only` (new), `-project-rules-optional`. Install guides and README open with a which-ZIP table.
+- New `-opal-only` package: `SKILL.md` with name/description-only frontmatter plus `references/*.md`, no folder entries, matching an Opal export (confirmed by import).
+- `-gemini-apps-only` leaves out `audit_folder.py`, which Gemini Apps' upload security scan rejects in 1.4.1.
+- One packager, `packaging/build_packages.py`, now builds, byte-checks and smoke-tests every archive for both releases and local candidates.
 
 ## 1.4.1 - 2026-10-02
 
