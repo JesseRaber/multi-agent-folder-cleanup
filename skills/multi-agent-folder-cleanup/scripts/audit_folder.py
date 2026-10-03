@@ -44,7 +44,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime
 
-VERSION = "1.4.0"  # must equal SKILL.md metadata.version
+VERSION = "1.4.1"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -69,6 +69,7 @@ NON_GOVERNING_TOKENS = ("incoming", "inbox", "history", "archive", "scratch",
                         "proposed", "skill copies", "superseded")
 
 LIST_CAP_BRIEF = 10
+AUDIT_ROOT = None
 
 # Names that CLAIM current state or authority. These must be opened and
 # verified against artifacts (workflow.md B2) - never trusted from the name.
@@ -161,6 +162,7 @@ def relslash(path, root):
 
 
 def sha256(path):
+    require_content_read(path)
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
@@ -385,6 +387,71 @@ def is_secret_hint_name(name):
                for sep in separators)
 
 
+def content_read_allowed(path):
+    """Fail closed before content I/O; metadata-only discovery is unaffected."""
+    current = os.path.abspath(path)
+    if AUDIT_ROOT:
+        try:
+            if os.path.normcase(os.path.commonpath([current, AUDIT_ROOT])) != os.path.normcase(AUDIT_ROOT):
+                return False
+        except ValueError:
+            return False
+    # Check the file and its folders up to, not including, the chosen root.
+    # Links above the root (a redirected profile, macOS /tmp) are the owner's
+    # choice of location, not traversal out of the audit.
+    stop = os.path.normcase(AUDIT_ROOT) if AUDIT_ROOT else None
+    while True:
+        if stop and os.path.normcase(current) == stop:
+            break
+        if is_secret_hint_name(os.path.basename(current)):
+            return False
+        if os.path.islink(current) or _is_windows_reparse(current):
+            return False
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+    return not _cloud_only(path)
+
+
+def require_content_read(path):
+    if not content_read_allowed(path):
+        raise PermissionError('READ BLOCKED: credential hint, link, or cloud placeholder')
+
+
+def markdown_targets(text):
+    """Inline destinations with balanced parentheses, escapes and angle syntax.
+
+    This is not a full CommonMark parser (reference-style links are not scanned).
+    """
+    for match in re.finditer(r'\]\(\s*', text):
+        start = match.end()
+        i = start
+        angle = i < len(text) and text[i] == '<'
+        if angle:
+            end = text.find('>', i + 1)
+            if end >= 0 and '\n' not in text[i:end]:
+                yield text[i:end + 1]
+            continue
+        depth = 0
+        while i < len(text):
+            char = text[i]
+            if char == '\\' and i + 1 < len(text):
+                i += 2
+                continue
+            if char == '(':
+                depth += 1
+            elif char == ')':
+                if depth == 0:
+                    break
+                depth -= 1
+            elif char.isspace() and depth == 0:
+                break
+            i += 1
+        if i > start and depth == 0 and i < len(text):
+            yield text[start:i]
+
+
 # Any URI scheme (http:, mailto:, file:, onenote:, ...) but not a Windows drive
 # letter such as C:/ - a single letter before the colon is a path.
 URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]+:")
@@ -409,7 +476,7 @@ def clean_local_reference(value):
     value = value.split("#", 1)[0].strip()
     if "%" in value:
         value = urllib.parse.unquote(value)
-    return value
+    return re.sub(r'\\([()])', r'\1', value)
 
 
 def is_external_or_nonpath(value):
@@ -418,12 +485,16 @@ def is_external_or_nonpath(value):
 
 
 def _resolved_paths(value, index_dir, root):
-    candidate = value.replace("\\", "/").lstrip("/")
+    normalized = value.replace("\\", "/")
+    if normalized.startswith('//') or re.match(r'^[A-Za-z]:/', normalized):
+        return [normalized] if os.path.exists(normalized) else []
+    candidate = normalized.lstrip('/')
     hits = []
-    for base in (index_dir, root):
-        full = os.path.join(base, candidate)
+    for base in ((root,) if normalized.startswith('/') else (index_dir, root)):
+        full = os.path.abspath(os.path.join(base, candidate))
         if os.path.exists(full):
             hits.append(full)
+            break  # document-relative target wins, including its casing
     return hits
 
 
@@ -431,7 +502,7 @@ def reference_resolves(value, index_dir, root):
     return bool(_resolved_paths(value, index_dir, root))
 
 
-def case_exact(path):
+def case_exact(path, root=None):
     """True if every segment of `path` matches the on-disk name byte for byte.
 
     os.path.exists is case-insensitive on Windows and on default macOS volumes,
@@ -443,6 +514,8 @@ def case_exact(path):
     """
     path = os.path.abspath(path)
     while True:
+        if root and os.path.normcase(path) == os.path.normcase(os.path.abspath(root)):
+            return True
         parent, name = os.path.split(path)
         if not name or parent == path:
             return True
@@ -456,7 +529,7 @@ def case_exact(path):
 
 def reference_case_mismatch(value, index_dir, root):
     hits = _resolved_paths(value, index_dir, root)
-    return bool(hits) and not any(case_exact(h) for h in hits)
+    return bool(hits) and not any(case_exact(h, root) for h in hits)
 
 
 def _resolve_under_root(value, root):
@@ -465,6 +538,7 @@ def _resolve_under_root(value, root):
 
 def load_expected_manifest(path):
     """Return path plus optional size/sha256 rows; never changes the target."""
+    require_content_read(path)
     with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as fh:
         sample = fh.read(4096)
         fh.seek(0)
@@ -482,6 +556,8 @@ def load_expected_manifest(path):
 
 
 def pointer_candidate(path, size):
+    if not content_read_allowed(path):
+        return False
     if size > 4096 or os.path.splitext(path)[1].lower() not in {".md", ".txt"}:
         return False
     try:
@@ -547,12 +623,16 @@ def has_segment(relpath, name):
 
 def _cloud_only(path):
     try:
-        return bool(os.lstat(path).st_file_attributes & CLOUD_ONLY_ATTRS)
+        attrs = os.lstat(path).st_file_attributes
+        # 0x40000 also means EA on ordinary files; RecallOnOpen is a reparse flag.
+        return bool(attrs & (0x1000 | 0x400000) or (attrs & 0x400 and attrs & 0x40000))
     except (AttributeError, OSError):
         return False
 
 
 def orphan_reason(path, size):
+    if not content_read_allowed(path):
+        return None
     name = os.path.basename(path)
     for rx, why in ORPHAN_TEMP_RULES:
         if rx.search(name):
@@ -577,6 +657,7 @@ SKILL_VERSION_RE = re.compile(r"^\s*version:\s*['\"]?([^'\"\s]+)['\"]?\s*$", re.
 def skill_identity(path):
     """(name, version) from SKILL.md frontmatter; never executes anything."""
     try:
+        require_content_read(path)
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             head = fh.read(8192)
     except OSError:
@@ -733,7 +814,14 @@ def print_summary_only(text, out_path):
 
 
 def run_report(args, root, coverage_pairs):
+    global AUDIT_ROOT
+    AUDIT_ROOT = root
     cap = (lambda n: min(n, LIST_CAP_BRIEF)) if args.brief else (lambda n: n)
+    def limited(items):
+        items = list(items)
+        yield from items[:cap(len(items))]
+        if len(items) > cap(len(items)):
+            print(f"  ... and {len(items) - cap(len(items))} more")
     dup_cap = min(args.dup_group_cap, 3) if args.brief else args.dup_group_cap
     host_base = (args.host_root.rstrip("\\/") if args.host_root else root)
     host_base_len = len(host_base)
@@ -838,7 +926,7 @@ def run_report(args, root, coverage_pairs):
                 if matches_any(rp, [pat]):
                     per_pat[pat] += 1
                     break
-        for pat, c in sorted(per_pat.items(), key=lambda x: (-x[1], x[0])):
+        for pat, c in limited(sorted(per_pat.items(), key=lambda x: (-x[1], x[0]))):
             print(f"  {c:6d}  {pat}")
         print("  These files were NOT classified. State this in the report.")
 
@@ -888,7 +976,7 @@ def run_report(args, root, coverage_pairs):
 
     section("Reparse points not descended (junctions / directory symlinks)")
     if reparse_points:
-        for path, target in sorted(reparse_points, key=lambda x: rel(x[0], root).lower()):
+        for path, target in limited(sorted(reparse_points, key=lambda x: rel(x[0], root).lower())):
             print(f"  {rel(path, root)}")
             print(f"     -> {target or '<unresolved>'}")
         print("  Descendants of these are in NO count in this report.")
@@ -943,11 +1031,12 @@ def run_report(args, root, coverage_pairs):
     if args.inspect_zip:
         section("ZIP central directories (no extraction)")
         member_cap = 5 if args.brief else 15
-        for p, _, _ in archives:
+        for p, _, _ in limited(archives):
             if not p.lower().endswith(".zip"):
                 continue
             print(f"-- {rel(p, root)}")
             try:
+                require_content_read(p)
                 with zipfile.ZipFile(p) as zf:
                     names = zf.namelist()
                     print(f"   entries: {len(names)}")
@@ -1017,7 +1106,7 @@ def run_report(args, root, coverage_pairs):
                 # Never drop these silently: an unhashed file is a hole in the
                 # coverage claim, and on OneDrive it usually means a
                 # placeholder or a lock, both of which block an Execute pass.
-                unreadable.append((p, exc.__class__.__name__))
+                unreadable.append((p, 'READ BLOCKED' if not content_read_allowed(p) else 'UNREADABLE'))
                 continue
             hashes[p] = h
             by_hash[h].append(p)
@@ -1134,7 +1223,7 @@ def run_report(args, root, coverage_pairs):
                 if "journal" in os.path.basename(p).lower() and size >= journal_limit]
     glance["journals"] = len(journals)
     if journals:
-        for path, size in sorted(journals, key=lambda x: (-x[1], rel(x[0], root).lower())):
+        for path, size in limited(sorted(journals, key=lambda x: (-x[1], rel(x[0], root).lower()))):
             print(f"  {size:9d}  {rel(path, root)}")
         print("  Rotation is a proposal only; preserve every entry and require approval.")
     else:
@@ -1143,11 +1232,10 @@ def run_report(args, root, coverage_pairs):
     missing_entrypoints = 0
     if args.entrypoint:
         section("Expected entrypoints")
-        for value in args.entrypoint:
+        missing_entrypoints = sum(not os.path.exists(_resolve_under_root(v, root)) for v in args.entrypoint)
+        for value in limited(args.entrypoint):
             target_path = _resolve_under_root(value, root)
             state = "PRESENT" if os.path.exists(target_path) else "MISSING"
-            if state == "MISSING":
-                missing_entrypoints += 1
             print(f"  {state:7}  {value}")
         print("  Missing is established against this direct filesystem root only.")
         glance["missing_entry"] = missing_entrypoints
@@ -1168,7 +1256,7 @@ def run_report(args, root, coverage_pairs):
     over_budget = read_total > args.read_budget_kb * 1024
     glance["read"] = (read_total, over_budget, bool(read_set))
     if read_set:
-        for key, size in read_set:
+        for key, size in limited(read_set):
             print(f"  {size / 1024:7.1f} KB  {key}")
         print(f"  Total: {read_total / 1024:.1f} KB (about {read_total // 4} tokens)")
         if over_budget:
@@ -1182,7 +1270,7 @@ def run_report(args, root, coverage_pairs):
         rows = portfolio_rows(root, args.entrypoint)
         print("  Project | Count scope | Root items | Entrypoints present")
         if rows:
-            for name, count, present in rows:
+            for name, count, present in limited(rows):
                 value = ", ".join(present) if present else "(none detected)"
                 print(f"  {name} | root-level | {count} | {value}")
         else:
@@ -1194,7 +1282,7 @@ def run_report(args, root, coverage_pairs):
         candidates = sorted((p for p, size, _ in files if pointer_candidate(p, size)),
                             key=lambda q: rel(q, root).lower())
         if candidates:
-            for path in candidates:
+            for path in limited(candidates):
                 print(f"  {rel(path, root)}")
             print("  Verify the target exists and that the file contains no independent guidance.")
         else:
@@ -1212,29 +1300,42 @@ def run_report(args, root, coverage_pairs):
             print(f"  MANIFEST UNREADABLE: {exc.__class__.__name__}")
             continue
         present = missing = size_bad = hash_bad = 0
+        detail_count = 0
+        def detail(message):
+            nonlocal detail_count
+            detail_count += 1
+            if not args.brief or detail_count <= LIST_CAP_BRIEF:
+                print(message)
         for row in expected:
             target_path = _resolve_under_root(row["path"], root)
             if not os.path.isfile(target_path):
                 missing += 1
-                print(f"  MISSING        {row['path']}")
+                detail(f"  MISSING        {row['path']}")
                 continue
             present += 1
             if row["size"]:
                 try:
                     wanted = int(row["size"])
                 except ValueError:
-                    print(f"  BAD SIZE VALUE {row['path']} = {row['size']!r}")
+                    detail(f"  BAD SIZE VALUE {row['path']} = {row['size']!r}")
                     size_bad += 1
                 else:
                     actual = os.path.getsize(target_path)
                     if actual != wanted:
                         size_bad += 1
-                        print(f"  SIZE MISMATCH  {row['path']} expected={wanted} actual={actual}")
+                        detail(f"  SIZE MISMATCH  {row['path']} expected={wanted} actual={actual}")
             if row["sha256"]:
-                actual_hash = sha256(target_path)
+                try:
+                    actual_hash = sha256(target_path)
+                except OSError:
+                    hash_bad += 1
+                    detail(f"  HASH UNCHECKED (READ BLOCKED or unreadable) {row['path']}")
+                    continue
                 if actual_hash.lower() != row["sha256"]:
                     hash_bad += 1
-                    print(f"  HASH MISMATCH  {row['path']}")
+                    detail(f"  HASH MISMATCH  {row['path']}")
+        if detail_count > cap(detail_count):
+            print(f"  ... and {detail_count - cap(detail_count)} more")
         print(f"  Expected: {len(expected)}  Present: {present}  Missing: {missing}  Size mismatches: {size_bad}  Hash mismatches: {hash_bad}")
         print("  This verifies listed files only; it does not authorize upload, overwrite, or promotion.")
 
@@ -1243,11 +1344,14 @@ def run_report(args, root, coverage_pairs):
         section(f"Index link check: {index_path}")
         idx = os.path.join(root, index_path)
         if os.path.isfile(idx):
+            if not content_read_allowed(idx):
+                print('  READ BLOCKED: index not inspected')
+                continue
             with open(idx, "r", encoding="utf-8", errors="replace") as fh:
                 content = fh.read()
             markdown_links = []
-            for match in MARKDOWN_LINK_RE.finditer(content):
-                link = clean_local_reference(match.group(1))
+            for target in markdown_targets(content):
+                link = clean_local_reference(target)
                 if not is_external_or_nonpath(link):
                     markdown_links.append(link)
             markdown_links = list(dict.fromkeys(markdown_links))
@@ -1268,6 +1372,14 @@ def run_report(args, root, coverage_pairs):
             broken_total += len(broken)
 
             print(f"  Markdown links checked: {len(markdown_links)}")
+            fallback = [link for link in markdown_links
+                        if not link.startswith(('/', '\\')) and not os.path.isabs(link)
+                        and not _resolved_paths(link, idx_dir, idx_dir)
+                        and _resolved_paths(link, root, root)]
+            if fallback:
+                print(f"  ROOT-FALLBACK REFERENCES: {len(fallback)} (not document-relative)")
+                for link in limited(fallback):
+                    print(f"     {link}")
             if broken:
                 print(f"  BROKEN MARKDOWN LINKS: {len(broken)}")
                 for b in broken[:cap(len(broken))]:
@@ -1275,7 +1387,8 @@ def run_report(args, root, coverage_pairs):
                 if len(broken) > cap(len(broken)):
                     print(f"     ... and {len(broken) - cap(len(broken))} more")
             else:
-                print("  all Markdown links resolve")
+                print("  document-relative links need repair; see root fallbacks" if fallback
+                      else "  all Markdown links resolve")
 
             print(f"  Backticked path references checked: {len(backticked_refs)}")
             if unresolved_refs:
@@ -1293,7 +1406,7 @@ def run_report(args, root, coverage_pairs):
                                if reference_case_mismatch(r, idx_dir, root)]
             if case_mismatched:
                 print(f"  CASE-MISMATCHED REFERENCES: {len(case_mismatched)} (review needed)")
-                for ref in case_mismatched:
+                for ref in limited(case_mismatched):
                     print(f"     {ref}")
                 print("  These resolve only because this filesystem is case-insensitive. "
                       "They break for an agent on Linux or a case-sensitive volume.")
@@ -1315,6 +1428,9 @@ def run_report(args, root, coverage_pairs):
             continue
         if not os.path.isdir(folder):
             print(f"  directory NOT FOUND: {dir_value}")
+            continue
+        if not content_read_allowed(idx):
+            print('  READ BLOCKED: coverage index not inspected')
             continue
         with open(idx, "r", encoding="utf-8", errors="replace") as fh:
             content = fh.read()
@@ -1359,7 +1475,7 @@ def run_report(args, root, coverage_pairs):
             print(f"  {name}  {version}  {rel(p, root)}")
         if len(skills) > cap(40):
             print(f"  ... and {len(skills) - cap(40)} more")
-        for key in sorted(multi):
+        for key in limited(sorted(multi)):
             versions = ", ".join(sorted(set(multi[key])))
             print(f"  {len(multi[key])} copies of {key} (versions: {versions})")
         print("  Copies inside a project are not installed skills. Hosts that scan "
@@ -1399,12 +1515,12 @@ def run_report(args, root, coverage_pairs):
         if len(roots) > 1:
             print("  Multiple root-level agent-instruction files - check for "
                   "conflicting scope. Record the conflict; resolve none unilaterally.")
-        for p in misplaced:
+        for p in limited(misplaced):
             print(f"  LIVE-LOADING NAME IN NON-GOVERNING LOCATION: {rel(p, root)}")
         if misplaced:
             print("  A host that walks the tree may load these as rules. Propose a "
                   "non-loading name such as AGENTS.proposed.md; never rename without approval.")
-        for p, s in oversized:
+        for p, s in limited(oversized):
             print(f"  OVER 32 KiB ({s} bytes): {rel(p, root)}")
         if oversized:
             print("  Codex reads at most 32 KiB of AGENTS.md by default and silently drops "

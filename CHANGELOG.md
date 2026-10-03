@@ -4,6 +4,15 @@
 
 - Nothing yet.
 
+## 1.4.1 - 2026-10-02
+
+- Content-read guard in both audit helpers: credential-hinted paths, links inside the root and detected cloud placeholders are never opened; blocked reads are not counted as verified hashes.
+- Markdown links: balanced/escaped parentheses, document-relative resolution, root-only fallback disclosed; case checks stop at the audit root.
+- `--brief` caps applied to every detail list.
+- `verify_move.py`: refuses junction/symlink traversal inside the plan, refuses to hash detected placeholders, and runs a Windows exclusive-read preflight that reports sharing violations.
+- Link checks stop at the audited root or the plan's common folder, so projects under a linked parent folder stay usable. Found in review of the candidate.
+- Regression tests added (68 total). CLI defaults and receipt format unchanged.
+
 ## 1.4.0 - 2026-10-01
 
 Changes come from a read-only scan of an 18-project shared portfolio used by Claude, Codex, Antigravity/Gemini and other agents (findings in the owner's project records, 2026-10-01).

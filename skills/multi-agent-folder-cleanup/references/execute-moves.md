@@ -16,6 +16,7 @@ Preconditions: an approved literal map, zero collisions, no target over the path
 - **OneDrive/SharePoint:** verify each source file is hydrated. In PowerShell, `Offline`, `RecallOnOpen`, or `RecallOnDataAccess` indicates a placeholder; `ReparsePoint` alone does not, because hydrated OneDrive files commonly retain it. Hydrate or exclude actual placeholders. Confirm the sync client shows idle. If sync is actively running, stop and wait. Run `verify_move.py preflight` under **Windows-native Python** for this step: elsewhere it prints `NOT CHECKED - needs Windows` rather than a count, and an unverified hydration state is not a passed check — a placeholder moves as a stub and the move then verifies against the wrong bytes.
 - Confirm free space ≥ 2× the total size being moved (staging holds a second copy).
 - Confirm no other agent or job is mid-write.
+- Reject junctions/symlinks in source, target and staging path components. The verifier checks existing components; a later path substitution remains possible, so retain writer coordination and recheck immediately before mutation. Its Windows exclusive-read probe is momentary, not a lease. Do not automatically remove Office lock files to make a check pass.
 
 Run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json`. Unguarded preflight remains available for planning; execution must use the approved receipt. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
 
@@ -62,6 +63,7 @@ Nothing here deletes user content. If a step seems to require deleting a documen
 - Empty source folders left behind are a cosmetic problem. A deleted file is not. When the two trade off, leave the folder.
 - A parent left empty because the move took its last child is not always cosmetic. If its name is confusable with a live folder (`output/` beside `outputs/`), it is a new ambiguity the cleanup created. Name every such parent in the verification block. Remove it only if the approved map named it.
 - On Windows, keep path resolution and any recursive move or cleanup in one PowerShell process. Verify each resolved absolute path remains within the approved root; do not enumerate in PowerShell and hand string-built paths to another shell.
+- Refuse ordinary cleanup through a junction or symlink, including linked ancestors; do not use recursive removal to detach links. Leave the path in place and request a separately reviewed link-specific operation. A successful verifier result never authorizes removal by itself.
 
 ### D7. Update navigation
 

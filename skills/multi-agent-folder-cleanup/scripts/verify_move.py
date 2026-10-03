@@ -35,20 +35,93 @@ import html
 import io
 import json
 import os
+import stat
 import sys
 from collections import Counter, defaultdict
 
-VERSION = "1.4.0"  # must equal SKILL.md metadata.version
+VERSION = "1.4.1"  # must equal SKILL.md metadata.version
 
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 
 
+SAFE_STOP = None  # common folder of the plan; set before any hashing
+
+
+def plan_stop(paths):
+    try:
+        return os.path.commonpath([os.path.dirname(os.path.abspath(p)) for p in paths])
+    except ValueError:
+        return None  # different drives: check every component
+
+
 def sha256(path):
+    require_safe_path(path, SAFE_STOP)
+    if is_placeholder(path):
+        raise OSError('NOT HYDRATED: refusing content read')
     h = hashlib.sha256()
     with open(path, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def require_safe_path(path, stop=None):
+    """Reject link traversal in existing components below `stop`.
+
+    Components above `stop` (the common folder of the plan) are the owner's
+    chosen location, such as a redirected profile or macOS /tmp. Point-in-time
+    only: this does not lock paths against a later replacement.
+    """
+    current = os.path.abspath(path)
+    stop = os.path.normcase(os.path.abspath(stop)) if stop else None
+    while True:
+        if stop and os.path.normcase(current) == stop:
+            break
+        try:
+            info = os.lstat(current)
+        except FileNotFoundError:
+            pass  # targets may not exist yet; their ancestors still matter
+        else:
+            tag = getattr(info, 'st_reparse_tag', 0)
+            if stat.S_ISLNK(info.st_mode) or tag & 0x20000000:
+                raise OSError('LINK PATH: symlink or junction traversal refused')
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        current = parent
+
+
+def path_problems(pairs):
+    global SAFE_STOP
+    problems = []
+    stop = SAFE_STOP = plan_stop([p for pair in pairs for p in pair])
+    for src, target in pairs:
+        for path in (src, target):
+            try:
+                require_safe_path(path, stop)
+            except OSError as exc:
+                problems.append((path, str(exc)))
+    return problems
+
+
+def windows_read_probe(path):
+    """Momentary exclusive-read probe, not a lease or a guarantee of future access."""
+    if os.name != 'nt':
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    create = kernel.CreateFileW
+    create.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                       wintypes.LPVOID, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    create.restype = wintypes.HANDLE
+    close = kernel.CloseHandle
+    close.argtypes = [wintypes.HANDLE]
+    close.restype = wintypes.BOOL
+    handle = create(path, 0x80000000, 0, None, 3, 0, None)
+    if handle == ctypes.c_void_p(-1).value:
+        raise ctypes.WinError(ctypes.get_last_error())
+    close(handle)
 
 
 def _safe_stdout():
@@ -148,6 +221,8 @@ def check_baseline_sources(path, identity):
         baseline = json.load(fh)
     if baseline_identity(baseline) != identity:
         sys.exit("BASELINE PLAN MISMATCH — use the baseline for this approved plan.")
+    global SAFE_STOP
+    SAFE_STOP = plan_stop([p for e in baseline["pairs"] for p in (e["source"], e["target"])])
     for entry in baseline["pairs"]:
         src = entry["source"]
         if not os.path.isfile(src) or sha256(src) != entry["sha256"]:
@@ -233,12 +308,17 @@ def is_placeholder(path):
     attrs = getattr(st, "st_file_attributes", None)
     if attrs is None:
         return False
-    return any(attrs & bit for bit in CLOUD_ATTRS.values())
+    return bool(attrs & (0x1000 | 0x400000) or (attrs & 0x400 and attrs & 0x40000))
 
 
 def cmd_preflight(args):
     pairs, identity = read_plan(args.map)
     check_approval(identity, args.approval)
+    unsafe = path_problems(pairs)
+    if unsafe:
+        for path, why in unsafe:
+            print(f'  UNSAFE PATH: {path}: {why}')
+        return 1
     if args.baseline:
         if not args.approval:
             sys.exit("A pre-move baseline check requires --approval.")
@@ -259,6 +339,15 @@ def cmd_preflight(args):
     can_check = placeholder_check_available()
     placeholders = ([s for s, _ in pairs if os.path.isfile(s) and is_placeholder(s)]
                     if can_check else [])
+    unavailable = []
+    if os.name == 'nt':
+        for src, _ in pairs:
+            if src in missing or src in placeholders:
+                continue
+            try:
+                windows_read_probe(src)
+            except OSError as exc:
+                unavailable.append(f'{src} (Windows error {exc.winerror})')
 
     source_counts = Counter(os.path.normcase(s).lower() for s, _ in pairs)
     seen = set()
@@ -281,6 +370,8 @@ def cmd_preflight(args):
     else:
         print("  cloud placeholders:       NOT CHECKED - needs Windows")
     print(f"  common target root:       {target_root or 'INCOMPATIBLE ROOTS'}")
+    print(f"  exclusive-read probe:     {len(unavailable)} unavailable (point-in-time)"
+          if os.name == 'nt' else '  exclusive-read probe:     NOT CHECKED - needs Windows')
 
     if target_root is None:
         print("  INCOMPATIBLE TARGET ROOTS: the targets share no common parent, so "
@@ -292,6 +383,7 @@ def cmd_preflight(args):
                          ("TARGET EXISTS", existing_targets),
                          ("PATH TOO LONG", long_paths),
                          ("NOT HYDRATED", placeholders),
+                         ("LOCKED OR UNREADABLE", unavailable),
                          ("DUPLICATED SOURCE", dupe_sources)):
         for i in items:
             print(f"  {label}: {i}")
@@ -324,7 +416,11 @@ def cmd_preflight(args):
 def cmd_baseline(args):
     pairs, identity = read_plan(args.map)
     check_approval(identity, args.approval)
+    unsafe = path_problems(pairs)
+    if unsafe:
+        sys.exit('UNSAFE PATH: ' + '; '.join(f'{path}: {why}' for path, why in unsafe))
     out = os.path.abspath(args.out)
+    require_safe_path(out, os.path.dirname(out))
     source_root = common_parent([s for s, _ in pairs])
     target_root = common_parent([t for _, t in pairs])
     if target_root is None:
@@ -368,6 +464,9 @@ def cmd_verify(args):
             sys.exit("Legacy baseline has no map identity; cannot bind --approval.")
         check_approval(identity, args.approval)
     entries = baseline["pairs"]
+    global SAFE_STOP
+    SAFE_STOP = plan_stop([p for e in entries for p in (e["source"], e["target"])]
+                          + ([os.path.join(os.path.abspath(args.stage), "x")] if args.stage else []))
     # Baselines written before target_root was recorded still verify: recompute it.
     target_root = baseline.get("target_root") or common_parent(
         [e["target"] for e in entries])
