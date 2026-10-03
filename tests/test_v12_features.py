@@ -40,9 +40,12 @@ class V12FeatureTests(unittest.TestCase):
                 self.assertIn(phrase, combined)
 
     def test_skill_contains_all_core_sections_and_complete_ending(self) -> None:
+        # v1.5: cleanup-only sections moved unchanged to references/cleanup-principles.md;
+        # SKILL.md is a router. Each heading must appear exactly once across the two.
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        principles = (SKILL_ROOT / "references/cleanup-principles.md").read_text(encoding="utf-8")
         headings = [
-            "## Choose the operating mode and mutation type",
+            "## Choose the operating mode",
             "## Split mixed-scope requests",
             "## Validate every evidence path",
             "## Audit portfolio roots explicitly",
@@ -55,8 +58,10 @@ class V12FeatureTests(unittest.TestCase):
         ]
         for heading in headings:
             with self.subTest(heading=heading):
-                self.assertEqual(skill.count(heading), 1)
-        self.assertTrue(skill.rstrip().endswith("because cleanup succeeded."))
+                self.assertEqual(skill.count(heading) + principles.count(heading), 1)
+        self.assertTrue(principles.rstrip().endswith("because cleanup succeeded."))
+        self.assertIn("references/work-mode.md", skill)
+        self.assertIn("references/cleanup-principles.md", skill)
 
     def make_fixture(self, root: Path) -> Path:
         (root / "ProjectA/AI_CONTEXT").mkdir(parents=True)

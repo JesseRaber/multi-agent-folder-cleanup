@@ -1,6 +1,6 @@
-# Preconditions — every mode
+# Preconditions — Audit, Plan and Execute
 
-Read this first in every run, then read only the file for your mode: [audit-mode.md](audit-mode.md), [plan-mode.md](plan-mode.md), [execute-moves.md](execute-moves.md) or [execute-records.md](execute-records.md).
+Read this first in every cleanup run (Work mode uses [work-mode.md](work-mode.md) instead), then [cleanup-principles.md](cleanup-principles.md), then only the file for your mode: [audit-mode.md](audit-mode.md), [plan-mode.md](plan-mode.md), [execute-moves.md](execute-moves.md) or [execute-records.md](execute-records.md).
 
 ## A. Preconditions
 
