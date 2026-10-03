@@ -44,7 +44,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime
 
-VERSION = "1.4.1"  # must equal SKILL.md metadata.version
+VERSION = "1.5.0"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -590,7 +590,37 @@ def portfolio_rows(root, expected):
         except OSError:
             root_items = "?"
         present = [x for x in checks if os.path.exists(os.path.join(child.path, x.replace("/", os.sep)))]
-        rows.append((child.name, root_items, present))
+        state = "empty" if root_items == 0 else ("managed" if present else "unmanaged")
+        sdir = os.path.join(child.path, "AI_CONTEXT", "SESSIONS")
+        session_count = 0
+        missing_count = "n/a"
+        if os.path.isdir(sdir):
+            session_names = [n for n in os.listdir(sdir) if n.lower().endswith(".md")]
+            session_count = len(session_names)
+            idx = read_small_text(os.path.join(child.path, "AI_CONTEXT", "SESSION_INDEX.md"))
+            if idx is not None:
+                missing_count = sum(n not in idx and not any(u in idx for u in UUID_RE.findall(n))
+                                    for n in session_names)
+        # Keep portfolio mode bounded: inspect conventional record locations,
+        # never recursively traverse an entire project merely to count hints.
+        pending_dirs = [child.path, os.path.join(child.path, "AI_CONTEXT")]
+        scratch = os.path.join(child.path, "AI_CONTEXT", "scratch")
+        if os.path.isdir(scratch) and not os.path.islink(scratch):
+            pending_dirs.append(scratch)
+            try:
+                pending_dirs.extend(e.path for e in os.scandir(scratch)
+                                    if e.is_dir(follow_symlinks=False))
+            except OSError:
+                pass
+        pending = 0
+        for base in pending_dirs:
+            try:
+                names = [e.name for e in os.scandir(base) if e.is_file(follow_symlinks=False)]
+            except OSError:
+                continue
+            pending += sum(bool(re.search(r"(?i)pending.*(navigation|shared|index)|(navigation|shared).*pending", n))
+                           for n in names)
+        rows.append((child.name, root_items, present, state, session_count, missing_count, pending))
     return rows
 
 def _safe_stdout():
@@ -686,6 +716,378 @@ def host_length(relpath, host_base_len):
     return host_base_len + 1 + len(relpath) if relpath else host_base_len
 
 
+# ---------------------------------------------------------------------------
+# Work-mode helpers (v1.5): --orient and --session-index.
+# Both are read-only like the rest of this script. They read session logs and
+# small navigation files through the same content-read guard, never write to
+# the root, and label modified-time evidence as local and replica-unsafe.
+# ---------------------------------------------------------------------------
+
+SESSION_NAME_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_("
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.md$")
+SESSION_FIELD_RE = re.compile(r"^-\s*(Session ID|Started|Tool/runtime)\s*:\s*(.+?)\s*$", re.MULTILINE)
+TURN_HEAD_RE = re.compile(r"^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$", re.MULTILINE)
+ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?")
+ROOT_STARTUP_NAMES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md")
+SESSION_READ_LIMIT = 1 << 20
+
+
+def parse_iso(value):
+    """Epoch seconds for an ISO-8601 time, or None. Naive times are local."""
+    if not value:
+        return None
+    m = ISO_RE.search(value)
+    if not m:
+        return None
+    text = m.group(0).replace(" ", "T").replace("Z", "+00:00")
+    text = re.sub(r"(\.\d{6})\d+", r"\1", text)
+    text = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", text)
+    try:
+        return datetime.fromisoformat(text).timestamp()
+    except ValueError:
+        return None
+
+
+def fmt_time(epoch):
+    return datetime.fromtimestamp(epoch).astimezone().isoformat(timespec="minutes") if epoch is not None else "unknown"
+
+
+def recorded_time(value):
+    """Never turn a timezone-free recorded value into an invented instant."""
+    match = ISO_RE.search(value or "")
+    if not match or not re.search(r"(?:Z|[+-]\d{2}:?\d{2})$", match.group(0)):
+        return None
+    return parse_iso(match.group(0))
+
+
+def work_activity(session):
+    return fmt_time(session["last_time"]) if session["last_time"] is not None else (
+        fmt_time(session["mtime"]) + " (file mtime; not recorded activity)")
+
+
+def work_path_state(path):
+    try:
+        os.stat(path)
+    except FileNotFoundError:
+        return "NOT FOUND"
+    except OSError:
+        return "UNAVAILABLE"
+    return "present"
+
+
+def duplicate_session_ids(sessions):
+    counts = {}
+    for session in sessions:
+        counts[session["id"]] = counts.get(session["id"], 0) + 1
+    return {sid for sid, count in counts.items() if count > 1}
+
+
+
+def read_small_text(path, limit=SESSION_READ_LIMIT):
+    """Guarded text read; None when blocked or unreadable."""
+    if not content_read_allowed(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read(limit + 1)
+            if len(text) > limit:
+                print(f"  read incomplete (over {limit} characters): {os.path.basename(path)}; not parsed")
+                return None
+            return text
+    except OSError:
+        return None
+
+
+def load_sessions(root, sessions_rel):
+    """Parse session logs directly inside the sessions folder (not recursive)."""
+    sdir = os.path.join(root, *sessions_rel.replace("\\", "/").split("/"))
+    sessions, nonstandard, blocked = [], [], []
+    state = work_path_state(sdir)
+    if state != "present":
+        return sdir, None, nonstandard, [state]
+    if not content_read_allowed(sdir):
+        return sdir, None, nonstandard, ["UNAVAILABLE (read blocked)"]
+    try:
+        names = sorted(os.listdir(sdir))
+    except OSError:
+        return sdir, None, nonstandard, ["UNAVAILABLE (listing failed)"]
+    for name in names:
+        full = os.path.join(sdir, name)
+        if not name.lower().endswith(".md") or not os.path.isfile(full):
+            continue
+        text = read_small_text(full)
+        if text is None:
+            blocked.append(name)
+            continue
+        fields = {k: v for k, v in SESSION_FIELD_RE.findall(text[:4096])}
+        m = SESSION_NAME_RE.match(name)
+        sid = fields.get("Session ID") or (m.group(5) if m else "")
+        uid = UUID_RE.search(sid or name)
+        if not uid:
+            nonstandard.append(name + " (no session UUID; not treated as a session log)")
+            continue
+        sid = uid.group(0).lower()
+        tool = fields.get("Tool/runtime") or (m.group(3) if m else "unknown")
+        tool = tool.split("(")[0].strip() or "unknown"
+        topic = m.group(4).replace("-", " ") if m else os.path.splitext(name)[0]
+        started = recorded_time(fields.get("Started", ""))
+        turns = TURN_HEAD_RE.findall(text)
+        last_title, last_time = "", None
+        if turns:
+            tail = turns[-1][1]
+            last_time = recorded_time(tail)
+            last_title = re.sub(r"^[\s\u2014|:-]*", "", ISO_RE.sub("", tail, count=1))
+            last_title = re.sub(r"^[\s\u2014|:-]*", "", last_title).strip()
+        try:
+            mtime = os.stat(full).st_mtime
+        except OSError:
+            blocked.append(name)
+            continue
+        if not m:
+            nonstandard.append(name)
+        sessions.append({
+            "name": name, "id": sid, "tool": tool, "topic": topic,
+            "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
+            "last_time": last_time, "mtime": mtime,
+        })
+    sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"]))
+    return sdir, sessions, nonstandard, blocked
+
+
+def _md_cell(value):
+    return str(value).replace("|", "\\|").replace("\n", " ").strip()
+
+
+def report_session_index(root, args, limited):
+    section("Session index check")
+    sdir, sessions, nonstandard, blocked = load_sessions(root, args.sessions_dir)
+    index_full = os.path.join(root, *args.session_index_file.replace("\\", "/").split("/"))
+    print(f"  sessions folder: {args.sessions_dir}")
+    if sessions is None:
+        print(f"  sessions folder {blocked[0]} (coverage unavailable)")
+        return {"sessions missing from index": "n/a (folder not inspected)"}
+    print(f"  session logs: {len(sessions)}")
+    index_state = work_path_state(index_full)
+    index_text = read_small_text(index_full) if index_state == "present" else None
+    if index_text is None:
+        state = index_state if index_state != "present" else "UNAVAILABLE (blocked, unreadable or incomplete)"
+        print(f"  index file {args.session_index_file}: {state}")
+        if state != "NOT FOUND":
+            print("  sessions missing from index: n/a (index not inspected)")
+            return {"sessions missing from index": "n/a (index not inspected)"}
+        index_text = ""
+    else:
+        print(f"  index file {args.session_index_file}: present")
+    duplicates = duplicate_session_ids(sessions)
+    print(f"  duplicate session IDs: {len(duplicates)} (no proposed rows for ambiguous IDs)")
+    for sid in limited(sorted(duplicates)):
+        print(f"    {sid}")
+    print("  recorded times require timezone offsets; unknown is not inferred from filenames")
+    missing = [s for s in sessions if s["id"] not in duplicates and s["id"].lower() not in index_text.lower()
+               and s["name"] not in index_text]
+    print(f"  sessions missing from index: {len(missing)}")
+    if missing:
+        rel_dir = os.path.relpath(sdir, os.path.dirname(index_full)).replace(os.sep, "/")
+        print("  Proposed rows (review Latest outcome and Status before saving):")
+        for s in limited(missing):
+            last = s["last_time"] or s["mtime"]
+            outcome = s["last_title"] or "(fill in)"
+            print(f"  | {fmt_time(s['started'])} | {work_activity(s)} | {s['id']} | {_md_cell(s['tool'])} | "
+                  f"{_md_cell(s['topic'])} | {_md_cell(outcome)} | (fill in) | "
+                  f"[Session]({rel_dir}/{urllib.parse.quote(s['name'])}) |")
+    stale = []
+    if index_text:
+        idx_dir = os.path.dirname(index_full)
+        for target in markdown_targets(index_text):
+            clean = clean_local_reference(target)
+            if not clean or is_external_or_nonpath(clean):
+                continue
+            norm = clean.replace("\\", "/")
+            if "/" + args.sessions_dir.strip("/").split("/")[-1] + "/" not in "/" + norm and \
+                    not norm.startswith(args.sessions_dir.strip("/").split("/")[-1] + "/"):
+                continue
+            if not reference_resolves(clean, idx_dir, root):
+                stale.append(clean)
+    print(f"  index links to missing session logs: {len(stale)}")
+    for item in limited(sorted(set(stale))):
+        print(f"    {item}")
+    print(f"  nonstandard session filenames: {len(nonstandard)}")
+    for item in limited(nonstandard):
+        print(f"    {item}")
+    if blocked:
+        print(f"  session logs not parsed (blocked, unreadable or incomplete): {len(blocked)}")
+        for item in limited(blocked):
+            print(f"    {item}")
+    return {"sessions missing from index": len(missing),
+            "index links to missing logs": len(set(stale))}
+
+
+def report_orient(root, args, limited):
+    section("Orient")
+    now = time.time()
+    print("  basis: file modified times on this machine; unreliable across sync replicas,")
+    print("         after cloud hydration and for clock skew. Leads only, not proof.")
+    # Startup read set.
+    startup = [n for n in ROOT_STARTUP_NAMES if os.path.isfile(os.path.join(root, n))]
+    for extra in ([args.quick_context] + list(args.index_path or ["PROJECT_INDEX.md"])):
+        p = os.path.join(root, *extra.replace("\\", "/").split("/"))
+        if os.path.isfile(p) and extra not in startup:
+            startup.append(extra)
+    total = 0
+    print("  startup read set:")
+    for n in startup:
+        size = os.path.getsize(os.path.join(root, *n.split("/")))
+        total += size
+        print(f"    {n}  {size // 1024} KB")
+    print(f"    total {total // 1024} KB (budget {args.read_budget_kb} KB)"
+          + ("  OVER BUDGET" if total > args.read_budget_kb * 1024 else ""))
+    qc = os.path.join(root, *args.quick_context.replace("\\", "/").split("/"))
+    qc_flag = False
+    if os.path.isfile(qc):
+        qsize = os.path.getsize(qc)
+        qc_flag = qsize > args.quick_context_kb * 1024
+        print(f"  quick context {args.quick_context}: {qsize // 1024} KB"
+              + (f"  OVER {args.quick_context_kb} KB: replace stale lines, don't append" if qc_flag else ""))
+        qtext = read_small_text(qc) or ""
+        head = qtext.splitlines()[:40]
+        update_lines = [line for line in head if re.search(r"(?i)(updated|latest state|^\s*\*\*20\d\d-|^\s*20\d\d-)", line)]
+        dates = [m.group(0) for line in update_lines for m in [re.search(r"20\d\d-\d\d-\d\d", line)] if m]
+        out_of_order = dates != sorted(dates, reverse=True)
+        if len(update_lines) > 2 or out_of_order:
+            print(f"  quick context header structure: {len(update_lines)} update-like lines"
+                  + ("; dates out of descending order" if out_of_order else "")
+                  + "; keep one current-state section")
+    else:
+        print(f"  quick context {args.quick_context}: NOT FOUND")
+
+    sdir, sessions, _nonstandard, _blocked = load_sessions(root, args.sessions_dir)
+    active = []
+    sessions_available = sessions is not None
+    if sessions is None:
+        print(f"  sessions folder {args.sessions_dir}: {_blocked[0]} (coverage unavailable)")
+        sessions = []
+    else:
+        recent = sorted(sessions, key=lambda s: (s["last_time"] or s["mtime"]), reverse=True)
+        print(f"  recent sessions (of {len(sessions)}):")
+        for s in limited(recent[:5]):
+            print(f"    {work_activity(s)}  {s['tool']}  {s['id'][:8]}  "
+                  f"{s['topic']}  [{s['turns']} turns] {s['last_title'][:70]}")
+        window = args.active_minutes * 60
+        active = [s for s in sessions if now - s["mtime"] <= window]
+    if _blocked and sessions_available:
+        print(f"  session logs not parsed (blocked, unreadable or incomplete): {len(_blocked)}")
+    duplicates = duplicate_session_ids(sessions)
+    if duplicates:
+        print(f"  duplicate session IDs: {len(duplicates)}; excluded from baseline selection")
+    scratch_rel = args.scratch_dir.replace("\\", "/")
+    scratch_full = os.path.join(root, *scratch_rel.split("/"))
+    active_scratch = []
+    if os.path.isdir(scratch_full):
+        for name in sorted(os.listdir(scratch_full)):
+            p = os.path.join(scratch_full, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                try:
+                    if now - os.stat(p).st_mtime <= args.active_minutes * 60:
+                        active_scratch.append(name)
+                except OSError:
+                    pass
+    if args.session_id:
+        mine = args.session_id.lower()
+        active = [s for s in active if not s["id"].startswith(mine)]
+        active_scratch = [n for n in active_scratch if not n.lower().startswith(mine)]
+    print(f"  possibly active writers (changed in last {args.active_minutes} min): "
+          f"{len(active)} session logs, {len(active_scratch)} scratch folders")
+    for s in limited(active):
+        print(f"    session {s['id'][:8]} {s['tool']} {s['topic']}")
+    for name in limited(active_scratch):
+        print(f"    scratch/{name}")
+    if active or active_scratch:
+        print("    -> another agent may be working: coordinate shared edits before writing;")
+        print("       stage exact pending edits in your scratch if coordination is unavailable.")
+
+    # Changed since baseline.
+    if args.since:
+        since = parse_iso(args.since)
+        if since is None:
+            sys.exit(f"--since is not an ISO date/time: {args.since!r}")
+        basis = f"--since {args.since}"
+    else:
+        dated = [s for s in sessions if s["id"] not in duplicates and s["started"]
+                 and not (args.session_id and s["id"].startswith(args.session_id.lower()))]
+        if dated:
+            latest = max(dated, key=lambda s: s["started"])
+            since, basis = latest["started"], f"start of latest session {latest['id'][:8]}"
+        else:
+            since, basis = now - 86400, "last 24 hours (no dated sessions)"
+    walk = collect(root, prune_noise=True, max_seconds=args.max_seconds)
+    skip_prefixes = tuple(p.strip("/").lower() + "/" for p in (args.sessions_dir, scratch_rel))
+    changed = []
+    for full, size, mtime in walk.files:
+        r = relslash(full, root)
+        if mtime < since or r.lower().startswith(skip_prefixes):
+            continue
+        if args.exclude and matches_any(r, args.exclude):
+            continue
+        changed.append((r, mtime))
+    changed.sort(key=lambda x: (-x[1], x[0]))
+    print(f"  files changed since {fmt_time(since)} ({basis}), excluding session logs and scratch: {len(changed)}")
+    for r, mtime in limited(changed):
+        print(f"    {fmt_time(mtime)}  {r}")
+    if walk.unvisited:
+        print(f"  WALK INCOMPLETE: {walk.unvisited} folders not visited (--max-seconds)")
+    if walk.pruned:
+        print(f"  generated-state folders not walked: {len(walk.pruned)}")
+
+    # New files the index never mentions.
+    index_paths = list(args.index_path or ["PROJECT_INDEX.md"])
+    index_text = ""
+    for ip in index_paths:
+        t = read_small_text(os.path.join(root, *ip.replace("\\", "/").split("/")))
+        if t:
+            index_text += t
+    unindexed = []
+    if index_text:
+        for r, _m in changed:
+            name = r.split("/")[-1]
+            if r in startup or r == args.session_index_file.replace("\\", "/") or r in index_paths \
+                    or index_mentions(index_text, name) or index_mentions(index_text, r):
+                continue
+            unindexed.append(r)
+        print(f"  changed files the index never names: {len(unindexed)}"
+              " (folder-level coverage may already include them)")
+        for r in limited(unindexed):
+            print(f"    {r}")
+    else:
+        print(f"  index {', '.join(index_paths)}: NOT FOUND or unreadable; unindexed check skipped")
+    return {"possibly active writers": len(active) + len(active_scratch),
+            "changed since baseline": len(changed),
+            "changed but unnamed in index": len(unindexed) if index_text else "n/a",
+            "quick context over size": "yes" if qc_flag else "no"}
+
+
+def run_work_helpers(args, root):
+    global AUDIT_ROOT
+    AUDIT_ROOT = root
+    cap = (lambda n: min(n, LIST_CAP_BRIEF)) if args.brief else (lambda n: min(n, 15))
+    def limited(items):
+        items = list(items)
+        yield from items[:cap(len(items))]
+        if len(items) > cap(len(items)):
+            print(f"      ... and {len(items) - cap(len(items))} more")
+    print(f"Read-only work-mode check of {root}")
+    print(f"Generated {datetime.now():%Y-%m-%d %H:%M}")
+    glance = {}
+    if args.orient:
+        glance.update(report_orient(root, args, limited))
+    if args.session_index:
+        glance.update(report_session_index(root, args, limited))
+    section("Findings at a glance")
+    for k, v in glance.items():
+        print(f"  {k:<32} {v}")
+    return glance
+
+
 def main():
     _safe_stdout()
     ap = argparse.ArgumentParser()
@@ -725,6 +1127,23 @@ def main():
                     help="Do not walk high-confidence generated state; list it instead.")
     ap.add_argument("--max-seconds", type=float, default=0.0,
                     help="Stop walking after this many seconds and disclose the gap.")
+    work = ap.add_argument_group("work mode (v1.5)")
+    work.add_argument("--orient", action="store_true",
+                      help="Arrival check: startup read set, recent and possibly active sessions, "
+                           "files changed since the latest session, changed files the index never names.")
+    work.add_argument("--session-index", action="store_true",
+                      help="Compare session logs with the session index; print proposed missing rows. Writes nothing.")
+    work.add_argument("--sessions-dir", default="AI_CONTEXT/SESSIONS")
+    work.add_argument("--session-index-file", default="AI_CONTEXT/SESSION_INDEX.md")
+    work.add_argument("--scratch-dir", default="AI_CONTEXT/scratch")
+    work.add_argument("--quick-context", default="AI_CONTEXT/PROJECT_QUICK_CONTEXT.md")
+    work.add_argument("--quick-context-kb", type=int, default=12,
+                      help="Flag quick context above this size (replace stale lines, don't append).")
+    work.add_argument("--active-minutes", type=int, default=30,
+                      help="Session logs or scratch folders changed this recently suggest an active writer.")
+    work.add_argument("--session-id",
+                      help="Your own session ID (or prefix), left out of the possibly-active list.")
+    work.add_argument("--since", help="ISO time baseline for --orient (default: start of latest session).")
     args = ap.parse_args()
 
     # A comma inside a pattern is almost always someone reaching for the PowerShell
@@ -786,7 +1205,10 @@ def main():
     buffer = io.StringIO()
     target = buffer if out_path else sys.stdout
     with contextlib.redirect_stdout(target):
-        glance = run_report(args, root, coverage_pairs)
+        if args.orient or args.session_index:
+            glance = run_work_helpers(args, root)
+        else:
+            glance = run_report(args, root, coverage_pairs)
     if out_path:
         text = buffer.getvalue()
         with open(out_path, "x", encoding="utf-8", newline="\n") as fh:
@@ -1189,15 +1611,50 @@ def run_report(args, root, coverage_pairs):
                      key=lambda q: rel(q, root).lower())
     glance["secrets"] = len(secrets)
     if secrets:
+        public_bundles = [p for p in secrets if os.path.basename(p).lower() == "cacert.pem"
+                          and "certifi" in relslash(p, root).lower().split("/")]
+        ambiguous_crypto = [p for p in secrets if p not in public_bundles
+                            and os.path.splitext(p)[1].lower() == ".pem"]
+        probable_private = [p for p in secrets if p not in public_bundles and p not in ambiguous_crypto]
         print(f"  {len(secrets)} file(s) matched credential-name hints:")
-        for p in secrets[:cap(25)]:
-            print(f"     {rel(p, root)}")
+        print(f"  probable private/session credential: {len(probable_private)}")
+        for p in probable_private[:cap(25)]: print(f"     {rel(p, root)}")
+        print(f"  ambiguous cryptographic material: {len(ambiguous_crypto)}")
+        for p in ambiguous_crypto[:cap(25)]: print(f"     {rel(p, root)}")
+        print(f"  recognizable public CA bundle: {len(public_bundles)}")
+        for p in public_bundles[:cap(25)]: print(f"     {rel(p, root)}")
         if len(secrets) > cap(25):
             print(f"     ... and {len(secrets) - cap(25)} more")
         print("  Do not stage, copy, or index these. Flag to the owner before sharing "
               "the folder. Never copy a secret value into a report or journal.")
     else:
         print("  none detected by name")
+
+    section("Handoff and pending-update lifecycle warnings")
+    handoffs = []
+    pending_updates = []
+    package_channels = []
+    for p, _size, _mtime in files:
+        r = relslash(p, root)
+        name = os.path.basename(p).lower()
+        if not is_non_governing(r) and ("handoff" in name or re.search(r"next[ _-].*prompt", name)):
+            handoffs.append(r)
+        if re.search(r"pending.*(navigation|shared|index)|(navigation|shared).*pending", name):
+            text = read_small_text(p) or ""
+            marker = next((s for s in ("Applied", "Superseded", "Conflicted", "Pending")
+                           if re.search(rf"(?im)^\s*(status\s*:\s*)?{s}\b", text)), "Unverifiable")
+            pending_updates.append((r, marker))
+        if p.lower().endswith(".zip") and re.search(r"(?i)(candidate|superseded|release)", r):
+            package_channels.append(r)
+    print(f"  handoff/next-prompt files outside non-governing areas: {len(handoffs)}")
+    for r in limited(sorted(handoffs)): print(f"    {r}")
+    print(f"  pending shared-update artifacts: {len(pending_updates)}")
+    for r, state in limited(sorted(pending_updates)): print(f"    {state:12} {r}")
+    print(f"  candidate/release/superseded ZIPs requiring channel review: {len(package_channels)}")
+    for r in limited(sorted(package_channels)): print(f"    {r}")
+    glance["handoffs"] = len(handoffs)
+    glance["pending_updates"] = len(pending_updates)
+    glance["package_channels"] = len(package_channels)
 
     section("Possible orphaned temporary files")
     orphans = []
@@ -1268,11 +1725,11 @@ def run_report(args, root, coverage_pairs):
     if args.portfolio:
         section("Portfolio root matrix (immediate children; advisory)")
         rows = portfolio_rows(root, args.entrypoint)
-        print("  Project | Count scope | Root items | Entrypoints present")
+        print("  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Entrypoints present")
         if rows:
-            for name, count, present in limited(rows):
+            for name, count, present, state, sessions, missing, pending in limited(rows):
                 value = ", ".join(present) if present else "(none detected)"
-                print(f"  {name} | root-level | {count} | {value}")
+                print(f"  {name} | root-level | {state} | {count} | {sessions} | {missing} | {pending} | {value}")
         else:
             print("  no immediate child directories")
         print("  Presence does not determine authority or operational state.")
@@ -1552,6 +2009,9 @@ def run_report(args, root, coverage_pairs):
     row("Identical content groups:", glance.get("identical", "not hashed"))
     row("Same name, different content:", glance.get("ambiguous", "not hashed"))
     row("Credential-name hints:", glance["secrets"])
+    row("Handoff / next-prompt files:", glance.get("handoffs", 0))
+    row("Pending shared-update artifacts:", glance.get("pending_updates", 0))
+    row("Package-channel review items:", glance.get("package_channels", 0))
     row("Large journals:", glance["journals"])
     print("  Counts only. Open the matching section before acting on any of them.")
 

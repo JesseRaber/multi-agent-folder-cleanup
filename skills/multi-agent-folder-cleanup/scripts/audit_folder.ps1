@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Read-only inventory of a project folder for multi-agent cleanup.
 
@@ -103,10 +103,20 @@ param(
     [double]$MaxSeconds = 0,
     [string[]]$IndexCoverage = @(),
     [int]$ReadBudgetKB = 40,
+    [switch]$Orient,
+    [switch]$SessionIndex,
+    [string]$SessionsDir = 'AI_CONTEXT/SESSIONS',
+    [string]$SessionIndexFile = 'AI_CONTEXT/SESSION_INDEX.md',
+    [string]$ScratchDir = 'AI_CONTEXT/scratch',
+    [string]$QuickContext = 'AI_CONTEXT/PROJECT_QUICK_CONTEXT.md',
+    [int]$QuickContextKB = 12,
+    [int]$ActiveMinutes = 30,
+    [string]$SessionId = '',
+    [string]$Since = '',
     [switch]$Version
 )
 
-$ScriptVersion = '1.4.1'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.5.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -569,8 +579,10 @@ if ($Out) {
     if (Test-Path -LiteralPath $OutFull) { throw "-Out already exists; choose a new file: $OutFull" }
 }
 
-Write-Line "Read-only audit of $RootFull"
-Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+if (-not ($Orient -or $SessionIndex)) {
+    Write-Line "Read-only audit of $RootFull"
+    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+}
 
 # Explicit walk instead of Get-ChildItem -Recurse, for three reasons:
 #  1. Windows PowerShell 5.1 follows junctions on -Recurse (PowerShell 7 and
@@ -589,6 +601,324 @@ function Test-LinkDirectory($item) {
     if (-not ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return $false }
     $lt = $item.LinkType
     return ($lt -eq 'Junction' -or $lt -eq 'SymbolicLink')
+}
+
+# ---------------------------------------------------------------------------
+# Work-mode helpers (v1.5): -Orient and -SessionIndex. Same output as
+# audit_folder.py --orient / --session-index. Read-only; modified-time evidence
+# is labeled local and replica-unsafe.
+# ---------------------------------------------------------------------------
+if ($Orient -or $SessionIndex) {
+    $SessionNameRx = '^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_(' + $UuidPattern + ')\.md$'
+    $IsoRx = '\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?'
+    $TurnRx = '(?m)^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$'
+    $WorkCap = if ($Brief) { 10 } else { 15 }
+    $Now = [DateTimeOffset]::Now
+    function ConvertFrom-Iso([string]$value) {
+        if (-not $value) { return $null }
+        $m = [regex]::Match($value, $IsoRx)
+        if (-not $m.Success) { return $null }
+        $t = $m.Value.Replace(' ', 'T')
+        $t = [regex]::Replace($t, '([+-]\d{2})(\d{2})$', '$1:$2')
+        try { return [DateTimeOffset]::Parse($t, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal) } catch { return $null }
+    }
+    function Format-WorkTime($dto) { if ($null -eq $dto) { 'unknown' } else { $dto.ToLocalTime().ToString("yyyy-MM-dd'T'HH:mmzzz") } }
+    function ConvertFrom-RecordedTime([string]$value) {
+        $m = [regex]::Match($value, $IsoRx)
+        if (-not $m.Success -or $m.Value -notmatch '(Z|[+-]\d{2}:?\d{2})$') { return $null }
+        return ConvertFrom-Iso $m.Value
+    }
+    function Get-WorkPathState([string]$path) {
+        try { $null = Get-Item -LiteralPath $path -Force -ErrorAction Stop; return 'present' }
+        catch [System.Management.Automation.ItemNotFoundException] { return 'NOT FOUND' }
+        catch { return 'UNAVAILABLE' }
+    }
+    function Format-Activity($s) {
+        if ($null -ne $s.LastTime) { return Format-WorkTime $s.LastTime }
+        return ((Format-WorkTime $s.MTime) + ' (file mtime; not recorded activity)')
+    }
+    function Get-DuplicateIds($items) {
+        $counts = @{}
+        foreach ($s in $items) { if ($counts.ContainsKey($s.Id)) { $counts[$s.Id]++ } else { $counts[$s.Id] = 1 } }
+        return @($counts.Keys | Where-Object { $counts[$_] -gt 1 } | Sort-Object)
+    }
+    function Join-RootRel([string]$relPath) {
+        $acc = $RootFull
+        foreach ($seg in $relPath.Replace('\', '/').Split('/')) { if ($seg) { $acc = [IO.Path]::Combine($acc, $seg) } }
+        return $acc
+    }
+    function Read-SmallText([string]$path) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+        if (-not (Test-ContentReadAllowed $path)) { return $null }
+        try {
+            $sr = [IO.StreamReader]::new($path, [Text.UTF8Encoding]::new($false), $true)
+            try {
+                $buf = New-Object char[] 1048577
+                $n = $sr.ReadBlock($buf, 0, $buf.Length)
+                if ($n -gt 1048576) {
+                    Write-Line ("  read incomplete (over 1048576 characters): {0}; not parsed" -f [IO.Path]::GetFileName($path))
+                    return $null
+                }
+                return [string]::new($buf, 0, $n)
+            } finally { $sr.Dispose() }
+        } catch { return $null }
+    }
+    function Write-Capped($items, [string]$indent = '    ') {
+        $items = @($items)
+        $take = [Math]::Min($items.Count, $WorkCap)
+        for ($i = 0; $i -lt $take; $i++) { Write-Line ($indent + $items[$i]) }
+        if ($items.Count -gt $take) { Write-Line ("      ... and {0} more" -f ($items.Count - $take)) }
+    }
+    function Get-Sessions {
+        $sdir = Join-RootRel $SessionsDir
+        $res = [pscustomobject]@{ Dir = $sdir; Sessions = $null; Nonstandard = @(); Blocked = @(); State = (Get-WorkPathState $sdir) }
+        if ($res.State -ne 'present') { return $res }
+        if (-not (Test-ContentReadAllowed $sdir)) { $res.State = 'UNAVAILABLE (read blocked)'; return $res }
+        $list = [Collections.Generic.List[object]]::new()
+        $non = [Collections.Generic.List[string]]::new(); $blk = [Collections.Generic.List[string]]::new()
+        try { $names = @(Get-ChildItem -LiteralPath $sdir -File -Force -ErrorAction Stop | Where-Object { $_.Name.ToLower().EndsWith('.md') } | Sort-Ordinal -Key { $_.Name }) }
+        catch { $res.State = 'UNAVAILABLE (listing failed)'; return $res }
+        foreach ($f in $names) {
+            $text = Read-SmallText $f.FullName
+            if ($null -eq $text) { $blk.Add($f.Name); continue }
+            $head = if ($text.Length -gt 4096) { $text.Substring(0, 4096) } else { $text }
+            $fields = @{}
+            foreach ($fm in [regex]::Matches($head, '(?m)^-\s*(Session ID|Started|Tool/runtime)\s*:\s*(.+?)\s*$')) { $fields[$fm.Groups[1].Value] = $fm.Groups[2].Value }
+            $nm = [regex]::Match($f.Name, $SessionNameRx)
+            $sid = if ($fields['Session ID']) { $fields['Session ID'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
+            $uid = [regex]::Match($(if ($sid) { $sid } else { $f.Name }), $UuidPattern)
+            if (-not $uid.Success) { $non.Add($f.Name + ' (no session UUID; not treated as a session log)'); continue }
+            $tool = if ($fields['Tool/runtime']) { $fields['Tool/runtime'] } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
+            $tool = $tool.Split('(')[0].Trim(); if (-not $tool) { $tool = 'unknown' }
+            $topic = if ($nm.Success) { $nm.Groups[4].Value.Replace('-', ' ') } else { [IO.Path]::GetFileNameWithoutExtension($f.Name) }
+            $started = ConvertFrom-RecordedTime $fields['Started']
+            $turns = [regex]::Matches($text, $TurnRx)
+            $ids = @{}; foreach ($t in $turns) { $ids[$t.Groups[1].Value] = 1 }
+            $lastTitle = ''; $lastTime = $null
+            if ($turns.Count) {
+                $tail = $turns[$turns.Count - 1].Groups[2].Value
+                $lastTime = ConvertFrom-RecordedTime $tail
+                $lastTitle = [regex]::Replace(([regex]::new($IsoRx)).Replace($tail, '', 1), '^[\s\u2014|:-]*', '')
+                $lastTitle = ([regex]::Replace($lastTitle, '^[\s\u2014|:-]*', '')).Trim()
+            }
+            if (-not $nm.Success) { $non.Add($f.Name) }
+            $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
+                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime })
+        }
+        $res.Sessions = @($list | Sort-Object -Property @{ Expression = { $null -eq $_.Started } }, @{ Expression = { if ($_.Started) { $_.Started.UtcTicks } else { 0 } } }, @{ Expression = { $_.Id } })
+        $res.Nonstandard = @($non); $res.Blocked = @($blk)
+        return $res
+    }
+    function Get-Activity($s) { if ($s.LastTime) { $s.LastTime } else { $s.MTime } }
+    function Test-Mine($id) { return ($SessionId -and $id.ToLower().StartsWith($SessionId.ToLower())) }
+
+    Write-Line "Read-only work-mode check of $RootFull"
+    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    $glance = [ordered]@{}
+
+    if ($Orient) {
+        Write-Section 'Orient'
+        Write-Line '  basis: file modified times on this machine; unreliable across sync replicas,'
+        Write-Line '         after cloud hydration and for clock skew. Leads only, not proof.'
+        $idxList = if ($IndexPath.Count) { @($IndexPath) } else { @('PROJECT_INDEX.md') }
+        $startup = [Collections.Generic.List[string]]::new()
+        foreach ($n in @('AGENTS.md', 'CLAUDE.md', 'GEMINI.md', 'README.md')) { if (Test-Path -LiteralPath (Join-RootRel $n) -PathType Leaf) { $startup.Add($n) } }
+        foreach ($extra in @($QuickContext) + $idxList) { if ((Test-Path -LiteralPath (Join-RootRel $extra) -PathType Leaf) -and -not $startup.Contains($extra)) { $startup.Add($extra) } }
+        $total = 0
+        Write-Line '  startup read set:'
+        foreach ($n in $startup) { $sz = (Get-Item -LiteralPath (Join-RootRel $n) -Force).Length; $total += $sz; Write-Line ("    {0}  {1} KB" -f $n, [Math]::Floor($sz / 1024)) }
+        Write-Line (("    total {0} KB (budget {1} KB)" -f [Math]::Floor($total / 1024), $ReadBudgetKB) + $(if ($total -gt $ReadBudgetKB * 1024) { '  OVER BUDGET' } else { '' }))
+        $qcFlag = $false
+        $qcPath = Join-RootRel $QuickContext
+        if (Test-Path -LiteralPath $qcPath -PathType Leaf) {
+            $qs = (Get-Item -LiteralPath $qcPath -Force).Length
+            $qcFlag = $qs -gt $QuickContextKB * 1024
+            Write-Line (("  quick context {0}: {1} KB" -f $QuickContext, [Math]::Floor($qs / 1024)) + $(if ($qcFlag) { "  OVER $QuickContextKB KB: replace stale lines, don't append" } else { '' }))
+            try {
+                $qhead = @(Get-Content -LiteralPath $qcPath -TotalCount 40 -ErrorAction Stop)
+                $updates = @($qhead | Where-Object { $_ -match '(?i)(updated|latest state|^\s*\*\*20\d\d-|^\s*20\d\d-)' })
+                $dates = @($updates | ForEach-Object { if ($_ -match '20\d\d-\d\d-\d\d') { $Matches[0] } })
+                $sortedDates = @($dates | Sort-Object -Descending)
+                $outOfOrder = (($dates -join '|') -ne ($sortedDates -join '|'))
+                if ($updates.Count -gt 2 -or $outOfOrder) {
+                    Write-Line (("  quick context header structure: {0} update-like lines" -f $updates.Count) + $(if ($outOfOrder) { '; dates out of descending order' } else { '' }) + '; keep one current-state section')
+                }
+            } catch { }
+        } else { Write-Line "  quick context ${QuickContext}: NOT FOUND" }
+
+        $S = Get-Sessions
+        $sessions = @(); $active = @()
+        if ($null -eq $S.Sessions) { Write-Line ("  sessions folder {0}: {1} (coverage unavailable)" -f $SessionsDir, $S.State) }
+        else {
+            $sessions = @($S.Sessions)
+            $recent = @($sessions | Sort-Object -Property @{ Expression = { (Get-Activity $_).UtcTicks } } -Descending | Select-Object -First 5)
+            Write-Line ("  recent sessions (of {0}):" -f $sessions.Count)
+            Write-Capped @($recent | ForEach-Object {
+                $t = $_.LastTitle; if ($t.Length -gt 70) { $t = $t.Substring(0, 70) }
+                "{0}  {1}  {2}  {3}  [{4} turns] {5}" -f (Format-Activity $_), $_.Tool, $_.Id.Substring(0, [Math]::Min(8, $_.Id.Length)), $_.Topic, $_.Turns, $t })
+            $active = @($sessions | Where-Object { ($Now - $_.MTime).TotalSeconds -le $ActiveMinutes * 60 })
+        }
+        if ($S.Blocked.Count -and $null -ne $S.Sessions) { Write-Line ("  session logs not parsed (blocked, unreadable or incomplete): {0}" -f $S.Blocked.Count) }
+        $duplicates = @(Get-DuplicateIds $sessions)
+        if ($duplicates.Count) { Write-Line ("  duplicate session IDs: {0}; excluded from baseline selection" -f $duplicates.Count) }
+        $scratchFull = Join-RootRel $ScratchDir
+        $activeScratch = @()
+        if (Test-Path -LiteralPath $scratchFull -PathType Container) {
+            $activeScratch = @(Get-ChildItem -LiteralPath $scratchFull -Directory -Force | Where-Object { -not $_.LinkType -and ($Now - [DateTimeOffset]$_.LastWriteTime).TotalSeconds -le $ActiveMinutes * 60 } | Sort-Ordinal -Key { $_.Name } | ForEach-Object { $_.Name })
+        }
+        if ($SessionId) {
+            $active = @($active | Where-Object { -not (Test-Mine $_.Id) })
+            $activeScratch = @($activeScratch | Where-Object { -not (Test-Mine $_) })
+        }
+        Write-Line ("  possibly active writers (changed in last {0} min): {1} session logs, {2} scratch folders" -f $ActiveMinutes, $active.Count, $activeScratch.Count)
+        Write-Capped @($active | ForEach-Object { "session {0} {1} {2}" -f $_.Id.Substring(0, 8), $_.Tool, $_.Topic })
+        Write-Capped @($activeScratch | ForEach-Object { "scratch/$_" })
+        if ($active.Count -or $activeScratch.Count) {
+            Write-Line '    -> another agent may be working: coordinate shared edits before writing;'
+            Write-Line '       stage exact pending edits in your scratch if coordination is unavailable.'
+        }
+
+        if ($Since) {
+            $sinceT = ConvertFrom-Iso $Since
+            if ($null -eq $sinceT) { throw "-Since is not an ISO date/time: '$Since'" }
+            $basis = "--since $Since"
+        } else {
+            $dated = @($sessions | Where-Object { $_.Id -notin $duplicates -and $_.Started -and -not (Test-Mine $_.Id) })
+            if ($dated.Count) {
+                $latest = $dated | Sort-Object -Property @{ Expression = { $_.Started.UtcTicks } } -Descending | Select-Object -First 1
+                $sinceT = $latest.Started; $basis = "start of latest session $($latest.Id.Substring(0, 8))"
+            } else { $sinceT = $Now.AddDays(-1); $basis = 'last 24 hours (no dated sessions)' }
+        }
+        $skip = @(($SessionsDir.Replace('\', '/').Trim('/') + '/').ToLower(), ($ScratchDir.Replace('\', '/').Trim('/') + '/').ToLower())
+        $changed = [Collections.Generic.List[object]]::new()
+        $prunedCount = 0; $unvisitedW = 0
+        $clockW = [Diagnostics.Stopwatch]::StartNew()
+        $stackW = [Collections.Generic.Stack[IO.DirectoryInfo]]::new(); $stackW.Push($RootDirInfo)
+        while ($stackW.Count) {
+            if ($MaxSeconds -gt 0 -and $clockW.Elapsed.TotalSeconds -gt $MaxSeconds) { $unvisitedW = $stackW.Count; break }
+            $d = $stackW.Pop()
+            try { $ents = @($d.EnumerateFileSystemInfos()) } catch { continue }
+            $isRootW = [object]::ReferenceEquals($d, $RootDirInfo)
+            $subs = @($ents | Where-Object { $_ -is [IO.DirectoryInfo] })
+            $envW = (-not $isRootW) -and (Test-EnvRoot @($subs | ForEach-Object { $_.Name }) @($ents | Where-Object { $_ -isnot [IO.DirectoryInfo] } | ForEach-Object { $_.Name }))
+            $envP = 0
+            foreach ($e in $ents) {
+                if ($e -is [IO.DirectoryInfo]) {
+                    if (Test-LinkDirectory $e) { continue }
+                    if ($envW) { $envP++; continue }
+                    if (($PruneSafe -contains $e.Name.ToLower()) -or (@($NoisePrefixHints | Where-Object { $e.Name.ToLower().StartsWith($_) }).Count)) { $prunedCount++; continue }
+                    $stackW.Push($e)
+                } else {
+                    $r = Get-RelSlash $e.FullName
+                    $mt = [DateTimeOffset]$e.LastWriteTime
+                    if ($mt -lt $sinceT) { continue }
+                    $rl = $r.ToLower(); if ($rl.StartsWith($skip[0]) -or $rl.StartsWith($skip[1])) { continue }
+                    $ex = $false; foreach ($pat in $Exclude) { if (Test-MatchPattern $r $pat) { $ex = $true } }
+                    if ($ex) { continue }
+                    $changed.Add([pscustomobject]@{ Rel = $r; MTime = $mt })
+                }
+            }
+            if ($envP) { $prunedCount++ }
+        }
+        $changedS = @($changed | Sort-Object -Property @{ Expression = { $_.MTime.UtcTicks }; Descending = $true }, @{ Expression = { $_.Rel }; Descending = $false })
+        Write-Line ("  files changed since {0} ({1}), excluding session logs and scratch: {2}" -f (Format-WorkTime $sinceT), $basis, $changedS.Count)
+        Write-Capped @($changedS | ForEach-Object { "{0}  {1}" -f (Format-WorkTime $_.MTime), $_.Rel })
+        if ($unvisitedW) { Write-Line "  WALK INCOMPLETE: $unvisitedW folders not visited (--max-seconds)" }
+        if ($prunedCount) { Write-Line "  generated-state folders not walked: $prunedCount" }
+        $idxText = ''
+        foreach ($ip in $idxList) { $t = Read-SmallText (Join-RootRel $ip); if ($t) { $idxText += $t } }
+        $unindexed = @()
+        $sessIdx = $SessionIndexFile.Replace('\', '/')
+        if ($idxText) {
+            $unindexed = @($changedS | Where-Object {
+                $r = $_.Rel; $nm = $r.Split('/')[-1]
+                -not ($startup.Contains($r) -or $r -eq $sessIdx -or ($idxList -contains $r) -or (Test-IndexMentions $idxText $nm) -or (Test-IndexMentions $idxText $r)) } | ForEach-Object { $_.Rel })
+            Write-Line ("  changed files the index never names: {0} (folder-level coverage may already include them)" -f $unindexed.Count)
+            Write-Capped $unindexed
+        } else { Write-Line ("  index {0}: NOT FOUND or unreadable; unindexed check skipped" -f ($idxList -join ', ')) }
+        $glance['possibly active writers'] = $active.Count + $activeScratch.Count
+        $glance['changed since baseline'] = $changedS.Count
+        $glance['changed but unnamed in index'] = $(if ($idxText) { $unindexed.Count } else { 'n/a' })
+        $glance['quick context over size'] = $(if ($qcFlag) { 'yes' } else { 'no' })
+    }
+
+    if ($SessionIndex) {
+        Write-Section 'Session index check'
+        $S = Get-Sessions
+        $indexFull = Join-RootRel $SessionIndexFile
+        Write-Line "  sessions folder: $SessionsDir"
+        if ($null -eq $S.Sessions) {
+            Write-Line ("  sessions folder {0} (coverage unavailable)" -f $S.State)
+            $glance['sessions missing from index'] = 'n/a (folder not inspected)'
+        } else {
+            $sessions = @($S.Sessions)
+            Write-Line ("  session logs: {0}" -f $sessions.Count)
+            $state = $null
+            $indexState = Get-WorkPathState $indexFull
+            $idx = Read-SmallText $indexFull
+            if ($null -eq $idx) {
+                $state = if ($indexState -ne 'present') { $indexState } else { 'UNAVAILABLE (blocked, unreadable or incomplete)' }
+                Write-Line "  index file ${SessionIndexFile}: $state"; $idx = ''
+            } else { Write-Line "  index file ${SessionIndexFile}: present" }
+            if ($state -and $state -ne 'NOT FOUND') {
+                Write-Line '  sessions missing from index: n/a (index not inspected)'
+                $glance['sessions missing from index'] = 'n/a (index not inspected)'
+            } else {
+            $duplicates = @(Get-DuplicateIds $sessions)
+            Write-Line ("  duplicate session IDs: {0} (no proposed rows for ambiguous IDs)" -f $duplicates.Count)
+            Write-Capped $duplicates
+            Write-Line '  recorded times require timezone offsets; unknown is not inferred from filenames'
+            $low = $idx.ToLower()
+            $missing = @($sessions | Where-Object { $_.Id -notin $duplicates -and -not $low.Contains($_.Id.ToLower()) -and -not $idx.Contains($_.Name) })
+            Write-Line ("  sessions missing from index: {0}" -f $missing.Count)
+            if ($missing.Count) {
+                $idxDir = [IO.Path]::GetDirectoryName($indexFull)
+                $baseUri = [Uri]::new($idxDir.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar)
+                $relDir = [Uri]::UnescapeDataString($baseUri.MakeRelativeUri([Uri]::new($S.Dir)).ToString()).Replace('\', '/').TrimEnd('/')
+                Write-Line '  Proposed rows (review Latest outcome and Status before saving):'
+                function Get-Cell($v) { ([string]$v).Replace('|', '\|').Replace("`n", ' ').Trim() }
+                Write-Capped @($missing | ForEach-Object {
+                    $outcomeText = if ($_.LastTitle) { $_.LastTitle } else { '(fill in)' }
+                    "| {0} | {1} | {2} | {3} | {4} | {5} | (fill in) | [Session]({6}/{7}) |" -f (Format-WorkTime $_.Started), (Format-Activity $_), $_.Id, (Get-Cell $_.Tool), (Get-Cell $_.Topic), (Get-Cell $outcomeText), $relDir, [Uri]::EscapeDataString($_.Name) }) '  '
+            }
+            $stale = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
+            if ($idx) {
+                $leaf = $SessionsDir.Replace('\', '/').Trim('/').Split('/')[-1]
+                $idxDir2 = [IO.Path]::GetDirectoryName($indexFull)
+                foreach ($tgt in (Get-MarkdownTargets $idx)) {
+                    $clean = Get-CleanReference $tgt
+                    if (-not $clean -or (Test-ExternalOrNonPath $clean)) { continue }
+                    $norm = $clean.Replace('\', '/')
+                    if (-not (('/' + $norm).Contains('/' + $leaf + '/'))) { continue }
+                    if (-not (Test-ReferenceResolves $clean $idxDir2)) { [void]$stale.Add($clean) }
+                }
+            }
+            Write-Line ("  index links to missing session logs: {0}" -f $stale.Count)
+            Write-Capped @($stale)
+            Write-Line ("  nonstandard session filenames: {0}" -f $S.Nonstandard.Count)
+            Write-Capped $S.Nonstandard
+            if ($S.Blocked.Count) { Write-Line ("  session logs not parsed (blocked, unreadable or incomplete): {0}" -f $S.Blocked.Count); Write-Capped $S.Blocked }
+            $glance['sessions missing from index'] = $missing.Count
+            $glance['index links to missing logs'] = $stale.Count
+            }
+        }
+    }
+
+    Write-Section 'Findings at a glance'
+    foreach ($k in $glance.Keys) { Write-Line ("  {0,-32} {1}" -f $k, $glance[$k]) }
+    if ($Out) {
+        $utf8w = [System.Text.UTF8Encoding]::new($false)
+        $streamW = [System.IO.File]::Open($OutFull, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
+        try { $bytesW = $utf8w.GetBytes((($script:ReportLines) -join "`n") + "`n"); $streamW.Write($bytesW, 0, $bytesW.Length) } finally { $streamW.Dispose() }
+        $onW = $false
+        foreach ($ln in $script:ReportLines) {
+            if ($ln.StartsWith('== ') -and $ln.EndsWith(' ==')) { $onW = ($ln -eq '== Findings at a glance ==') }
+            if ($onW -and $ln.Trim()) { Write-Host $ln }
+        }
+        Write-Host ""
+        Write-Host ("Full report: {0} ({1} lines). Read sections from it as needed." -f $OutFull, $script:ReportLines.Count)
+    }
+    exit 0
 }
 
 $allFiles = [System.Collections.Generic.List[System.IO.FileInfo]]::new()
@@ -953,11 +1283,31 @@ $secrets = @($allFiles | Where-Object { Test-SecretHintName $_.Name } | Sort-Ord
 $glance['secrets'] = $secrets.Count
 if ($secrets.Count) {
     Write-Line ("  " + $secrets.Count + " file(s) matched credential-name hints:") -ForegroundColor Yellow
-    $secrets | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("     " + (Get-Short $_.FullName)) }
+    $publicBundles = @($secrets | Where-Object { $_.Name.ToLower() -eq 'cacert.pem' -and (Get-Short $_.FullName).ToLower().Split('/') -contains 'certifi' })
+    $ambiguousCrypto = @($secrets | Where-Object { $publicBundles -notcontains $_ -and $_.Extension.ToLower() -eq '.pem' })
+    $probablePrivate = @($secrets | Where-Object { $publicBundles -notcontains $_ -and $ambiguousCrypto -notcontains $_ })
+    Write-Line ("  probable private/session credential: " + $probablePrivate.Count)
+    $probablePrivate | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("     " + (Get-Short $_.FullName)) }
+    Write-Line ("  ambiguous cryptographic material: " + $ambiguousCrypto.Count)
+    $ambiguousCrypto | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("     " + (Get-Short $_.FullName)) }
+    Write-Line ("  recognizable public CA bundle: " + $publicBundles.Count)
+    $publicBundles | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("     " + (Get-Short $_.FullName)) }
     if ($secrets.Count -gt (Get-Cap 25)) { Write-Line ("     ... and " + ($secrets.Count - (Get-Cap 25)) + " more") }
     Write-Line "  Do not stage, copy, or index these. Flag to the owner before sharing the folder. Never copy a secret value into a report or journal." -ForegroundColor Yellow
 }
 else { Write-Line "  none detected by name" }
+
+Write-Section "Handoff and pending-update lifecycle warnings"
+$handoffs = @($files | Where-Object { $r = Get-Short $_.FullName; -not (Test-NonGoverning $r) -and ($_.Name -match '(?i)handoff|next[ _-].*prompt') })
+$pendingUpdates = @($files | Where-Object { $_.Name -match '(?i)pending.*(navigation|shared|index)|(navigation|shared).*pending' })
+$packageChannels = @($files | Where-Object { $_.Extension.ToLower() -eq '.zip' -and (Get-Short $_.FullName) -match '(?i)(candidate|superseded|release)' })
+Write-Line ("  handoff/next-prompt files outside non-governing areas: " + $handoffs.Count)
+$handoffs | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
+Write-Line ("  pending shared-update artifacts: " + $pendingUpdates.Count)
+$pendingUpdates | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    Unverifiable " + (Get-Short $_.FullName)) }
+Write-Line ("  candidate/release/superseded ZIPs requiring channel review: " + $packageChannels.Count)
+$packageChannels | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
+$glance['handoffs'] = $handoffs.Count; $glance['pending_updates'] = $pendingUpdates.Count; $glance['package_channels'] = $packageChannels.Count
 
 Write-Section "Possible orphaned temporary files"
 $orphans = @($files | ForEach-Object {
@@ -1031,14 +1381,41 @@ if ($Portfolio) {
         'AI_CONTEXT/PROJECT_QUICK_CONTEXT.md', 'AI_CONTEXT/PROJECT_ACTIVITY_JOURNAL.md',
         'AI_CONTEXT/CHAT_INDEX.md')
     $checks = @($defaults + $EntryPoint | Select-Object -Unique)
-    Write-Line "  Project | Count scope | Root items | Entrypoints present"
+    Write-Line "  Project | State | Count scope | Root items | Entrypoints present | Sessions | Missing index rows | Pending updates"
     $children = @(Get-ChildItem -LiteralPath $RootFull -Directory -Force -ErrorAction SilentlyContinue | Sort-Ordinal -Key { $_.Name.ToLower() })
     if ($children.Count) {
         foreach ($child in @($children | Select-BriefItems)) {
             $count = @(Get-ChildItem -LiteralPath $child.FullName -Force -ErrorAction SilentlyContinue).Count
             $present = @($checks | Where-Object { Test-Path -LiteralPath (Join-Path $child.FullName $_) })
             $value = if ($present.Count) { $present -join ', ' } else { '(none detected)' }
-            Write-Line ("  {0} | root-level | {1} | {2}" -f $child.Name, $count, $value)
+            $state = if ($count -eq 0) { 'empty' } elseif ($present.Count) { 'managed' } else { 'unmanaged' }
+            $sessionDir = Join-Path $child.FullName 'AI_CONTEXT/SESSIONS'
+            $sessionFiles = if (Test-Path -LiteralPath $sessionDir -PathType Container) {
+                @(Get-ChildItem -LiteralPath $sessionDir -File -Filter '*.md' -ErrorAction SilentlyContinue)
+            } else { @() }
+            $sessionCount = $sessionFiles.Count
+            $indexFile = Join-Path $child.FullName 'AI_CONTEXT/SESSION_INDEX.md'
+            $missingRows = 'n/a'
+            if (Test-Path -LiteralPath $indexFile -PathType Leaf) {
+                try {
+                    $indexText = Get-Content -LiteralPath $indexFile -Raw -ErrorAction Stop
+                    $missingRows = @($sessionFiles | Where-Object { $indexText -notmatch [regex]::Escape($_.Name) }).Count
+                } catch { $missingRows = 'n/a' }
+            }
+            # Keep portfolio mode bounded: inspect conventional record locations
+            # without recursively traversing the whole project or linked folders.
+            $pendingDirs = @($child.FullName, (Join-Path $child.FullName 'AI_CONTEXT'))
+            $scratchDir = Join-Path $child.FullName 'AI_CONTEXT/scratch'
+            if (Test-Path -LiteralPath $scratchDir -PathType Container) {
+                $pendingDirs += $scratchDir
+                $pendingDirs += @(Get-ChildItem -LiteralPath $scratchDir -Directory -Force -ErrorAction SilentlyContinue |
+                    Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+                    ForEach-Object { $_.FullName })
+            }
+            $pendingCount = @($pendingDirs | Select-Object -Unique | ForEach-Object {
+                Get-ChildItem -LiteralPath $_ -File -Force -ErrorAction SilentlyContinue
+            } | Where-Object { $_.Name -match '(?i)pending[-_ ]?(update|navigation|edit)|proposed[-_ ]?(update|patch)' }).Count
+            Write-Line ("  {0} | {1} | root-level | {2} | {3} | {4} | {5} | {6}" -f $child.Name, $state, $count, $value, $sessionCount, $missingRows, $pendingCount)
         }
     }
     else { Write-Line "  no immediate child directories" }
@@ -1272,6 +1649,9 @@ Write-GlanceRow 'Path length risks:' $glance['long']
 Write-GlanceRow 'Identical content groups:' $(if ($glance.ContainsKey('identical')) { $glance['identical'] } else { 'not hashed' })
 Write-GlanceRow 'Same name, different content:' $(if ($glance.ContainsKey('ambiguous')) { $glance['ambiguous'] } else { 'not hashed' })
 Write-GlanceRow 'Credential-name hints:' $glance['secrets']
+Write-GlanceRow 'Handoff / next-prompt files:' $glance['handoffs']
+Write-GlanceRow 'Pending shared-update artifacts:' $glance['pending_updates']
+Write-GlanceRow 'Package-channel review items:' $glance['package_channels']
 Write-GlanceRow 'Large journals:' $glance['journals']
 Write-Line "  Counts only. Open the matching section before acting on any of them."
 

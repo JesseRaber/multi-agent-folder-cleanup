@@ -37,14 +37,14 @@ Coverage is disclosed, never assumed. A directory the helper cannot read is list
 
 `--inspect-zip` / `-InspectZip` reads ZIP central directories without extracting. `--index-path` is repeatable; a named but missing index is a finding. Reports include empty directories, path risks, archives, duplicate names, optional content hashes, claim-name queues, credential-name hints, reparse points, and case-mismatched references.
 
-These are structural findings, not authority decisions. A suggested exclusion is not permission to remove. A claim-name match is a file to open, not a current-state verdict. A credential-name match is a warning, not proof of a secret. Identical hashes do not select a canonical copy. A reparse point is skipped, not assessed; check the cloud view separately.
+These are structural findings, not authority decisions. A suggested exclusion is not permission to remove. A claim-name match is a file to open, not a current-state verdict. Credential findings are tiered as probable private/session material, ambiguous `.pem` material, or recognizable public certificate bundles; the tier is still a warning rather than proof, and every tier retains the conservative no-content-read guard. Identical hashes do not select a canonical copy. A reparse point is skipped, not assessed; check the cloud view separately.
 
 ## Check the helper version first
 
 ```bash
-python scripts/audit_folder.py --version     # audit_folder.py 1.4.1
-python scripts/verify_move.py --version      # verify_move.py 1.4.1
-pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.4.1
+python scripts/audit_folder.py --version     # audit_folder.py 1.5.0
+python scripts/verify_move.py --version      # verify_move.py 1.5.0
+pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.5.0
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
@@ -52,6 +52,23 @@ Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed ins
 In v1.4.1, credential-name hints, link traversal and detected cloud placeholders block content reads (hashes, archive inspection, pointer/skill/index/manifest reads). Metadata remains counted. These guards do not identify every secret or prove cloud synchronization. Inline Markdown destinations support balanced parentheses and escaped parentheses; reference-style definitions and full CommonMark parsing remain out of scope. Root-only fallback matches are labeled separately rather than silently treated as document-relative links.
 
 Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. Re-review on a different host; never treat receipt equality as cross-device authorization.
+
+## Work-mode checks (v1.5)
+
+Two read-only checks for agents working in a shared folder ([work-mode.md](work-mode.md)). Both skip the full audit, write nothing to the root, and honor `--brief`, `--out`, `--exclude` and `--max-seconds`.
+
+```bash
+python scripts/audit_folder.py --root <root> --orient --session-id <your-id>
+python scripts/audit_folder.py --root <root> --session-index
+pwsh -File scripts/audit_folder.ps1 -Root <root> -Orient -SessionIndex -SessionId <your-id>
+```
+
+- `--orient` / `-Orient`: startup read-set size against `--read-budget-kb`; quick-context size against `--quick-context-kb` (default 12); the five most recent sessions; session logs and scratch folders changed within `--active-minutes` (default 30) as possibly active writers, leaving out your own `--session-id`; files changed since `--since` or, by default, the start of the latest other session (session logs and scratch excluded, generated state not walked); and which of those changed files the index (`--index-path`, default `PROJECT_INDEX.md`) never names.
+- `--session-index` / `-SessionIndex`: compares session logs in `--sessions-dir` (default `AI_CONTEXT/SESSIONS`) with `--session-index-file` (default `AI_CONTEXT/SESSION_INDEX.md`); prints proposed rows for missing sessions, index links to logs that no longer exist, and session files without a standard name or UUID. Review the proposed rows' outcome and status before saving them with a guarded append.
+- Session logs are parsed for the header fields `Session ID`, `Started` and `Tool/runtime`, and turn headings such as `## T001 — <time> — <title>` or `T001 | <time> | <title>`; the filename pattern is the fallback.
+- Activity and change lists come from local modified times. They are leads: sync replicas, hydration and clock skew change them. They never prove that another agent is or is not working.
+- A full audit also inventories handoff/next-prompt ambiguity, pending-update artifacts and their evidenced lifecycle state, and candidate/released/superseded ZIPs that share a folder. It reports review candidates; it does not choose a current handoff, apply a pending edit, move a package or authorize deletion.
+- `--portfolio` / `-Portfolio` reports immediate-child state (`managed`, `unmanaged` or `empty`), root-item scope, detected entrypoints, sessions, missing session-index rows when the index is readable, and pending-update artifacts. Empty and unmanaged are distinct observations, not quality verdicts.
 
 ## Keep the report small (v1.4)
 
@@ -76,6 +93,14 @@ pwsh -File scripts/audit_folder.ps1 -Root <root> -HashFiles -Out C:\Temp\report.
 - `--entrypoint` doubles as the **startup read set**: list the project's read order. The helper totals it with the root auto-loaded instruction files and flags a total above `--read-budget-kb` (default 40) and any `AGENTS.md` over 32 KiB (Codex's default `project_doc_max_bytes`).
 - `--index-coverage INDEX=DIR` lists files directly in `DIR` that `INDEX` never mentions by filename, URL-encoded filename or embedded UUID.
 - `--host-root` measures path length as host root + relative path. Use it whenever the folder is mounted under a different prefix than the one OneDrive or Windows enforces.
+
+### Work-helper evidence limits
+
+- Missing folders are distinct from denied, guarded or failed listings. Unavailable coverage is reported as `n/a`, not zero sessions.
+- Session/index reads are bounded at 1,048,576 text characters. Oversized content is disclosed and not parsed; an incomplete index never produces apparently complete missing-row or stale-link counts.
+- Duplicate session IDs are reported for review. Helpers neither merge logs nor propose rows or select an orientation baseline for ambiguous IDs.
+- Recorded session/turn timestamps need explicit timezone offsets. Missing/naive recorded times remain unknown; filenames do not establish a timezone. Displayed known instants include the local offset. A file-modification-time fallback is labeled and does not establish recorded activity or writer ownership. For an explicit `--since`, provide an offset; a naive CLI value uses the executing machine's local timezone.
+- Proposed rows require human/agent review. Helpers do not update indexes, establish writer exclusivity or prove remote sync. Manual fallback on hosts without scripts follows Work mode W1/W6 and discloses limited coverage.
 
 ## Large roots and time limits
 

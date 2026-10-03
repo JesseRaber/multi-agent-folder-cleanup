@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### 1.5.0 candidate — Work mode
+
+- New **Work** mode (`references/work-mode.md`, W1–W7) for ordinary work in a shared multi-agent folder: arrive within a read budget, claim your own session log and scratch folder, save new files where the next agent will look, give new documents a status header, edit shared records with re-read/minimal-edit/verify, index deliverables only, and hand off at the end of every request. Work mode never moves, renames or deletes existing files.
+- `audit_folder.py --orient` / `audit_folder.ps1 -Orient`: startup read-set and quick-context size, recent sessions, possibly active writers (session logs and scratch folders changed within `--active-minutes`, excluding `--session-id`), files changed since `--since` or the latest other session, and changed files the index never names. Modified-time evidence is labeled as leads only. Absorbs register item R025 (orient mode inside existing helpers).
+- `--session-index` / `-SessionIndex`: session logs missing from the session index (with proposed rows), index links to missing logs, nonstandard session files. Read-only. Absorbs R026.
+- SKILL.md slimmed from 15 KB to 7 KB: a mode router plus authorization, instruction and evidence rules. Cleanup-only sections moved unchanged to `references/cleanup-principles.md`, which Audit, Plan and Execute read after `preconditions.md`. Description broadened so the skill also loads for saving, naming and indexing work.
+- Optional Project Rules template 3.1.0: one subsection pointing to Work mode.
+- Python/PowerShell parity for the new checks verified on Windows PowerShell 5.1; tests in `tests/test_v15_work_mode.py`.
+- Portfolio follow-up adds managed/unmanaged/empty project state, session and missing-index counts, pending-update counts, and guidance to reuse recent same-task evidence before starting expensive duplicate work.
+- Full audits now surface handoff ambiguity, pending-update lifecycle state, candidate/released/superseded package-channel ambiguity, quick-context header drift, and credential-risk tiers while preserving the conservative content-read guard.
+
 - Release ZIPs renamed by audience: `-UNIVERSAL-skill` (replaces `-skill` and `-portable`), `-claude-code-plugin`, `-codex-chatgpt-plugin`, `-gemini-apps-only`, `-opal-only` (new), `-project-rules-optional`. Install guides and README open with a which-ZIP table.
 - New `-opal-only` package: `SKILL.md` with name/description-only frontmatter plus `references/*.md`, no folder entries, matching an Opal export (confirmed by import).
 - `-gemini-apps-only` leaves out `audit_folder.py`, which Gemini Apps' upload security scan rejects in 1.4.1.

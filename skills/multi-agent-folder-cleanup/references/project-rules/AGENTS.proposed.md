@@ -1,6 +1,6 @@
 # Project rules
 
-Version: 3.0.0 — reusable edition, 2026-09-29.
+Version: 3.1.0 — reusable edition, 2026-10-03.
 
 This text governs a project only when the owner adopts it for that project through an applicable instruction mechanism. A review copy, attachment, archive, or incoming proposal does not activate itself. When adopted, apply it throughout the project, subject to the host's higher-priority instructions and applicable scoped project instructions.
 
@@ -37,6 +37,10 @@ Use these defaults, or preserve established equivalent paths and document the ma
 | `AI_CONTEXT/scratch/<session-id>/` | Session-owned temporary work and pending changes |
 
 After adoption, create or merge these records only as needed and when authorized and safe. Do not overwrite populated records with templates, reorganize the project merely to match these defaults, or create competing indexes. Normal project code and assets retain their existing locations. This policy is self-contained; no companion policy files are required.
+
+### Day-to-day saving and indexing
+
+When the multi-agent-folder-cleanup skill is available, follow its Work mode (`references/work-mode.md`) for where to save new files, file headers, shared-record edits, index rows and the end-of-request handoff. Without it: drafts in your own `AI_CONTEXT/scratch/<session-id>/`, deliverables where the project index points, unreviewed outside material in an incoming area, and an index row for each new deliverable.
 
 ## 4. Record every project-related user request
 

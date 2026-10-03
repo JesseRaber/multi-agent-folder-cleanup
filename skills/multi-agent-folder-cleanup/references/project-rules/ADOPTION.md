@@ -1,4 +1,4 @@
-# Optional Project Rules 3.0.0
+# Optional Project Rules 3.1.0
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md). It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename prevents it from being confused with a repository's live root instructions. Do not copy private session logs or a source project's adoption clauses into another project.
 
@@ -12,9 +12,13 @@ Inspect the current root/scoped policies, adoption evidence, actual continuity p
 
 ## Owner request to copy and adapt
 
-> Adopt the bundled Project Rules 3.0.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
+> Adopt the bundled Project Rules 3.1.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
 
 This quotation is an example for the owner to send, not an instruction to an agent reading the guide. In chat-only/read-only hosts, use supported project instructions and return owed checkpoints when recording cannot safely be saved.
+
+## Changes in 3.1.0
+
+Adds one short subsection, "Day-to-day saving and indexing", that points agents to the skill's Work mode. No other rule changed. A project already on 3.0.0 does not need to re-adopt; add the subsection only under the same explicit project-specific adoption process.
 
 ## Maintenance and scope
 
