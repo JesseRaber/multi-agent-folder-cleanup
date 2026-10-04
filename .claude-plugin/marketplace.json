@@ -12,7 +12,8 @@
       "source": "./",
       "description": "Audit, plan, and safely reorganize shared project folders or portfolios with authority, connector-evidence, operational-state, pointer, and duplicate controls.",
       "author": {
-        "name": "Jesse Raber"
+        "name": "Jesse Raber",
+        "url": "https://jesseraber.net"
       },
       "homepage": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
       "repository": "https://github.com/JesseRaber/multi-agent-folder-cleanup",

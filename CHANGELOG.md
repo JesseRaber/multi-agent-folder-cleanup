@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### 1.5.2 (released 2026-10-04) — move-safety fixes and helper examples
+
+- `verify_move.py`: new `--root` on `preflight`, `baseline` and `verify` refuses sources/targets outside the project (OUTSIDE ROOT) and a baseline written inside it (register R094).
+- `verify_move.py`: a map whose common root is the filesystem root now guards each pair's folder instead of refusing every `--out` (R105); case-only renames on case-insensitive volumes are not reported as TARGET EXISTS (R106); macOS path comparisons fold case (R107); the Windows exclusive-read probe uses the `\\?\` extended-length form for long paths (R108).
+- `audit-tools.md`: `-ExecutionPolicy Bypass`, a `powershell.exe` fallback and `python3` examples (R089–R091); guidance when a host package omits a helper (R103 follow-up).
+- SKILL.md: what to do when a package does not bundle `references/project-rules/` (R104).
+- Removed the legacy `references/workflow.md` router, which duplicated SKILL.md's mode table; fixed the stale `workflow.md B2` comment (R098, R110).
+- pyflakes cleanup in `audit_folder.py`; no behavior change (R099).
+- Author link to jesseraber.net in plugin metadata and a README credit line (R088).
+
 ### 1.5.1 candidate — root identity and shared-work convergence
 
 - Stop root-dependent work when a connector or search returns multiple same-name candidate project roots. Record full paths/sites and stable IDs; do not silently combine results or select a winner.
