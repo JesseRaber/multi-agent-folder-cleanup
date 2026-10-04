@@ -44,6 +44,7 @@ Treat summaries as leads. Verify anything your task depends on against the actua
 
 Naming:
 
+- Before creating an important standalone file, search the intended folder, project index and canonical tracker for the same purpose, subject and likely filename variants. If an established artifact already serves the purpose, update it in place when authorized or create a clearly linked proposal that says what it would replace. If the lookup is unavailable, disclose that limitation; do not claim the file is unique. This is a bounded pre-write check, not a reason to scan unrelated archives.
 - Follow established naming and native formats. For a new standalone Markdown report without a convention, use `YYYY-MM-DD_<short-topic>.md`. Add the tool name only when several models produce parallel versions of the same thing.
 - Use plain words, hyphens or underscores, and no characters that break on Windows, OneDrive or URLs (`: * ? " < > |`, trailing dots or spaces).
 - Keep paths short and check the actual host/application limits; do not treat a single character count as a universal limit.
@@ -93,6 +94,11 @@ Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superse
 
 ## W6. Index what matters, not everything
 
+- Maintain exactly one authoritative project-wide tracker for proposed changes, future work, deferred work and open tasks. Use the tracker named by adopted project instructions or current navigation; if none exists, default to `PROJECT_ROADMAP_STATUS.md`. Put the canonical path in the project index and quick context/startup navigation. A roadmap entry is a proposal or status record, not approval to execute it.
+- Before recording new future work, search the canonical tracker for the same outcome, scope or dependency. Update the existing item when it is the same work; otherwise assign the next stable ID and record a concise title, status, source/provenance, dependencies or acceptance evidence when material, and links to supporting detail. Never let a suggestion live only in a session log, review, report, handoff, chat transcript or quick-context paragraph.
+- Do not create another roadmap, backlog, TODO list, proposed-change list, next-steps list or independent future-task file. A scoped design, migration, validation or execution plan may exist when the task needs one, but it must identify the canonical tracker and its related item IDs; any newly discovered future work goes into the canonical tracker rather than becoming a second backlog inside the supporting plan.
+- When multiple tracker-like files already exist, do not choose by filename, modified time or apparent completeness and do not silently merge, rename or delete them. Establish the canonical tracker from owner direction, adopted instructions and current navigation. Inventory unresolved actionable items from the others with provenance, reconcile them into the canonical tracker without losing status or source identity, then classify the older files as supporting evidence or History and point them to the canonical tracker. Physical moves or deletions remain cleanup work and need their applicable authorization.
+- Treat the canonical tracker as a shared record under W5. If it cannot be updated safely, save one exact pending tracker insertion in your session scratch area and link it from the session log; do not create a substitute roadmap. Reconcile the pending insertion before claiming the task handoff is complete. Delegated helpers return proposed tracker rows to the coordinating writer unless a single writer for the tracker is explicitly designated.
 - Give important deliverables and authority/instruction files individual discoverable links, even inside a covered folder. Use the established index or its linked topic index. One line: path, purpose, classification (Authority, Current, Deliverable, Evidence, Reference, Backlog, Incoming, History, Scratch), coverage and existence.
 - Folder coverage is enough for routine supporting files and scratch descendants. Add a folder row only when existing navigation does not cover it. Do not add a row for every generated file.
 - Update the row when you supersede a file: mark the old one History/superseded and point it at the new one.
@@ -107,6 +113,7 @@ Before each final answer, so the work survives if the chat stops here:
 - [ ] Deliverables are saved in the authorized place and format with appropriate provenance (W3–W4)
 - [ ] Index row added or updated for new deliverables (W6)
 - [ ] Quick context updated if the state changed
+- [ ] Every newly proposed, deferred or discovered future task is added to the one canonical tracker (or one exact pending insertion is recorded); no competing task list was created
 - [ ] Session-index row created at session creation or refreshed for a significant outcome/close; routine turns need only their log entry
 - [ ] Next step written where the next agent will see it
 

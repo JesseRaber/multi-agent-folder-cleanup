@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.5.0` — see `CHANGELOG.md`.
+`1.5.1` candidate — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.5.1**.
 
 ## Install
 
@@ -18,9 +18,10 @@ Prebuilt packages are attached to each [release](https://github.com/JesseRaber/m
 
 | Your AI app | Download |
 |---|---|
-| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, Copilot, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
+| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
 | Claude Code `/plugin install` (not the Claude app uploader) | `…-claude-code-plugin.zip` |
 | Codex / ChatGPT plugin marketplace | `…-codex-chatgpt-plugin.zip` |
+| Microsoft Copilot agent skill upload | `…-microsoft-copilot-agent-only.zip` |
 | Gemini Apps skill upload | `…-gemini-apps-only.zip` |
 | Opal skill import | `…-opal-only.zip` |
 | Optional Project Rules template only | `…-project-rules-optional.zip` |
@@ -29,6 +30,7 @@ Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can
 
 Host-specific packages leave out what that host rejects:
 
+- `-microsoft-copilot-agent-only`: no `.ps1`; Microsoft Copilot's custom-skill sandbox supports Python and selected web/POSIX script types but rejects PowerShell skill scripts.
 - `-gemini-apps-only`: no `audit_folder.py`, `audit_folder.ps1`, `agents/openai.yaml` or project rules. Google's upload security scan rejects the audit script's credential-guard code; the package omits it rather than disguising it.
 - `-opal-only`: `SKILL.md` (name and description only in the header) plus `references/*.md`. Opal imports Markdown only, so no scripts.
 
@@ -85,9 +87,15 @@ tests/                           package, regression, and Python/PowerShell pari
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
 
+## What v1.5.1 adds
+
+- Stops root-dependent work when connector discovery returns ambiguous same-name project roots and preserves every path/site and stable identifier in the checkpoint.
+- Forbids canonical-root selection from filename, modified time, search rank, size or matching hashes; authority/navigation evidence is required.
+- Adds a claim-state table to audits, a bounded pre-write duplicate lookup, and one canonical roadmap/task tracker for shared projects.
+
 ## What v1.5.0 adds
 
-- **Work mode** for agents doing ordinary work in a shared folder: where to save, how to name, a short header for new documents, safe edits to shared records, what to index, and an end-of-request handoff checklist (`references/work-mode.md`).
+- **Work mode** for agents doing ordinary work in a shared folder: where to save, how to name, one authoritative roadmap/task tracker, a short header for new documents, safe edits to shared records, what to index, and an end-of-request handoff checklist (`references/work-mode.md`).
 - **`--orient` and `--session-index`** in both audit helpers: read-only arrival checks (possibly active writers, files changed since the latest session, changed files the index never names) and a session-index gap check with proposed rows.
 - **Smaller always-loaded file**: SKILL.md is now a 7 KB router; cleanup-only guidance moved to `references/cleanup-principles.md`. A Work-mode run reads about 13 KB.
 - Optional Project Rules 3.1.0 adds a short pointer to Work mode.

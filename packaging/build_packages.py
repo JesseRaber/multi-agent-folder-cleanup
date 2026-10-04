@@ -1,4 +1,4 @@
-"""Build and verify the six install archives. Never tags, uploads or installs.
+"""Build and verify the seven install archives. Never tags, uploads or installs.
 
 Usage: python packaging/build_packages.py NEW_OUTPUT_DIRECTORY [--status TEXT]
 
@@ -10,6 +10,7 @@ Package names say who each archive is for (register R074-R076):
   UNIVERSAL-skill         skill folder for every skill uploader or skills folder
   claude-code-plugin      Claude Code /plugin layout (not the Claude app uploader)
   codex-chatgpt-plugin    OpenAI Codex / ChatGPT plugin layout
+  microsoft-copilot-agent-only  Microsoft Copilot agent uploader (no PowerShell)
   gemini-apps-only        Gemini Apps uploader (its security scan rejects some files)
   opal-only               Opal importer (SKILL.md + references/*.md only)
   project-rules-optional  optional Project Rules template on its own
@@ -71,6 +72,14 @@ def build_packages(files):
     universal[ROOT + 'LICENSE.txt'] = repo('LICENSE')
     universal[ROOT + 'INSTALL.md'] = repo('packaging/INSTALL-universal.md')
     packages['UNIVERSAL-skill'] = (universal, True)
+
+    # Microsoft Copilot custom-skill sandboxes support Python and common web/
+    # POSIX script types, but reject PowerShell (.ps1) at upload validation.
+    # Preserve the Python helpers and omit only the unsupported script type.
+    copilot = {n: d for n, d in skill.items() if not n.endswith('.ps1')}
+    copilot[ROOT + 'LICENSE.txt'] = repo('LICENSE')
+    copilot[ROOT + 'INSTALL.md'] = repo('packaging/INSTALL-microsoft-copilot.md')
+    packages['microsoft-copilot-agent-only'] = (copilot, True)
 
     for flavor, metadata, guide in [('claude-code-plugin', '.claude-plugin', 'INSTALL-claude-code.md'),
                                     ('codex-chatgpt-plugin', '.codex-plugin', 'INSTALL-codex-chatgpt.md')]:
@@ -150,7 +159,9 @@ def verify(archive, flavor, items, dirs, version):
                 out = subprocess.run([sys.executable, str(scripts / name), '--version'],
                                      capture_output=True, text=True, check=True)
                 assert out.stdout.strip().endswith(version), out.stdout
-            if flavor == 'gemini-apps-only':
+            if flavor in ('gemini-apps-only', 'microsoft-copilot-agent-only'):
+                if flavor == 'microsoft-copilot-agent-only':
+                    assert not any(n.lower().endswith('.ps1') for n in listed)
                 return
             fixture = Path(tmp) / 'fixture'
             fixture.mkdir()
