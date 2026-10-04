@@ -7,15 +7,22 @@ Use this reference only when the target is available through a mounted filesyste
 - Windows or OneDrive: prefer `audit_folder.ps1` with PowerShell 5.1 or 7+ because it can inspect placeholder attributes.
 - POSIX, remote sandboxes, or other mounted filesystems: use `audit_folder.py` with Python 3.8+.
 - Connector-only access: neither helper applies. Use `references/connector-audit.md` and mark byte-level checks unverified.
+- Helper missing from your install: some host packages omit it on purpose (the Gemini Apps package has no `audit_folder.py`; the Microsoft Copilot package has no `.ps1`). Use the other helper if present; otherwise follow the manual checks in the mode file and mark helper-only checks NOT RUN. Never recreate a helper from memory.
 
 ```powershell
-pwsh -File scripts/audit_folder.ps1 -Root 'C:\Projects\Thing' -SuggestExcludes
-pwsh -File scripts/audit_folder.ps1 -Root 'C:\Projects\Thing' -HashFiles -Exclude 'tmp/**','**/__pycache__/**' -IndexPath 'INDEX.md','AI_CONTEXT/CHAT_INDEX.md'
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Root 'C:\Projects\Thing' -SuggestExcludes
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Root 'C:\Projects\Thing' -HashFiles -Exclude 'tmp/**','**/__pycache__/**' -IndexPath 'INDEX.md','AI_CONTEXT/CHAT_INDEX.md'
+# No PowerShell 7 (pwsh)? Windows PowerShell 5.1 takes the same arguments:
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\audit_folder.ps1 -Root 'C:\Projects\Thing' -SuggestExcludes
 ```
 
+`-ExecutionPolicy Bypass` applies to this one process only; it does not change the machine or user policy. Use it when the default policy blocks unsigned downloaded scripts. Do not change the persistent execution policy as part of an audit.
+
+On Linux and macOS, `python` may be missing or Python 2; use `python3` with the same arguments in every example below (on Windows, `py -3` also works).
+
 ```bash
-python scripts/audit_folder.py --root /work/thing --suggest-excludes
-python scripts/audit_folder.py --root /work/thing --hash-files \
+python3 scripts/audit_folder.py --root /work/thing --suggest-excludes
+python3 scripts/audit_folder.py --root /work/thing --hash-files \
   --exclude 'tmp/**' --exclude '**/__pycache__/**' \
   --index-path INDEX.md --index-path AI_CONTEXT/CHAT_INDEX.md
 ```
@@ -42,16 +49,16 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python scripts/audit_folder.py --version     # audit_folder.py 1.5.1
-python scripts/verify_move.py --version      # verify_move.py 1.5.1
-pwsh -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.5.1
+python3 scripts/audit_folder.py --version    # audit_folder.py 1.5.2
+python3 scripts/verify_move.py --version     # verify_move.py 1.5.2
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.5.2
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
 
 In v1.4.1, credential-name hints, link traversal and detected cloud placeholders block content reads (hashes, archive inspection, pointer/skill/index/manifest reads). Metadata remains counted. These guards do not identify every secret or prove cloud synchronization. Inline Markdown destinations support balanced parentheses and escaped parentheses; reference-style definitions and full CommonMark parsing remain out of scope. Root-only fallback matches are labeled separately rather than silently treated as document-relative links.
 
-Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. Re-review on a different host; never treat receipt equality as cross-device authorization.
+Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. In v1.5.2, pass `--root <project>` to `preflight`, `baseline` and `verify` so any source or target outside the project is refused as OUTSIDE ROOT and a baseline written inside the project is refused. Case-only renames (`readme.md` to `README.md`) on case-insensitive volumes are no longer reported as TARGET EXISTS, maps spanning top-level folders no longer refuse every baseline location, macOS paths compare case-insensitively, and Windows probes use the extended-length form for long paths. Re-review on a different host; never treat receipt equality as cross-device authorization.
 
 ## Work-mode checks (v1.5)
 
@@ -143,18 +150,18 @@ Journal reporting flags journal-like files at or above the threshold. Entrypoint
 ## Review and verify a move map
 
 ```bash
-python scripts/verify_move.py review --map /safe/plan/moves.csv \
+python3 scripts/verify_move.py review --map /safe/plan/moves.csv \
   --approval-out /safe/plan/proposal.json > /safe/plan/review.md
 # Planning preflight may be unguarded. After owner approval of the generated view:
-python scripts/verify_move.py preflight --map /safe/plan/moves.csv --approval /safe/plan/proposal.json
-python scripts/verify_move.py baseline --map /safe/plan/moves.csv \
-  --approval /safe/plan/proposal.json --out /safe/plan/baseline.json
-python scripts/verify_move.py verify --baseline /safe/plan/baseline.json \
-  --approval /safe/plan/proposal.json --stage /safe/staging
+python3 scripts/verify_move.py preflight --map /safe/plan/moves.csv --approval /safe/plan/proposal.json --root /work/thing
+python3 scripts/verify_move.py baseline --map /safe/plan/moves.csv \
+  --approval /safe/plan/proposal.json --out /safe/plan/baseline.json --root /work/thing
+python3 scripts/verify_move.py verify --baseline /safe/plan/baseline.json \
+  --approval /safe/plan/proposal.json --stage /safe/staging --root /work/thing
 # Immediately before the agent performs the approved moves:
-python scripts/verify_move.py preflight --map /safe/plan/moves.csv \
-  --approval /safe/plan/proposal.json --baseline /safe/plan/baseline.json
-python scripts/verify_move.py verify --baseline /safe/plan/baseline.json --approval /safe/plan/proposal.json
+python3 scripts/verify_move.py preflight --map /safe/plan/moves.csv \
+  --approval /safe/plan/proposal.json --baseline /safe/plan/baseline.json --root /work/thing
+python3 scripts/verify_move.py verify --baseline /safe/plan/baseline.json --approval /safe/plan/proposal.json --root /work/thing
 ```
 
 `review` renders CSV or JSON through the same parser used by preflight/baseline. It prints the map's absolute location, raw-byte SHA-256, ordered resolved-pairs SHA-256, row count and ordinal row IDs. Relative paths resolve against the map file's folder, not the current directory. Both digests and that location bind the proposal; relocating a relative map requires a new review even if the raw bytes match. Review output is a proposal, not permission; record the actual owner authorization separately.

@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.5.1"
+  version: "1.5.2"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.1**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.5.2**.
 
 ## Choose the operating mode
 
@@ -55,7 +55,7 @@ Measure journal size. Above the configured threshold (default 100 KB), flag it a
 
 ## Optional project rules
 
-For an owner requesting reusable project guidance, use [the optional Project Rules adoption guide](references/project-rules/ADOPTION.md). The accompanying `AGENTS.proposed.md` is a copyable template, not active instructions. Skill installation or cleanup approval does not adopt it; merge/adopt it only under a separate explicit project-specific request. Existing project policies and cleanup without this template remain supported.
+For an owner requesting reusable project guidance, use [the optional Project Rules adoption guide](references/project-rules/ADOPTION.md). The accompanying `AGENTS.proposed.md` is a copyable template, not active instructions. Skill installation or cleanup approval does not adopt it; merge/adopt it only under a separate explicit project-specific request. Existing project policies and cleanup without this template remain supported. Some host packages (Gemini Apps, Opal) do not bundle `references/project-rules/`; if the guide is missing, say so and point the owner to the `-project-rules-optional` release ZIP or the repository instead of reconstructing the template.
 
 ## Keep evidence honest in every mode
 

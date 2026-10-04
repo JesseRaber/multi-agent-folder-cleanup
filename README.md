@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.5.1` candidate — see `CHANGELOG.md`.
+`1.5.2` — see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.1**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.5.2**.
 
 ## Install
 
@@ -73,7 +73,6 @@ skills/multi-agent-folder-cleanup/
   references/plan-mode.md        Plan protocol and approval package
   references/execute-moves.md    staged move protocol, verification, recovery
   references/execute-records.md  record-only, connector and additive execution
-  references/workflow.md         router to the mode files
   references/audit-tools.md      deterministic helper usage and limitations
   references/connector-audit.md   connector evidence and safe cloud-edit boundaries
   references/portfolio-audit-template.md  multi-project audit matrix
@@ -86,6 +85,12 @@ tests/                           package, regression, and Python/PowerShell pari
 ```
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
+
+## What v1.5.2 fixes
+
+- `verify_move.py --root <project>` refuses any source or target outside the project, and any baseline written inside it.
+- Case-only renames (`readme.md` to `README.md`) are no longer blocked as TARGET EXISTS; maps spanning top-level folders no longer refuse every baseline location; macOS paths compare case-insensitively; Windows probes handle long paths.
+- Helper examples now cover `-ExecutionPolicy Bypass`, `powershell.exe` without PowerShell 7, and `python3` on Linux/macOS. The legacy `references/workflow.md` router is removed (SKILL.md already routes by mode). Guidance for host packages that omit a helper or the project-rules folder.
 
 ## What v1.5.1 adds
 
@@ -190,3 +195,7 @@ The tag must match the versions in `SKILL.md`, `.codex-plugin/plugin.json`, and 
 ## Authority rule
 
 If two copies disagree, this repository is current. A release archive, chat upload, or host-local cache is not.
+
+---
+
+Created by Jesse Raber — [jesseraber.net](https://jesseraber.net)

@@ -1,11 +1,11 @@
 {
   "name": "multi-agent-folder-cleanup",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Audit, plan, and safely reorganize shared project folders or multi-project portfolios with connector evidence validation and verified execution boundaries.",
   "skills": "./skills/",
   "author": {
     "name": "Jesse Raber",
-    "url": "https://github.com/JesseRaber"
+    "url": "https://jesseraber.net"
   },
   "homepage": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
   "repository": "https://github.com/JesseRaber/multi-agent-folder-cleanup",

@@ -14,6 +14,9 @@ Move map: CSV with `source,target` (header optional) or JSON list of
     python verify_move.py preflight --map moves.csv --approval /tmp/proposal.json --baseline /tmp/baseline.json
     python verify_move.py verify --baseline /tmp/baseline.json [--stage DIR] [--approval /tmp/proposal.json]
 
+Pass --root PROJECT to preflight, baseline and verify to refuse any source or
+target outside the project folder (and any baseline written inside it).
+
 A proposal receipt identifies a plan; it does not prove owner consent.
 Checks do not lock other writers. Legacy unguarded commands remain supported.
 
@@ -39,12 +42,48 @@ import stat
 import sys
 from collections import Counter, defaultdict
 
-VERSION = "1.5.1"  # must equal SKILL.md metadata.version
+VERSION = "1.5.2"  # must equal SKILL.md metadata.version
 
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 
 
 SAFE_STOP = None  # common folder of the plan; set before any hashing
+
+
+def fold(path):
+    """Comparison key for paths. Windows normcase already lowercases; macOS
+    volumes are case-insensitive by default but normcase is a no-op there, so
+    lowercase explicitly. Linux stays case-sensitive."""
+    path = os.path.normcase(path)
+    return path.lower() if sys.platform == "darwin" else path
+
+
+def is_fs_root(path):
+    return bool(path) and os.path.dirname(path) == path
+
+
+def win_long_path(path):
+    """Extended-length form for Win32 calls on paths near MAX_PATH."""
+    if len(path) < 240 or path.startswith("\\\\?\\"):
+        return path
+    if path.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + path[2:]
+    return "\\\\?\\" + path
+
+
+def same_file(a, b):
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def outside_root(paths, root):
+    """Paths that are not the project root or below it (R094)."""
+    if not root:
+        return []
+    root = os.path.abspath(root)
+    return [p for p in paths if not is_within(os.path.abspath(p), root)]
 
 
 def plan_stop(paths):
@@ -73,9 +112,9 @@ def require_safe_path(path, stop=None):
     only: this does not lock paths against a later replacement.
     """
     current = os.path.abspath(path)
-    stop = os.path.normcase(os.path.abspath(stop)) if stop else None
+    stop = fold(os.path.abspath(stop)) if stop else None
     while True:
-        if stop and os.path.normcase(current) == stop:
+        if stop and fold(current) == stop:
             break
         try:
             info = os.lstat(current)
@@ -118,7 +157,7 @@ def windows_read_probe(path):
     close = kernel.CloseHandle
     close.argtypes = [wintypes.HANDLE]
     close.restype = wintypes.BOOL
-    handle = create(path, 0x80000000, 0, None, 3, 0, None)
+    handle = create(win_long_path(os.path.abspath(path)), 0x80000000, 0, None, 3, 0, None)
     if handle == ctypes.c_void_p(-1).value:
         raise ctypes.WinError(ctypes.get_last_error())
     close(handle)
@@ -275,11 +314,11 @@ def common_parent(paths):
 def is_within(path, root):
     """True when path is root or below it. Compares whole segments, so a
     sibling named like the root ('...\\Projects-old') is not treated as inside
-    it, and normcase keeps it correct on case-insensitive filesystems."""
+    it, and fold() keeps it correct on case-insensitive filesystems."""
     if not root:
         return False
     try:
-        return os.path.normcase(os.path.commonpath([path, root])) == os.path.normcase(root)
+        return fold(os.path.commonpath([fold(path), fold(root)])) == fold(root)
     except ValueError:
         return False
 
@@ -311,10 +350,15 @@ def is_placeholder(path):
     return bool(attrs & (0x1000 | 0x400000) or (attrs & 0x400 and attrs & 0x40000))
 
 
+def root_problems(pairs, root):
+    return [(p, "OUTSIDE ROOT: not inside --root " + os.path.abspath(root))
+            for p in outside_root([x for pair in pairs for x in pair], root)]
+
+
 def cmd_preflight(args):
     pairs, identity = read_plan(args.map)
     check_approval(identity, args.approval)
-    unsafe = path_problems(pairs)
+    unsafe = root_problems(pairs, args.root) + path_problems(pairs)
     if unsafe:
         for path, why in unsafe:
             print(f'  UNSAFE PATH: {path}: {why}')
@@ -334,7 +378,11 @@ def cmd_preflight(args):
         by_target[os.path.normcase(t).lower()].append((s, t))
     collisions = {group[0][1]: [s for s, _ in group]
                   for group in by_target.values() if len(group) > 1}
-    existing_targets = [t for _, t in pairs if os.path.exists(t)]
+    # A case-only rename (readme.md -> README.md) on a case-insensitive volume
+    # sees its own source as the "existing" target; that is not a collision.
+    existing_targets = [t for s, t in pairs
+                        if os.path.exists(t) and not (s != t and s.lower() == t.lower()
+                                                      and same_file(s, t))]
     long_paths = [t for _, t in pairs if len(t) > args.path_threshold]
     can_check = placeholder_check_available()
     placeholders = ([s for s, _ in pairs if os.path.isfile(s) and is_placeholder(s)]
@@ -416,7 +464,7 @@ def cmd_preflight(args):
 def cmd_baseline(args):
     pairs, identity = read_plan(args.map)
     check_approval(identity, args.approval)
-    unsafe = path_problems(pairs)
+    unsafe = root_problems(pairs, args.root) + path_problems(pairs)
     if unsafe:
         sys.exit('UNSAFE PATH: ' + '; '.join(f'{path}: {why}' for path, why in unsafe))
     out = os.path.abspath(args.out)
@@ -425,8 +473,13 @@ def cmd_baseline(args):
     target_root = common_parent([t for _, t in pairs])
     if target_root is None:
         sys.exit("Targets span incompatible roots; use one approved target root per move map")
-    for root in (source_root, target_root):
-        if is_within(out, root):
+    guarded = [args.root] if args.root else []
+    for root, side in ((source_root, [s for s, _ in pairs]), (target_root, [t for _, t in pairs])):
+        # A map spanning top-level folders has '/' (or a drive) as its common
+        # root, which would refuse every --out. Guard each pair's folder instead.
+        guarded += sorted({os.path.dirname(p) for p in side}) if is_fs_root(root) else [root]
+    for root in guarded:
+        if is_within(out, os.path.abspath(root)):
             sys.exit("Refusing to write the baseline inside the source or target tree: "
                      f"{out}\n(The baseline is the recovery record; a move must not be "
                      "able to disturb it.)")
@@ -464,6 +517,9 @@ def cmd_verify(args):
             sys.exit("Legacy baseline has no map identity; cannot bind --approval.")
         check_approval(identity, args.approval)
     entries = baseline["pairs"]
+    escaped = outside_root([p for e in entries for p in (e["source"], e["target"])], args.root)
+    if escaped:
+        sys.exit("OUTSIDE ROOT: baseline paths are not inside --root: " + "; ".join(escaped))
     global SAFE_STOP
     SAFE_STOP = plan_stop([p for e in entries for p in (e["source"], e["target"])]
                           + ([os.path.join(os.path.abspath(args.stage), "x")] if args.stage else []))
@@ -507,8 +563,9 @@ def cmd_verify(args):
         # A verified target with the source still present is a copy - the
         # dual-tree state this protocol exists to prevent - not a move.
         if (not args.stage and not args.allow_source_present
-                and os.path.normcase(e["source"]) != os.path.normcase(e["target"])
-                and os.path.exists(e["source"])):
+                and fold(e["source"]) != fold(e["target"])
+                and os.path.exists(e["source"])
+                and not same_file(e["source"], check)):
             print(f"  STILL AT SOURCE (copied, not moved): {e['source']}")
             still_at_source += 1
 
@@ -523,6 +580,9 @@ def cmd_verify(args):
         return 1
     print("All files verified. Staging may be removed once sources are confirmed empty.")
     return 0
+
+
+ROOT_HELP = "Project folder; refuse sources/targets outside it (and a baseline inside it)"
 
 
 def main():
@@ -540,14 +600,17 @@ def main():
     p = sub.add_parser("preflight"); p.add_argument("--map", required=True)
     p.add_argument("--approval", help="Receipt identifying the owner-approved review")
     p.add_argument("--baseline", help="Also require unchanged baselined sources before moving")
-    p.add_argument("--path-threshold", type=int, default=240); p.set_defaults(fn=cmd_preflight)
+    p.add_argument("--path-threshold", type=int, default=240)
+    p.add_argument("--root", help=ROOT_HELP); p.set_defaults(fn=cmd_preflight)
 
     b = sub.add_parser("baseline"); b.add_argument("--map", required=True)
     b.add_argument("--approval", help="Receipt identifying the owner-approved review")
-    b.add_argument("--out", required=True); b.set_defaults(fn=cmd_baseline)
+    b.add_argument("--out", required=True)
+    b.add_argument("--root", help=ROOT_HELP); b.set_defaults(fn=cmd_baseline)
 
     v = sub.add_parser("verify"); v.add_argument("--baseline", required=True)
     v.add_argument("--stage")
+    v.add_argument("--root", help=ROOT_HELP)
     v.add_argument("--approval", help="Bind verification to the approved plan identity")
     v.add_argument("--allow-source-present", action="store_true",
                    help="Final verify of an approved COPY: do not fail when sources remain.")

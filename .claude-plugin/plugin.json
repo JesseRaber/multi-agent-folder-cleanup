@@ -1,9 +1,10 @@
 {
   "name": "multi-agent-folder-cleanup",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Audit, plan, and safely reorganize a shared project folder or multi-project portfolio so agents can validate authority, separate documentary from operational state, reject cross-project search contamination, and avoid duplicate or ambiguous trees.",
   "author": {
-    "name": "Jesse Raber"
+    "name": "Jesse Raber",
+    "url": "https://jesseraber.net"
   },
   "homepage": "https://github.com/JesseRaber/multi-agent-folder-cleanup",
   "repository": "https://github.com/JesseRaber/multi-agent-folder-cleanup",

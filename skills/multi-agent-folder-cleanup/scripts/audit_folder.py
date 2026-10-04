@@ -44,7 +44,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime
 
-VERSION = "1.5.1"  # must equal SKILL.md metadata.version
+VERSION = "1.5.2"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -72,7 +72,7 @@ LIST_CAP_BRIEF = 10
 AUDIT_ROOT = None
 
 # Names that CLAIM current state or authority. These must be opened and
-# verified against artifacts (workflow.md B2) - never trusted from the name.
+# verified against artifacts (audit-mode.md B2) - never trusted from the name.
 CLAIM_PATTERNS = [
     "*authority*", "*status*", "*index*", "*manifest*", "*inventory*",
     "*handoff*", "*final*", "*current*", "*roadmap*", "*quick_context*",
@@ -891,7 +891,6 @@ def report_session_index(root, args, limited):
         rel_dir = os.path.relpath(sdir, os.path.dirname(index_full)).replace(os.sep, "/")
         print("  Proposed rows (review Latest outcome and Status before saving):")
         for s in limited(missing):
-            last = s["last_time"] or s["mtime"]
             outcome = s["last_title"] or "(fill in)"
             print(f"  | {fmt_time(s['started'])} | {work_activity(s)} | {s['id']} | {_md_cell(s['tool'])} | "
                   f"{_md_cell(s['topic'])} | {_md_cell(outcome)} | (fill in) | "
@@ -1524,7 +1523,7 @@ def run_report(args, root, coverage_pairs):
         for p, _, _ in files:
             try:
                 h = sha256(p)
-            except OSError as exc:
+            except OSError:
                 # Never drop these silently: an unhashed file is a hole in the
                 # coverage claim, and on OneDrive it usually means a
                 # placeholder or a lock, both of which block an Execute pass.
@@ -1717,8 +1716,8 @@ def run_report(args, root, coverage_pairs):
             print(f"  {size / 1024:7.1f} KB  {key}")
         print(f"  Total: {read_total / 1024:.1f} KB (about {read_total // 4} tokens)")
         if over_budget:
-            print(f"  OVER BUDGET: every session pays this before working. Propose a short "
-                  f"router plus on-demand detail files; do not delete content.")
+            print("  OVER BUDGET: every session pays this before working. Propose a short "
+                  "router plus on-demand detail files; do not delete content.")
     else:
         print("  none identified (pass the project's read order as entrypoints)")
 
