@@ -63,6 +63,8 @@ Classify same-name records as:
 
 A divergent control artifact—authority map, exclusion register, schema, allowlist, validation rule, or status entrypoint—outranks ordinary duplicate cleanup. Companion-root disagreement outranks in-tree duplication because search may surface the stale shared copy first.
 
+Canonical status is an authority/navigation fact, not a file-property inference. Do not choose among roots or control artifacts by preferred-looking name, newest modified time, search order, size or matching hash. When same-name roots remain ambiguous, preserve their paths and stable identifiers and stop the affected root-dependent action.
+
 ## Inventory against artifacts, not names
 
 With a mounted filesystem, run the deterministic helper described in [audit-tools.md](audit-tools.md). First confirm `--version` equals this skill's version; a mismatch is a mixed install whose documented checks may not exist. Prefer `--brief` or `--out` and read **Findings at a glance** before any detail section. With connector-only access, follow [connector-audit.md](connector-audit.md) and disclose the downgrade.

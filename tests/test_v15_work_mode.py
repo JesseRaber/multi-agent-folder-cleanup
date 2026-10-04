@@ -242,8 +242,40 @@ class WorkModeTests(unittest.TestCase):
         text = (REPO / "skills/multi-agent-folder-cleanup/references/work-mode.md").read_text(encoding="utf-8")
         for phrase in ("same task is active", "one explicitly current handoff per subject",
                        "Pending**, **Applied**, **Superseded**, **Conflicted** or **Unverifiable",
-                       "same-version candidate"):
+                       "same-version candidate", "exactly one authoritative project-wide tracker",
+                       "do not create a substitute roadmap", "newly discovered future work"):
             self.assertIn(phrase, text)
+
+    def test_optional_rules_carry_single_tracker_requirement(self):
+        text = (REPO / "skills/multi-agent-folder-cleanup/references/project-rules/AGENTS.proposed.md").read_text(encoding="utf-8")
+        for phrase in ("exactly one authoritative project-wide tracker",
+                       "Do not create a competing roadmap", "one exact pending tracker insertion",
+                       "Delegated helpers return proposed rows"):
+            self.assertIn(phrase, text)
+
+    def test_v151_decision_invariants_are_routed_to_relevant_modes(self):
+        refs = REPO / "skills/multi-agent-folder-cleanup/references"
+        preconditions = (refs / "preconditions.md").read_text(encoding="utf-8")
+        connector = (refs / "connector-audit.md").read_text(encoding="utf-8")
+        audit = (refs / "audit-mode.md").read_text(encoding="utf-8")
+        work = (refs / "work-mode.md").read_text(encoding="utf-8")
+
+        # Ambiguous connector roots stop only root-dependent work and retain identity evidence.
+        self.assertIn("multiple same-name candidate roots", preconditions)
+        self.assertIn("stable identifier", preconditions)
+        self.assertIn("stop the affected inspection or mutation", connector)
+
+        # File properties never become authority evidence for a canonical root.
+        connector_lower = connector.lower()
+        for prohibited_basis in ("filename", "newest modified time", "search rank", "matching bytes/hashes"):
+            self.assertIn(prohibited_basis, connector_lower)
+        self.assertIn("owner direction or applicable adopted authority/navigation", connector)
+
+        # Audit and Work modes receive only their relevant additions.
+        self.assertIn("`Documented`, `Observed`, `Inferred` or `Unknown`", audit)
+        self.assertIn("What would verify it", audit)
+        self.assertIn("Before creating an important standalone file", work)
+        self.assertIn("bounded pre-write check", work)
 
 
 if __name__ == "__main__":

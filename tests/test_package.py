@@ -64,6 +64,14 @@ class PackageTests(unittest.TestCase):
         )
         self.assertIn("$multi-agent-folder-cleanup", data["interface"]["default_prompt"])
 
+    def test_copilot_package_rule_preserves_python_and_omits_powershell(self) -> None:
+        packager = (ROOT / "packaging/build_packages.py").read_text(encoding="utf-8")
+        guide = (ROOT / "packaging/INSTALL-microsoft-copilot.md").read_text(encoding="utf-8")
+        self.assertIn("microsoft-copilot-agent-only", packager)
+        self.assertIn("not n.endswith('.ps1')", packager)
+        self.assertIn("Preserve the Python helpers", packager)
+        self.assertIn("does not support `.ps1`", guide)
+
 
 if __name__ == "__main__":
     unittest.main()

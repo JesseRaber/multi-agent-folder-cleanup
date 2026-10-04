@@ -47,6 +47,8 @@ For each document that asserts a completed state:
 
 Record each as **verified**, **contradicted**, or **unverifiable**. Never upgrade "unverifiable" to "current".
 
+For each material conclusion, record a compact claim table: `Claim`, `State` (`Documented`, `Observed`, `Inferred` or `Unknown`), `Evidence`, `Scope/date`, and `What would verify it`. `Observed` means directly inspected in the stated scope; it does not mean provider-wide or current beyond the observation time. Repeated documentary claims remain `Documented` until independently checked.
+
 A stale index is not only one that points at missing paths. Check the inverse too: **does the index or manifest omit folders that exist?** A root-level `PROJECT_FOLDER_MANIFEST.csv` with 1,282 rows and an authoritative name that contains zero rows for the four most recent working folders will convince an agent those folders are not part of the project. Record it as **contradicted by filesystem state**, with the specific folder names that are missing.
 
 ### B3. Classify
@@ -87,6 +89,8 @@ Stop here in Audit mode. Do not create navigation files. Do not move anything. T
  ran, and — if it did not — which checks are therefore unavailable>
 ## Outcome
 <2-4 bullets: the actual state, plainly>
+## Claim table
+<material claim → Documented/Observed/Inferred/Unknown → evidence → scope/date → what would verify it>
 ## Other roots
 <each companion/mirror root, what it claims is active, whether it carries
  entrypoints — or "none found", which is also a result>

@@ -26,6 +26,8 @@ For every enterprise-search or connector result:
 4. Do not use a mismatched result to establish presence, absence, authority, or current state.
 5. Treat quoted hashes or byte comparisons as record-reported evidence, not independently recomputed evidence.
 
+If discovery returns two or more same-name candidate project roots, record every full path/site and stable item/root identifier and stop the affected inspection or mutation. Do not silently pick one or combine their results. Return a checkpoint naming the ambiguity and the evidence needed to resolve it. Search rank, filename, newest modified time and matching bytes/hashes do not establish which root is canonical; require owner direction or applicable adopted authority/navigation.
+
 ## Build an entrypoint matrix
 
 Derive expected files from owner instructions. Typical candidates are `AGENTS.md`, `CLAUDE.md`, `README_FIRST.md`, `PROJECT_ROADMAP_STATUS.md`, `AUTHORITY_MAP.md`, `INDEX.md`, `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md`, `AI_CONTEXT/PROJECT_ACTIVITY_JOURNAL.md`, and `AI_CONTEXT/CHAT_INDEX.md`.
@@ -45,6 +47,8 @@ Classify each as opened, directly listed, path-validated search result, missing 
 ## Separate state types
 
 A handoff, roadmap, journal, or report establishes documentary state. Operational state requires current repository, provider, deployment, database, runtime, device, or test evidence. Use **documented as** when operational verification is unavailable.
+
+For material conclusions, keep a compact claim table with columns `Claim`, `State` (`Documented`, `Observed`, `Inferred` or `Unknown`), `Evidence`, `Scope/date`, and `What would verify it`. Do not collapse an inference into an observation because several documents repeat it.
 
 ## Same-name controls
 

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### 1.5.1 candidate — root identity and shared-work convergence
+
+- Stop root-dependent work when a connector or search returns multiple same-name candidate project roots. Record full paths/sites and stable IDs; do not silently combine results or select a winner.
+- Canonical-root selection can come only from owner direction or applicable adopted authority/navigation—not filename, modified time, search rank, size or hash equality.
+- Audit reports now include a compact claim table separating Documented, Observed, Inferred and Unknown conclusions with evidence, scope/date and the verification needed.
+- Work mode performs a bounded pre-write lookup in the intended folder, project index and canonical tracker before creating an important standalone file.
+- Work mode and the optional Project Rules require one authoritative project-wide tracker for all proposed changes, future work, deferred work and open tasks. Supporting plans link to stable tracker IDs instead of growing independent backlogs; existing competing lists are reconciled with provenance, and unsafe shared writes become one exact pending tracker insertion rather than another roadmap file.
+- Add `-microsoft-copilot-agent-only.zip`: the full skill and Python helpers without `audit_folder.ps1`, which Microsoft Copilot's upload validator rejects as an unsupported skill-script type.
+
 ### 1.5.0 candidate — Work mode
 
 - New **Work** mode (`references/work-mode.md`, W1–W7) for ordinary work in a shared multi-agent folder: arrive within a read budget, claim your own session log and scratch folder, save new files where the next agent will look, give new documents a status header, edit shared records with re-read/minimal-edit/verify, index deliverables only, and hand off at the end of every request. Work mode never moves, renames or deletes existing files.
