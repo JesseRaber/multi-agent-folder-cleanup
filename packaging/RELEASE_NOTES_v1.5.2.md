@@ -1,6 +1,6 @@
 # multi-agent-folder-cleanup 1.5.2
 
-Status: candidate on branch `release/v1.5.2`; not published until the owner approves the merge and tag.
+Status: released as tag `v1.5.2` after owner approval 2026-10-04.
 
 ## Changes
 

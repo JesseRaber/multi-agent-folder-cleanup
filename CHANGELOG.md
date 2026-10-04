@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### 1.5.2 — move-safety fixes and helper examples
+### 1.5.2 (released 2026-10-04) — move-safety fixes and helper examples
 
 - `verify_move.py`: new `--root` on `preflight`, `baseline` and `verify` refuses sources/targets outside the project (OUTSIDE ROOT) and a baseline written inside it (register R094).
 - `verify_move.py`: a map whose common root is the filesystem root now guards each pair's folder instead of refusing every `--out` (R105); case-only renames on case-insensitive volumes are not reported as TARGET EXISTS (R106); macOS path comparisons fold case (R107); the Windows exclusive-read probe uses the `\\?\` extended-length form for long paths (R108).
