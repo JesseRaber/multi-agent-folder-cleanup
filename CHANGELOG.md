@@ -1,5 +1,10 @@
 # Changelog
 
+### Unreleased (v1.6.1 candidate) — record verification
+
+- Added read-only `scripts/verify_records.py` (R150, R154): per-file SHA-256, UTF-8 validity, BOM, CRLF/LF/lone-CR counts, mojibake markers outside code, unresolved Markdown relative links and table damage, plus `--compare` (exact / newline-normalized / whitespace-only / differ) and `--expect-sha256`. Work mode now asks agents to cite its output before calling a shared-record edit verified. Regression tests cover each check and confirm inputs are never modified.
+- Source: Claude session `7c06e17e-ede7-484c-9d8f-32e0fa6e07c2`; scope confirmed by the Codex (36e6245f) and Manus (07cf1444) audits of 2026-10-06.
+
 ### 1.6.0 (released 2026-10-06) — shared-record, rerun and privacy safeguards
 
 - Fixed pre-existing R100 parity under Windows PowerShell 5.1 by giving tied session timestamps and duplicate IDs the same ordinal, case-insensitive relative-filename tie-breaker in both helpers. Added a tied-timestamp regression fixture plus a dependency-gated runner and pinned PyYAML development requirement.
