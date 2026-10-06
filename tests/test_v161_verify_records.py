@@ -127,6 +127,15 @@ class VerifyRecordsTests(unittest.TestCase):
         self.assertPass("--expect-sha256", f"{path}={digest.upper()}")
         self.assertFinding("expected", "--expect-sha256", f"{path}={'0' * 64}")
 
+    def test_redirected_output_is_utf8_under_a_legacy_console_encoding(self) -> None:
+        # Windows pipes default to cp1252; the report must still be UTF-8.
+        damaged = chr(0x2014).encode("utf-8").decode("cp1252").encode("utf-8")
+        path = self.write("enc.md", b"x " + damaged + b"\n")
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        proc = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True, env=env)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("mojibake marker", proc.stdout.decode("utf-8"))
+
     def test_unreadable_file_is_exit_2(self) -> None:
         code, out = run(self.dir / "nope.md")
         self.assertEqual(code, 2, out)

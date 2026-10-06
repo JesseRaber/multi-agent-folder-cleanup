@@ -201,7 +201,20 @@ def pair(value, label):
     return left, right
 
 
+def _safe_stdout():
+    """Never crash on a path the console cannot encode (Windows cp1252);
+    redirected output is UTF-8, matching the other helpers."""
+    try:
+        if sys.stdout.isatty():
+            sys.stdout.reconfigure(errors="backslashreplace")
+        else:
+            sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    except (AttributeError, ValueError):
+        pass
+
+
 def main(argv=None):
+    _safe_stdout()
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--version", action="version", version=f"verify_records.py {VERSION}")
