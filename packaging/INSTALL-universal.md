@@ -99,7 +99,8 @@ A loaded skill states **Mode: Audit** first and reports
   you need the audit helper's OneDrive placeholder check; `audit_folder.py` cannot
   produce it. `verify_move.py preflight` checks hydration only under Windows-native Python.
 - All four scripts are read-only against the target folder. `verify_move.py`
-  never moves, copies, or deletes anything.
+  never moves, copies, or deletes anything. `verify_records.py` checks shared
+  records (hash, encoding, line endings, links, tables) and does not modify them.
 
 ## Verify what you downloaded
 
