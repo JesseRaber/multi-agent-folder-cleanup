@@ -67,7 +67,7 @@ Copy or upload only `skills/multi-agent-folder-cleanup/`, preserving its `SKILL.
 skills/multi-agent-folder-cleanup/
   SKILL.md                       concise routing and safety contract
   agents/openai.yaml             OpenAI discovery and starter-prompt metadata
-  scripts/                       read-only audit and move-verification helpers
+  scripts/                       read-only audit, move- and record-verification helpers
   references/preconditions.md    every-mode preconditions (read first)
   references/audit-mode.md       Audit protocol and report format
   references/plan-mode.md        Plan protocol and approval package
@@ -152,7 +152,7 @@ These address preventable failure modes observed in one model/project and inspec
 
 ## What the scripts do
 
-All three scripts are read-only against the target folder. `verify_move.py` never moves files.
+All four scripts are read-only against the target folder. `verify_move.py` never moves files.
 
 ```bash
 python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \

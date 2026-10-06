@@ -98,7 +98,7 @@ A loaded skill states **Mode: Audit** first and reports
 - **PowerShell script:** PowerShell 5.1 or PowerShell 7+. Required on Windows if
   you need the audit helper's OneDrive placeholder check; `audit_folder.py` cannot
   produce it. `verify_move.py preflight` checks hydration only under Windows-native Python.
-- All three scripts are read-only against the target folder. `verify_move.py`
+- All four scripts are read-only against the target folder. `verify_move.py`
   never moves, copies, or deletes anything.
 
 ## Verify what you downloaded

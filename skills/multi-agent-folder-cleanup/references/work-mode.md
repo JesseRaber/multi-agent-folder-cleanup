@@ -82,7 +82,7 @@ Unless the target may contain credentials, first save a byte-for-byte pre-edit c
 3. Re-read after saving, compute the complete after SHA-256 and diff against the pre-edit copy when one is permitted. Confirm the edit is there exactly once, everything else is unchanged, and encoding, line endings and structured regions such as Markdown tables remain intact.
 4. If the file changed since you read it, merge your change onto the new version. If you can't do that safely, save the exact intended edit in your scratch folder, mark it PENDING in your session log and move on.
 
-Do not claim a shared edit is **verified**, **zero loss** or **aligned** unless the applicable hash, diff and structure checks above passed. When a pre-edit copy is prohibited because the file contains credentials, report that recovery and diff coverage limit instead.
+Do not claim a shared edit is **verified**, **zero loss** or **aligned** unless the applicable hash, diff and structure checks above passed. When `scripts/verify_records.py` is available, run it on every shared record you changed and cite its output line for each file; an ACTIVATED or "verified" record entry without that output, or an equivalent stated check, must say "not verified". When a pre-edit copy is prohibited because the file contains credentials, report that recovery and diff coverage limit instead.
 
 A pending edit must be concrete enough for a later writer to apply without guessing:
 

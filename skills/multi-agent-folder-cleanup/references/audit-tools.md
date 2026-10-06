@@ -51,6 +51,7 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ```bash
 python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.0
 python3 scripts/verify_move.py --version     # verify_move.py 1.6.0
+python3 scripts/verify_records.py --version  # verify_records.py 1.6.0
 pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.0
 ```
 
@@ -146,6 +147,16 @@ pwsh -File scripts/audit_folder.ps1 -Root <portfolio> `
 ```
 
 Journal reporting flags journal-like files at or above the threshold. Entrypoint checks are grounded only in the direct root. Portfolio mode reports immediate children and root-level counts without determining authority. Pointer detection is conservative and advisory. An expected-upload manifest may be a line list or CSV with `path` and optional `size` and `sha256`; it verifies listed files but authorizes nothing.
+
+## Check shared records after an edit
+
+```bash
+python3 scripts/verify_records.py AGENTS.md PROJECT_INDEX.md AI_CONTEXT/SESSION_INDEX.md
+python3 scripts/verify_records.py AGENTS.md --expect-sha256 AGENTS.md=<recorded hash>
+python3 scripts/verify_records.py --compare installed/AGENTS.md=source/AGENTS.md
+```
+
+Read-only. Per file it reports SHA-256, byte count, UTF-8 validity, BOM, CRLF/LF/lone-CR counts, mojibake markers outside code (for example `â€”`), Markdown relative links that do not resolve, and table damage (missing separator row, column-count mismatch, a row stranded outside its table). `--newline lf|crlf` enforces one style (default: any one style, never mixed); `--allow-bom` accepts a BOM where a file needs one. `--compare` reports exact bytes, equal only after newline normalization, whitespace-only difference, or differ. `--expect-sha256` checks a recorded hash. Exit 0 means no findings, 1 findings, 2 unreadable input. A pass proves only these properties, not meaning, adoption or synchronization; URLs and `#anchors` are not checked.
 
 ## Review and verify a move map
 

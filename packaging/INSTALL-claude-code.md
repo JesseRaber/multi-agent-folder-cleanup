@@ -84,7 +84,7 @@ Portfolio smoke test:
 - **PowerShell script:** PowerShell 5.1 or 7+. Needed on Windows for the
   audit helper's OneDrive placeholder check, which `audit_folder.py` cannot produce.
   `verify_move.py preflight` checks hydration only under Windows-native Python.
-- All three scripts are read-only against the target folder. `verify_move.py`
+- All four scripts are read-only against the target folder. `verify_move.py`
   never moves, copies, or deletes.
 
 ## Verify what you downloaded
