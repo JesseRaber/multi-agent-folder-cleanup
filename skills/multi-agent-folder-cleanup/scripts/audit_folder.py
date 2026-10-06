@@ -387,15 +387,15 @@ def is_secret_hint_name(name):
                for sep in separators)
 
 
-def content_read_allowed(path):
-    """Fail closed before content I/O; metadata-only discovery is unaffected."""
+def content_read_block_reason(path):
+    """Return the fail-closed reason without performing content I/O."""
     current = os.path.abspath(path)
     if AUDIT_ROOT:
         try:
             if os.path.normcase(os.path.commonpath([current, AUDIT_ROOT])) != os.path.normcase(AUDIT_ROOT):
-                return False
+                return "unreadable"
         except ValueError:
-            return False
+            return "unreadable"
     # Check the file and its folders up to, not including, the chosen root.
     # Links above the root (a redirected profile, macOS /tmp) are the owner's
     # choice of location, not traversal out of the audit.
@@ -404,14 +404,21 @@ def content_read_allowed(path):
         if stop and os.path.normcase(current) == stop:
             break
         if is_secret_hint_name(os.path.basename(current)):
-            return False
+            return "credential"
         if os.path.islink(current) or _is_windows_reparse(current):
-            return False
+            return "link"
         parent = os.path.dirname(current)
         if parent == current:
             break
         current = parent
-    return not _cloud_only(path)
+    if _cloud_only(path):
+        return "unreadable"
+    return None
+
+
+def content_read_allowed(path):
+    """Fail closed before content I/O; metadata-only discovery is unaffected."""
+    return content_read_block_reason(path) is None
 
 
 def require_content_read(path):
@@ -1552,6 +1559,7 @@ def run_report(args, root, coverage_pairs):
         hashes = {}
         unreadable = []
         guarded = []
+        linked = []
         for p, _, _ in files:
             try:
                 h = sha256(p)
@@ -1559,8 +1567,11 @@ def run_report(args, root, coverage_pairs):
                 # Never drop these silently: an unhashed file is a hole in the
                 # coverage claim, and on OneDrive it usually means a
                 # placeholder or a lock, both of which block an Execute pass.
-                if not content_read_allowed(p):
+                reason = content_read_block_reason(p)
+                if reason == "credential":
                     guarded.append(p)
+                elif reason == "link":
+                    linked.append(p)
                 else:
                     unreadable.append((p, 'UNREADABLE'))
                 continue
@@ -1574,6 +1585,15 @@ def run_report(args, root, coverage_pairs):
             if len(guarded) > cap(25):
                 print(f"  ... and {len(guarded) - cap(25)} more")
             print(f"  {len(guarded)} file(s) were not hashed by design. "
+                  "Their content-read guard remains active.")
+
+        if linked:
+            section("LINKED PATH - not followed or hashed")
+            for p in linked[:cap(25)]:
+                print(f"  READ BLOCKED       {rel(p, root)}")
+            if len(linked) > cap(25):
+                print(f"  ... and {len(linked) - cap(25)} more")
+            print(f"  {len(linked)} linked path(s) were not followed or hashed. "
                   "Their content-read guard remains active.")
 
         if unreadable:

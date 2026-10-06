@@ -267,31 +267,35 @@ function Test-SecretHintName([string]$name) {
     return $false
 }
 
-function Test-ContentReadAllowed([string]$path) {
+function Get-ContentReadBlockReason([string]$path) {
     $cur = [IO.Path]::GetFullPath($path)
     $inside = $false
     foreach ($base in @($RootFull, $RootWalk)) {
         $boundary = $base.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
         if ($cur -eq $base -or $cur.StartsWith($boundary, [StringComparison]::OrdinalIgnoreCase)) { $inside = $true }
     }
-    if (-not $inside) { return $false }
+    if (-not $inside) { return 'unreadable' }
     $first = $true
     while ($cur) {
         # Folders above the chosen root are the owner's location, not traversal.
         if ($cur.TrimEnd('\', '/') -ieq $RootFull.TrimEnd('\', '/') -or $cur.TrimEnd('\', '/') -ieq $RootWalk.TrimEnd('\', '/')) { break }
-        if (Test-SecretHintName ([IO.Path]::GetFileName($cur))) { return $false }
+        if (Test-SecretHintName ([IO.Path]::GetFileName($cur))) { return 'credential' }
         try {
             $item = Get-Item -LiteralPath $cur -Force -ErrorAction Stop
             # Cloud-only state matters for the file itself; folders are only
             # checked for links (OneDrive folders carry recall attributes).
-            if ($item.LinkType -or ($first -and (Test-CloudOnly $item))) { return $false }
-        } catch { return $false }
+            if ($item.LinkType) { return 'link' }
+            if ($first -and (Test-CloudOnly $item)) { return 'unreadable' }
+        } catch { return 'unreadable' }
         $first = $false
         $parent = [IO.Path]::GetDirectoryName($cur)
         if ($parent -eq $cur) { break }
         $cur = $parent
     }
-    return $true
+    return $null
+}
+function Test-ContentReadAllowed([string]$path) {
+    return $null -eq (Get-ContentReadBlockReason $path)
 }
 function Assert-ContentRead([string]$path) {
     if (-not (Test-ContentReadAllowed $path)) { throw 'READ BLOCKED: credential hint, link, or cloud placeholder' }
@@ -1220,6 +1224,7 @@ else { Write-Line "  none" }
 if ($HashFiles) {
     $unreadable = [System.Collections.ArrayList]::new()
     $guarded = [System.Collections.ArrayList]::new()
+    $linked = [System.Collections.ArrayList]::new()
     $hashes = foreach ($f in $files) {
         try {
             Assert-ContentRead $f.FullName
@@ -1233,9 +1238,10 @@ if ($HashFiles) {
             # Never drop these silently: an unhashed file is a hole in the
             # coverage claim, and on OneDrive it usually means a placeholder
             # or a lock, both of which block an Execute pass.
-            if (Test-ContentReadAllowed $f.FullName) {
-                [void]$unreadable.Add([pscustomobject]@{ Path = $f.FullName; Why = 'UNREADABLE' })
-            } else { [void]$guarded.Add($f.FullName) }
+            $reason = Get-ContentReadBlockReason $f.FullName
+            if ($reason -eq 'credential') { [void]$guarded.Add($f.FullName) }
+            elseif ($reason -eq 'link') { [void]$linked.Add($f.FullName) }
+            else { [void]$unreadable.Add([pscustomobject]@{ Path = $f.FullName; Why = 'UNREADABLE' }) }
         }
     }
 
@@ -1244,6 +1250,13 @@ if ($HashFiles) {
         $guarded | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("  CREDENTIAL GUARD   " + (Get-Short $_)) }
         if ($guarded.Count -gt (Get-Cap 25)) { Write-Line ("  ... and " + ($guarded.Count - (Get-Cap 25)) + " more") }
         Write-Line ("  " + $guarded.Count + " file(s) were not hashed by design. Their content-read guard remains active.")
+    }
+
+    if ($linked.Count) {
+        Write-Section 'LINKED PATH - not followed or hashed'
+        $linked | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("  READ BLOCKED       " + (Get-Short $_)) }
+        if ($linked.Count -gt (Get-Cap 25)) { Write-Line ("  ... and " + ($linked.Count - (Get-Cap 25)) + " more") }
+        Write-Line ("  " + $linked.Count + " linked path(s) were not followed or hashed. Their content-read guard remains active.")
     }
 
     if ($unreadable.Count) {

@@ -1,11 +1,14 @@
 """v1.5.3 regressions for R094/R096/R123/R124/R126."""
 from pathlib import Path
+import contextlib
+import io
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 REPO = Path(__file__).resolve().parents[1]
@@ -52,9 +55,9 @@ class V153CandidateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             with zipfile.ZipFile(root / "evil.zip", "w") as zf:
-                for name in ("safe/report.md", "inside/../escape.txt", r"inside\..\escape2.txt",
+                for name in ("safe/report.md", "inside/../escape.txt", "inside/../escape2.txt",
                              "/absolute.txt", "C:/drive.txt"):
-                    zf.writestr(name, b"x")
+                    zf.writestr(zipfile.ZipInfo(name), b"x")
             for name, result in run_audits(root, "--inspect-zip"):
                 with self.subTest(helper=name):
                     self.assertEqual(result.returncode, 0, result.stderr)
@@ -76,6 +79,52 @@ class V153CandidateTests(unittest.TestCase):
                     guarded = result.stdout.split("Not hashed by design (credential guard)", 1)[1].split("== Identical content", 1)[0]
                     self.assertIn("credentials.md", guarded)
                     self.assertNotIn("Resolve before any Execute", guarded)
+
+    @unittest.skipIf(sys.platform == "win32", "POSIX symlink fixture")
+    def test_credential_and_link_land_in_different_sections(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "ordinary.md").write_text("ordinary", encoding="utf-8")
+            (root / "credentials.md").write_text("secret fixture", encoding="utf-8")
+            try:
+                (root / "linked.md").symlink_to(root / "ordinary.md")
+            except OSError as exc:
+                self.skipTest(f"symlink unavailable: {exc}")
+            for name, result in run_audits(root, "--hash-files"):
+                with self.subTest(helper=name):
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    guarded = result.stdout.split("Not hashed by design (credential guard)", 1)[1].split("== LINKED PATH", 1)[0]
+                    linked = result.stdout.split("LINKED PATH - not followed or hashed", 1)[1].split("== Identical content", 1)[0]
+                    self.assertIn("credentials.md", guarded)
+                    self.assertNotIn("linked.md", guarded)
+                    self.assertIn("linked.md", linked)
+                    self.assertIn("READ BLOCKED", linked)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows placeholder classification")
+    def test_cloud_placeholder_keeps_execute_blocking_advice(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("audit_folder_fixture", PY)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            item = root / "offline.md"
+            item.write_text("fixture", encoding="utf-8")
+            module.AUDIT_ROOT = str(root.resolve())
+            output = io.StringIO()
+            with mock.patch.object(module, "_cloud_only", side_effect=lambda path: Path(path) == item), \
+                    mock.patch.object(sys, "argv", [str(PY), "--root", str(root), "--hash-files"]), \
+                    contextlib.redirect_stdout(output):
+                self.assertEqual(module.content_read_block_reason(str(item)), "unreadable")
+                self.assertFalse(module.content_read_allowed(str(item)))
+                module.main()
+            report = output.getvalue()
+            unreadable = report.split("UNREADABLE - could not hash", 1)[1].split("== Identical content", 1)[0]
+            self.assertIn("offline.md", unreadable)
+            self.assertIn("Resolve before any Execute pass", unreadable)
+            if "Not hashed by design (credential guard)" in report:
+                guarded = report.split("Not hashed by design (credential guard)", 1)[1].split("==", 1)[0]
+                self.assertNotIn("offline.md", guarded)
 
     def test_header_variants_outcome_and_distinct_writer_pairing(self):
         with tempfile.TemporaryDirectory() as tmp:
