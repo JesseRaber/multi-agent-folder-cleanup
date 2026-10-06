@@ -152,7 +152,7 @@ def verify(archive, flavor, items, dirs, version):
             if flavor.endswith('-plugin'):
                 scripts /= 'skills/' + NAME
             scripts /= 'scripts'
-            for name in ('audit_folder.py', 'verify_move.py'):
+            for name in ('audit_folder.py', 'verify_move.py', 'verify_records.py'):
                 if not (scripts / name).exists():
                     assert flavor == 'gemini-apps-only', (flavor, name)
                     continue
