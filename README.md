@@ -8,7 +8,7 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.5.3` — local candidate; see `CHANGELOG.md`.
+`1.5.3` — released 2026-10-06; see `CHANGELOG.md`.
 
 Report as: **Loaded Multi-Agent Folder Cleanup v1.5.3**.
 
@@ -178,7 +178,7 @@ python skills/multi-agent-folder-cleanup/scripts/verify_move.py preflight \
   --map moves.csv --approval proposal.json --root <project> --path-threshold 240
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
   --map moves.csv --approval proposal.json --root <project> --out /safe/audit/baseline.json
-# Recheck with preflight --approval proposal.json --baseline /safe/audit/baseline.json before moving.
+# Recheck with preflight --approval proposal.json --baseline /safe/audit/baseline.json --root <project> before moving.
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
   --baseline /safe/audit/baseline.json --root <project>
 ```

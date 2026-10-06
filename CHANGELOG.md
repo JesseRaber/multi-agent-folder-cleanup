@@ -1,13 +1,11 @@
 # Changelog
 
-## Unreleased
-
-### 1.5.3 candidate — audit parity and documentation corrections
+### 1.5.3 (released 2026-10-06) — audit parity and documentation corrections
 
 - Added warn-only `--root` guidance to every move-verification recipe and a clear warning for unconfined helper calls (R094).
 - Hardened ZIP member-name checks, separated credential-guarded files from true hash failures, broadened session-header parsing and filename fallback labels, and counted possibly active writers by distinct session in both helpers (R096, R123, R124, R126).
 - Added regression coverage and clean no-PowerShell skips; corrected Work/Plan fallbacks, audit taxonomy routing, record-edit coordination, optional Project Rules package wording and canonical-tracker examples (R100, R128–R130, R135, R138).
-- Known deferred limitations: hard-link identity checks (R065) and move-map swaps/cycles (R131).
+- Known deferred limitations: hard-link identity checks (R065), move-map swaps/cycles (R131), claims-section noise (R125) and the case-fold collision banner (R136).
 
 ### 1.5.2 (released 2026-10-04) — move-safety fixes and helper examples
 
