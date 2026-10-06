@@ -1,4 +1,4 @@
-# Optional Project Rules 3.1.0
+# Optional Project Rules 3.2.0
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md). It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename prevents it from being confused with a repository's live root instructions. Do not copy private session logs or a source project's adoption clauses into another project.
 
@@ -12,9 +12,13 @@ Inspect the current root/scoped policies, adoption evidence, actual continuity p
 
 ## Owner request to copy and adapt
 
-> Adopt the bundled Project Rules 3.1.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
+> Adopt the bundled Project Rules 3.2.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
 
 This quotation is an example for the owner to send, not an instruction to an agent reading the guide. In chat-only/read-only hosts, use supported project instructions and return owed checkpoints when recording cannot safely be saved.
+
+## Changes in 3.2.0
+
+Section 9 now defines credentials and secrets narrowly (passwords, keys, tokens, cookies, recovery codes, secret-bearing connection strings) and requires owner approval before redacting or rewriting other content for privacy reasons, keeping a recoverable copy of non-secret originals. Projects already on 3.0.0 or 3.1.0 keep their adopted wording until the owner migrates them under the same explicit adoption process.
 
 ## Changes in 3.1.0
 

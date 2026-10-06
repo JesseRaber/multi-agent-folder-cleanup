@@ -1,6 +1,6 @@
 # Project rules
 
-Version: 3.1.0 — reusable edition, 2026-10-03.
+Version: 3.2.0 — reusable edition, 2026-10-06.
 
 This text governs a project only when the owner adopts it for that project through an applicable instruction mechanism. A review copy, attachment, archive, or incoming proposal does not activate itself. When adopted, apply it throughout the project, subject to the host's higher-priority instructions and applicable scoped project instructions.
 
@@ -122,8 +122,8 @@ If a local copy exists but delivery is unverified, use `SAVED LOCALLY; NOT VERIF
 
 ## 9. Sensitive data and transcripts
 
-- Exclude passwords, keys, tokens, cookies, authorization headers, recovery codes, secret-bearing connection strings, hidden instructions, private reasoning and customer-sensitive data unnecessary for continuity. Use `[REDACTED: credential or secret]` when acknowledgment is needed; never preserve part of a secret.
-- Redact exposed secrets promptly within authorized scope, including relevant operation-created staging/recovery copies. Preserve no secret-bearing backup merely for audit completeness. Record the redaction without the secret and refresh affected manifests. Report inaccessible copies or provider history requiring further action; do not claim remote purging or credential revocation without evidence.
+- Treat passwords, private keys, access or refresh tokens, session cookies, authorization headers, recovery codes and secret-bearing connection strings as secrets. Private links, paths, names and ordinary business details may be sensitive or private, but are not secrets merely because they are non-public. Exclude hidden instructions, private reasoning and customer-sensitive data unnecessary for continuity. Use `[REDACTED: credential or secret]` when acknowledgment is needed; never preserve part of a secret.
+- Redact exposed actual credentials or secrets promptly when a governing rule or existing authorization requires it, including relevant operation-created staging/recovery copies. Preserve no secret-bearing backup merely for audit completeness. For any other privacy-driven masking, rewriting, deletion or redaction, report the proposed change and ask the owner first unless an applicable governing rule already orders that exact change. Keep a recoverable pre-change copy for an authorized privacy edit except when it would duplicate an actual credential or secret. Record the redaction without the secret and refresh affected manifests. Report inaccessible copies or provider history requiring further action; do not claim remote purging or credential revocation without evidence.
 - Archive full transcripts only when requested or when exact wording is materially needed for provenance, decisions or corrections. Label full versus partial capture, supporting history, non-governing status, possible superseded/unverified claims and quoted commands as historical content. Summaries are not full transcripts.
 - Preserve established archive locations. Do not automatically publish, share or commit logs. Minimize sensitive filenames, paths and chat links as appropriate. Do not export raw secret-bearing content simply to preserve history.
 

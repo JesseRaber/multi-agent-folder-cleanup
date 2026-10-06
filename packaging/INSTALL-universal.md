@@ -25,10 +25,11 @@ When a host has no native skill loader, paste this into its instructions:
 > When the user mentions a messy or sprawling project folder, an AI handoff
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
-> State the operating mode (Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.5.3.
+> State the operating mode (Work / Audit / Plan / Execute) in the first line.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.6.0.
 > Read `references/preconditions.md` before any run, then only the file for the
-> mode: `audit-mode.md`, `plan-mode.md`, `execute-moves.md` or `execute-records.md`.
+> mode: `work-mode.md`, `audit-mode.md`, `plan-mode.md`, `execute-moves.md` or
+> `execute-records.md`. If `SKILL.md` is loaded, follow its mode routing.
 > Never move or delete anything without an explicitly approved move map.
 
 ---
@@ -41,7 +42,7 @@ interface or configured skills directory. For distribution across supported
 ChatGPT and Codex surfaces, use the `-codex-chatgpt-plugin.zip` package.
 
 Custom GPT / Project without a skill ZIP: upload `SKILL.md`,
-`references/preconditions.md`, `references/audit-mode.md`,
+`references/preconditions.md`, `references/work-mode.md`, `references/audit-mode.md`,
 `references/plan-mode.md` and `references/navigation-templates.md` as knowledge
 files and paste the instruction block above.
 
@@ -87,7 +88,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.5.3**.
+**Loaded Multi-Agent Folder Cleanup v1.6.0**.
 
 ---
 
@@ -95,7 +96,8 @@ A loaded skill states **Mode: Audit** first and reports
 
 - **Scripts:** Python 3.8+. Standard library only - no `pip install`.
 - **PowerShell script:** PowerShell 5.1 or PowerShell 7+. Required on Windows if
-  you need the OneDrive placeholder check; the Python version cannot produce it.
+  you need the audit helper's OneDrive placeholder check; `audit_folder.py` cannot
+  produce it. `verify_move.py preflight` checks hydration only under Windows-native Python.
 - All three scripts are read-only against the target folder. `verify_move.py`
   never moves, copies, or deletes anything.
 

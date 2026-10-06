@@ -1,5 +1,16 @@
 # Changelog
 
+### 1.6.0 candidate — shared-record, rerun and privacy safeguards
+
+- Fixed pre-existing R100 parity under Windows PowerShell 5.1 by giving tied session timestamps and duplicate IDs the same ordinal, case-insensitive relative-filename tie-breaker in both helpers. Added a tied-timestamp regression fixture plus a dependency-gated runner and pinned PyYAML development requirement.
+- Require item-level tracker mapping and a completion/supersession false-gap check before a source is treated as merged or retired (R140).
+- Require recoverable non-credential pre-edit copies, before/after hashes, exact diffs and line-ending, encoding and Markdown-table structure checks before shared-record edits are called verified, zero-loss or aligned (R141-R142).
+- Require idempotent agent-written edit/move scripts, move verification or equivalent guards, preserved archived originals and current-state inspection before a rerun after unexpected behavior (R143).
+- Keep session-log ownership with its writer and make open-work lists complete, including owner decisions and corrected-turn restatements (R144-R145).
+- Define actual secrets narrowly, require owner approval for other privacy-driven redaction and preserve recoverable non-secret originals (R146).
+- Opal review follow-ups: Work-mode pending-edit outcomes go in the acting writer's own log; the universal install fallback includes Work mode; install requirements distinguish `audit_folder.py` from `verify_move.py` hydration checks; archive-and-stub is stated to be outside the move protocol; optional Project Rules bumped to 3.2.0 for the section 9 change.
+- Source: Claude handoff/review session `9ea792fb-da82-4728-982b-0d544f7c891e`, T001-T003; implementation tracks register rows R140-R146.
+
 ### 1.5.3 (released 2026-10-06) — audit parity and documentation corrections
 
 - Added warn-only `--root` guidance to every move-verification recipe and a clear warning for unconfined helper calls (R094).

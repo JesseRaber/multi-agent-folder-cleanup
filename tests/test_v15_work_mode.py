@@ -116,7 +116,8 @@ class WorkModeTests(unittest.TestCase):
     def assert_work_parity(self, *flags):
         py = run_py(self.root, *flags)
         self.assertEqual(py.returncode, 0, py.stderr)
-        ps = shutil.which("pwsh") or shutil.which("powershell.exe")
+        requested = os.environ.get("AUDIT_TEST_POWERSHELL")
+        ps = shutil.which(requested) if requested else (shutil.which("pwsh") or shutil.which("powershell.exe"))
         if ps:
             mapping = {"--session-index": "-SessionIndex", "--orient": "-Orient",
                        "--sessions-dir": "-SessionsDir", "--session-index-file": "-SessionIndexFile"}
@@ -132,13 +133,21 @@ class WorkModeTests(unittest.TestCase):
     def test_duplicate_ids_do_not_propose_ambiguous_rows_or_baselines(self):
         sessions = self.root / "AI_CONTEXT/SESSIONS"
         source = next(sessions.glob("*22222222*.md"))
-        (sessions / "duplicate.md").write_bytes(source.read_bytes())
+        duplicate = sessions / "duplicate.md"
+        duplicate.write_bytes(source.read_bytes())
+        tied = 1_750_000_000_123_456_700
+        os.utime(source, ns=(tied, tied))
+        os.utime(duplicate, ns=(tied, tied))
         out = self.assert_work_parity("--session-index", "--orient")
         self.assertIn("duplicate session IDs: 1", out)
         self.assertNotIn("| 22222222-2222-4222-8222-222222222222 |", out)
         self.assertIn("start of latest session 11111111", out)
+        recent = out.index("  recent sessions")
+        source_line = out.index("22222222  second", recent)
+        duplicate_line = out.index("22222222  duplicate", recent)
+        self.assertLess(source_line, duplicate_line)
         self.assertTrue(source.exists())
-        self.assertTrue((sessions / "duplicate.md").exists())
+        self.assertTrue(duplicate.exists())
 
     def test_oversized_log_is_not_reported_as_latest_complete_record(self):
         source = next((self.root / "AI_CONTEXT/SESSIONS").glob("*22222222*.md"))

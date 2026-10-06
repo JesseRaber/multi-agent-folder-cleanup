@@ -70,7 +70,7 @@ A loaded skill answers with **Mode: Audit** on the first line and offers a
 read-only inventory before proposing anything. If it starts suggesting a folder
 tree immediately, the skill did not load.
 
-The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v1.5.3**.
+The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v1.6.0**.
 
 Portfolio smoke test:
 
@@ -82,7 +82,8 @@ Portfolio smoke test:
 
 - **Scripts:** Python 3.8+, standard library only. No dependencies to install.
 - **PowerShell script:** PowerShell 5.1 or 7+. Needed on Windows for the
-  OneDrive placeholder check, which the Python version cannot produce.
+  audit helper's OneDrive placeholder check, which `audit_folder.py` cannot produce.
+  `verify_move.py preflight` checks hydration only under Windows-native Python.
 - All three scripts are read-only against the target folder. `verify_move.py`
   never moves, copies, or deletes.
 

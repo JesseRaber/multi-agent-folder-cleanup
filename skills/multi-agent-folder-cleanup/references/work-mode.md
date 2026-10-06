@@ -33,6 +33,8 @@ Treat summaries as leads. Verify anything your task depends on against the actua
 
 ## W3. Save new files where the next agent will look
 
+Write only in your own session log. If another agent's work needs correction, record the correction as a turn in your log and cite that agent's session and turn; never append to or rewrite the other agent's log.
+
 | What you made | Where it goes |
 |---|---|
 | Finished deliverable | The project area the index names for that kind of work. No obvious area: the closest existing folder, and say so in the index row. |
@@ -73,10 +75,14 @@ Shared records are the index, quick context, session index and any file other ag
 
 Before editing, establish a supported conditional update, a cooperating lock covering the relevant writers/devices, or a designated single writer. A local lock does not exclude remote cloud writers. Rereading and hash checks verify integrity; they do not establish exclusive ownership. If coordination is unavailable, save the exact intended edit in your session scratch folder, mark it PENDING in your log, and continue independent work.
 
+Unless the target may contain credentials, first save a byte-for-byte pre-edit copy in your project session scratch area; a tool-private temporary folder is not a durable recovery location. Never copy a credential-bearing file for this purpose. Record the complete before SHA-256, then preserve the target's encoding, line endings and structure while editing. For Markdown tables, keep each row inside the table, with no blank lines, and retain the table's established sort order.
+
 1. Re-read the file immediately before writing.
 2. Make the smallest exact edit (a bounded replace or a true append). Never rebuild a whole shared file from an older or truncated copy.
-3. Re-read after saving and confirm the edit is there exactly once and everything else is unchanged.
+3. Re-read after saving, compute the complete after SHA-256 and diff against the pre-edit copy when one is permitted. Confirm the edit is there exactly once, everything else is unchanged, and encoding, line endings and structured regions such as Markdown tables remain intact.
 4. If the file changed since you read it, merge your change onto the new version. If you can't do that safely, save the exact intended edit in your scratch folder, mark it PENDING in your session log and move on.
+
+Do not claim a shared edit is **verified**, **zero loss** or **aligned** unless the applicable hash, diff and structure checks above passed. When a pre-edit copy is prohibited because the file contains credentials, report that recovery and diff coverage limit instead.
 
 A pending edit must be concrete enough for a later writer to apply without guessing:
 
@@ -90,7 +96,7 @@ Session/turn: <source ID and turn>
 Reconcile: <condition required before applying>
 ```
 
-When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Append the applied/superseded/conflicted outcome to the source session record. A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
+When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Record the applied/superseded/conflicted outcome in your own session log, citing the source session and turn; only the source session's writer appends to that session's log (W3). A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
 
 Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superseded**, **Conflicted** or **Unverifiable**. Compare the current target with the exact proposed change; filename age and the old base hash are not enough. Retain the source-session link and outcome even after the staged payload is no longer actionable.
 
@@ -100,6 +106,7 @@ Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superse
 - Before recording new future work, search the canonical tracker for the same outcome, scope or dependency. Update the existing item when it is the same work; otherwise assign the next stable ID and record a concise title, status, source/provenance, dependencies or acceptance evidence when material, and links to supporting detail. Never let a suggestion live only in a session log, review, report, handoff, chat transcript or quick-context paragraph.
 - Do not create another roadmap, backlog, TODO list, proposed-change list, next-steps list or independent future-task file. A scoped design, migration, validation or execution plan may exist when the task needs one, but it must identify the canonical tracker and its related item IDs; any newly discovered future work goes into the canonical tracker rather than becoming a second backlog inside the supporting plan.
 - When multiple tracker-like files already exist, do not choose by filename, modified time or apparent completeness and do not silently merge, rename or delete them. Establish the canonical tracker from owner direction, adopted instructions and current navigation. Inventory unresolved actionable items from the others with provenance, reconcile them into the canonical tracker without losing status or source identity, then classify the older files as supporting evidence or History and point them to the canonical tracker. Physical moves or deletions remain cleanup work and need their applicable authorization.
+- Before treating a source roadmap, backlog, review, handoff or task list as merged or retired, map every actionable item to its canonical tracker ID and record that mapping. For each apparent gap, search current-state evidence and relevant history for proof that the item was completed or superseded before reporting it missing. Unmapped or unverifiable items remain open; source-level labels such as "merged" are not item-level evidence.
 - Treat the canonical tracker as a shared record under W5. If it cannot be updated safely, save one exact pending tracker insertion in your session scratch area and link it from the session log; do not create a substitute roadmap. Reconcile the pending insertion before claiming the task handoff is complete. Delegated helpers return proposed tracker rows to the coordinating writer unless a single writer for the tracker is explicitly designated.
 - Give important deliverables and authority/instruction files individual discoverable links, even inside a covered folder. Use the established index or its linked topic index. One line: path, purpose, classification (Authority, Current, Deliverable, Evidence, Reference, Backlog, Incoming, History, Scratch), coverage and existence.
 - Folder coverage is enough for routine supporting files and scratch descendants. Add a folder row only when existing navigation does not cover it. Do not add a row for every generated file.
@@ -112,6 +119,7 @@ Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superse
 Before each final answer, so the work survives if the chat stops here:
 
 - [ ] Session log entry: request, what you did, files changed, what's verified, what's open
+- [ ] `Limits/open work` names every known unresolved item, including owner decisions created by this turn; write `None` only when nothing remains. A correction to an earlier turn restates the complete current open-work list.
 - [ ] Deliverables are saved in the authorized place and format with appropriate provenance (W3–W4)
 - [ ] Index row added or updated for new deliverables (W6)
 - [ ] Quick context updated if the state changed
