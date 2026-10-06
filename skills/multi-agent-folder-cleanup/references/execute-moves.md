@@ -42,6 +42,8 @@ Immediately before movement, run `scripts/verify_move.py preflight --map moves.c
 
 Execute the exact approved list in one uninterrupted pass. **Do not add a discretionary approval pause between already approved paths.** A partially executed move is the dual-tree failure the whole protocol exists to prevent. However, a failed safety check, changed source, missing file, collision, hash mismatch, or newly required action outside the map is a stop condition: preserve staging, stop at the safest recoverable boundary, and report the exact partial state.
 
+An agent-written move script must invoke `verify_move.py` with the approved receipt/root/baseline as applicable, or implement the same current-source, existing-target, already-moved, identity and hash checks. It must be safe to run twice and must never overwrite an archived original or any existing target. If a run produces unexpected behavior, inspect and reconcile the complete current source/target/staging state before any rerun; do not assume the first run failed cleanly. Archive-and-stub (moving a file and leaving a pointer stub in its place) is not part of this protocol; it needs its own owner-approved scope, map and acceptance checks.
+
 This is consistent with normal consent practice rather than an exception to it: approval was obtained for the entire map in C3, so every path touched here is already authorized. Anything *outside* the map is not, and does not become authorized by being discovered mid-run.
 
 ### D5. Verify final

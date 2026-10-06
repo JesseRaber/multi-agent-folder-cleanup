@@ -44,7 +44,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime
 
-VERSION = "1.5.3"  # must equal SKILL.md metadata.version
+VERSION = "1.6.0"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -873,7 +873,11 @@ def load_sessions(root, sessions_rel):
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
             "last_time": last_time, "mtime": mtime, "start_source": start_source,
         })
-    sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"]))
+    # Use a complete deterministic key. Duplicate IDs and equal timestamps are
+    # valid audit findings, so neither may leave ordering to directory enumeration
+    # or a sort implementation's stability.
+    sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"],
+                                 s["name"].lower(), s["name"]))
     return sdir, sessions, nonstandard, blocked
 
 
@@ -990,7 +994,8 @@ def report_orient(root, args, limited):
         print(f"  sessions folder {args.sessions_dir}: {_blocked[0]} (coverage unavailable)")
         sessions = []
     else:
-        recent = sorted(sessions, key=lambda s: (s["last_time"] or s["mtime"]), reverse=True)
+        recent = sorted(sessions, key=lambda s: (-(s["last_time"] or s["mtime"]),
+                                                 s["name"].lower(), s["name"]))
         print(f"  recent sessions (of {len(sessions)}):")
         for s in limited(recent[:5]):
             print(f"    {work_activity(s)}  {s['tool']}  {s['id'][:8]}  "
@@ -1042,7 +1047,7 @@ def report_orient(root, args, limited):
         dated = [s for s in sessions if s["id"] not in duplicates and s["started"]
                  and not (args.session_id and s["id"].startswith(args.session_id.lower()))]
         if dated:
-            latest = max(dated, key=lambda s: s["started"])
+            latest = min(dated, key=lambda s: (-s["started"], s["name"].lower(), s["name"]))
             since, basis = latest["started"], f"start of latest session {latest['id'][:8]}"
         else:
             since, basis = now - 86400, "last 24 hours (no dated sessions)"

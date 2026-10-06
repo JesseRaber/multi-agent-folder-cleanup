@@ -45,6 +45,8 @@ For each document that asserts a completed state:
 - Is its modified date consistent with the work it claims?
 - Does a later document contradict it?
 
+For any source described as consolidated, merged or retired, map every actionable item to a canonical tracker ID before accepting that claim. Before reporting an apparent missing item, search current-state evidence and relevant history for proof that it was completed or superseded. Record unmapped, completed, superseded and unverifiable items separately so a stale source does not create either lost work or a false gap.
+
 Record each as **verified**, **contradicted**, or **unverifiable**. Never upgrade "unverifiable" to "current".
 
 For each material conclusion, record a compact claim table: `Claim`, `State` (`Documented`, `Observed`, `Inferred` or `Unknown`), `Evidence`, `Scope/date`, and `What would verify it`. `Observed` means directly inspected in the stated scope; it does not mean provider-wide or current beyond the observation time. Repeated documentary claims remain `Documented` until independently checked.

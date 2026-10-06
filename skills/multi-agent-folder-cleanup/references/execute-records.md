@@ -9,12 +9,14 @@ Use this subtype for an approved literal list of factual corrections where no fi
 Before D8 or D9 edits, establish a supported conditional update, a cooperating lock of adequate scope, or a designated single writer covering the relevant writers/devices. Rereads, timestamps, hashes, ETags and fingerprints are integrity/conflict checks, not proof of exclusivity. If coordination is unavailable, stage the exact edit as pending and defer only the unsafe shared mutation.
 
 1. Record the exact approved files and the intended factual changes. Name any instruction file separately.
-2. Immediately before editing, capture SHA-256 and modified time for every approved file plus any authority or instruction files that must remain unchanged.
+2. Immediately before editing, capture SHA-256 and modified time for every approved file plus any authority or instruction files that must remain unchanged. Unless an approved file may contain credentials, save a byte-for-byte pre-edit copy in the project session scratch area; never place it only in a tool-private temporary folder. Never make a pre-edit copy of a credential-bearing file.
 3. Re-read the live files. If a hash or modified time changed after review, another writer is active: do not force the old text back. Re-stage from the new version, merge only the approved facts, and repeat the guard.
-4. Apply minimal exact-context patches. If expected context does not match, treat that as a safe stop rather than using broad replacement or overwrite.
-5. Re-hash the changed files and verify the intended facts directly. Search for the specific stale or contradictory claims the correction was meant to remove or label; absence must be measured, not assumed.
+4. Apply minimal exact-context patches. Preserve encoding, line endings and file structure. In a Markdown table, keep rows inside the table with no blank lines and preserve its established sort order. If expected context does not match, treat that as a safe stop rather than using broad replacement or overwrite.
+5. Re-hash the changed files, diff each non-credential target against its project-scratch pre-edit copy, and verify the intended facts directly. Confirm only intended lines changed and that encoding, line endings and structured regions remain intact. Search for the specific stale or contradictory claims the correction was meant to remove or label; absence must be measured, not assumed. Do not claim **verified**, **zero loss** or **aligned** without these applicable checks; disclose when credential safeguards prohibit the copy/diff check.
 6. Verify protected authority and instruction files are byte-identical except for any instruction file explicitly approved in step 1. For an approved instruction edit, verify that only the named factual text changed and that behavioral rules, authority, scope, permissions and read order remain intact.
 7. If a required journal write occurs after these checks, guard it independently and verify the appended entry. Do not present the journal hash as proof that earlier shared records remained unchanged.
+
+Any agent-written edit script must check whether its intended row or marker already exists before inserting, preserve the structural rules above and be safe to run twice. After unexpected output or behavior, inspect the complete current target before deciding whether any rerun is safe; never rerun blindly.
 
 
 ### D9. Connector-safe record editing

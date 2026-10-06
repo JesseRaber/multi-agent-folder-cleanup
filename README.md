@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.5.3` — released 2026-10-06; see `CHANGELOG.md`.
+`1.6.0` — released 2026-10-06; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.3**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.6.0**.
 
 ## Install
 
@@ -109,7 +109,7 @@ The skill folder contains the maintained workflow. Plugin manifests and release 
 - **Work mode** for agents doing ordinary work in a shared folder: where to save, how to name, one authoritative roadmap/task tracker, a short header for new documents, safe edits to shared records, what to index, and an end-of-request handoff checklist (`references/work-mode.md`).
 - **`--orient` and `--session-index`** in both audit helpers: read-only arrival checks (possibly active writers, files changed since the latest session, changed files the index never names) and a session-index gap check with proposed rows.
 - **Smaller always-loaded file**: SKILL.md is now a 7 KB router; cleanup-only guidance moved to `references/cleanup-principles.md`. A Work-mode run reads about 13 KB.
-- Optional Project Rules 3.1.0 adds a short pointer to Work mode.
+- Optional Project Rules 3.1.0 adds a short pointer to Work mode (3.2.0 in v1.6.0 narrows the section 9 secret definition).
 
 ## What v1.4.1 fixes
 

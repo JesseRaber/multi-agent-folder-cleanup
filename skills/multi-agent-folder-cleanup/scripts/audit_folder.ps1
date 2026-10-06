@@ -116,7 +116,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.5.3'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.6.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -503,6 +503,21 @@ function Sort-Ordinal {
     }
 }
 function Get-DescKey([int64]$n) { return (1000000000000000 - $n).ToString('D16') }
+function Get-SessionNameKey($s) {
+    return $s.Name.ToLowerInvariant() + [char]0 + $s.Name
+}
+function Get-SessionLoadKey($s) {
+    $missing = if ($null -eq $s.Started) { '1' } else { '0' }
+    $ticks = if ($null -eq $s.Started) { 0 } else { $s.Started.UtcTicks }
+    return $missing + [char]0 + $ticks.ToString('D19') + [char]0 + $s.Id + [char]0 + (Get-SessionNameKey $s)
+}
+function Get-SessionRecentKey($s) {
+    $ticks = (Get-Activity $s).UtcTicks
+    return ([DateTimeOffset]::MaxValue.UtcTicks - $ticks).ToString('D19') + [char]0 + (Get-SessionNameKey $s)
+}
+function Get-SessionLatestStartKey($s) {
+    return ([DateTimeOffset]::MaxValue.UtcTicks - $s.Started.UtcTicks).ToString('D19') + [char]0 + (Get-SessionNameKey $s)
+}
 function Test-NonGoverning([string]$relPath) {
     $segs = $relPath.ToLower().Split('/')
     for ($i = 0; $i -lt $segs.Count - 1; $i++) {
@@ -718,7 +733,7 @@ if ($Orient -or $SessionIndex) {
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
                 Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource })
         }
-        $res.Sessions = @($list | Sort-Object -Property @{ Expression = { $null -eq $_.Started } }, @{ Expression = { if ($_.Started) { $_.Started.UtcTicks } else { 0 } } }, @{ Expression = { $_.Id } })
+        $res.Sessions = @($list | Sort-Ordinal -Key { Get-SessionLoadKey $_ })
         $res.Nonstandard = @($non); $res.Blocked = @($blk)
         return $res
     }
@@ -764,7 +779,7 @@ if ($Orient -or $SessionIndex) {
         if ($null -eq $S.Sessions) { Write-Line ("  sessions folder {0}: {1} (coverage unavailable)" -f $SessionsDir, $S.State) }
         else {
             $sessions = @($S.Sessions)
-            $recent = @($sessions | Sort-Object -Property @{ Expression = { (Get-Activity $_).UtcTicks } } -Descending | Select-Object -First 5)
+            $recent = @($sessions | Sort-Ordinal -Key { Get-SessionRecentKey $_ } | Select-Object -First 5)
             Write-Line ("  recent sessions (of {0}):" -f $sessions.Count)
             Write-Capped @($recent | ForEach-Object {
                 $t = $_.LastTitle; if ($t.Length -gt 70) { $t = $t.Substring(0, 70) }
@@ -801,7 +816,7 @@ if ($Orient -or $SessionIndex) {
         } else {
             $dated = @($sessions | Where-Object { $_.Id -notin $duplicates -and $_.Started -and -not (Test-Mine $_.Id) })
             if ($dated.Count) {
-                $latest = $dated | Sort-Object -Property @{ Expression = { $_.Started.UtcTicks } } -Descending | Select-Object -First 1
+                $latest = $dated | Sort-Ordinal -Key { Get-SessionLatestStartKey $_ } | Select-Object -First 1
                 $sinceT = $latest.Started; $basis = "start of latest session $($latest.Id.Substring(0, 8))"
             } else { $sinceT = $Now.AddDays(-1); $basis = 'last 24 hours (no dated sessions)' }
         }

@@ -79,6 +79,12 @@ Generated state is not evidence. Excluding it from analysis does not remove it f
 
 Credential-name matches are warnings. Report probable private credentials separately from ambiguous cryptographic material and recognizable public certificate bundles; a `.pem` extension alone does not prove a private key. Keep content-read guards conservative: never open, stage, copy, quote or index browser profiles, cookies, login databases, `.env`, private-key candidates or tokens merely to classify them.
 
+## Protect secrets without erasing private context
+
+Treat passwords, private keys, access or refresh tokens, session cookies, authorization headers, recovery codes and secret-bearing connection strings as secrets. Private links, local or cloud paths, names and ordinary business details may be sensitive or private, but they are not secrets merely because they are non-public.
+
+Unless an applicable governing rule already requires the exact privacy-driven redaction, ask the owner before masking, rewriting, deleting or otherwise redacting content for privacy. Report the affected files, proposed transformation and why it is needed. Preserve a recoverable pre-change copy for authorized privacy edits; actual credential or secret values are the exception and must not be duplicated into recovery material. A cleanup request alone does not authorize privacy rewriting.
+
 ## Classify each substantive file once
 
 Use exactly one bucket:
