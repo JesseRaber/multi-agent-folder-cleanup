@@ -29,9 +29,9 @@ ChatGPT desktop, Codex CLI, and the Codex IDE extension can use standalone skill
 
 ## Requirements and safety
 
-- Python 3.8+ for the portable audit and move-verification helpers.
+- Python 3.8+ for the portable audit, move-verification, and record-verification helpers.
 - PowerShell 5.1 or 7+ for the Windows/OneDrive audit helper.
-- All helpers are read-only against the target folder; `verify_move.py` never moves, copies, or deletes anything.
+- All helpers are read-only against the target folder; `verify_move.py` never moves, copies, or deletes anything. `verify_records.py` checks shared records and does not modify them.
 - A folder reorganization still requires an explicitly approved literal move map.
 
 Verify the release archives against `SHA256SUMS.txt` before extracting (`sha256sum -c SHA256SUMS.txt`, or `Get-FileHash` on Windows). If a downloaded copy disagrees with https://github.com/JesseRaber/multi-agent-folder-cleanup, the repository is current.

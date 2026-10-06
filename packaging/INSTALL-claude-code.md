@@ -85,7 +85,8 @@ Portfolio smoke test:
   audit helper's OneDrive placeholder check, which `audit_folder.py` cannot produce.
   `verify_move.py preflight` checks hydration only under Windows-native Python.
 - All four scripts are read-only against the target folder. `verify_move.py`
-  never moves, copies, or deletes.
+  never moves, copies, or deletes. `verify_records.py` checks shared records
+  and does not modify them.
 
 ## Verify what you downloaded
 

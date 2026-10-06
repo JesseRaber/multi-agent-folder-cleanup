@@ -1,10 +1,12 @@
 # Multi-Agent Folder Cleanup
 
-Canonical source for the `multi-agent-folder-cleanup` Agent Skill and its OpenAI and Claude plugin packages.
+Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-The goal is a shared project folder where an agent arriving cold can quickly tell what is true now, what is proposed, and what is historical without choosing between plausible copies.
+Canonical source for the skill and its OpenAI and Claude plugin packages. Current release: **v1.6.1** (2026-10-06).
 
-Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
+An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
+
+Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki) · [install](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Install) · [modes](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Modes) · [scripts](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Scripts) · [FAQ](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/FAQ) · [changelog](CHANGELOG.md)
 
 ## Version
 
@@ -156,7 +158,7 @@ These address preventable failure modes observed in one model/project and inspec
 
 ## What the scripts do
 
-All four scripts are read-only against the target folder. `verify_move.py` never moves files.
+All four scripts are read-only against the target folder. `verify_move.py` never moves files. `verify_records.py` (v1.6.1) checks shared records and does not modify them.
 
 ```bash
 python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
@@ -185,13 +187,16 @@ python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
 # Recheck with preflight --approval proposal.json --baseline /safe/audit/baseline.json --root <project> before moving.
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
   --baseline /safe/audit/baseline.json --root <project>
+
+python skills/multi-agent-folder-cleanup/scripts/verify_records.py \
+  path/to/INDEX.md path/to/PROJECT_QUICK_CONTEXT.md
 ```
 
 Python 3.8+, standard library only. On Windows or OneDrive, prefer `audit_folder.ps1` (PowerShell 5.1 or 7+) because it can inspect placeholder attributes. On other platforms, record hydration as unverified until checked on Windows.
 
 ## Validation and releases
 
-Every pull request runs the pinned OpenAI skill and plugin validators, package/version checks, Python compilation, PowerShell parsing, all regression tests, and a line-by-line Python/PowerShell report comparison on Ubuntu, plus the full suite on Windows (PowerShell 7 and a Windows PowerShell 5.1 junction smoke test). Tagged releases repeat runtime smoke tests, build all four install archives, extract them, run the packaged code, and publish SHA-256 checksums.
+Every pull request runs the pinned OpenAI skill and plugin validators, package/version checks, Python compilation, PowerShell parsing, all regression tests, and a line-by-line Python/PowerShell report comparison on Ubuntu, plus the full suite on Windows (PowerShell 7 and a Windows PowerShell 5.1 junction smoke test). Tagged releases repeat runtime smoke tests, build the install archives, extract them, run the packaged code, and publish SHA-256 checksums.
 
 To publish after the release commit is merged:
 
@@ -201,6 +206,28 @@ git push origin vX.Y.Z
 ```
 
 The tag must match the versions in `SKILL.md`, `.codex-plugin/plugin.json`, and `.claude-plugin/plugin.json`. Use **Actions → Release → Run workflow** to build artifacts without publishing.
+
+## FAQ
+
+### Which ZIP do I install?
+
+Use `…-UNIVERSAL-skill.zip` for Claude app skill upload, ChatGPT or Codex standalone skills, Grok, local models, and a normal skills folder. Claude Code, the Codex/ChatGPT plugin marketplace, Microsoft Copilot, Gemini Apps, and Opal each need the matching package in the install table. Releases before v1.5.0 used older asset names.
+
+### Does this skill move or delete files?
+
+No. Audit is read-only. Plan only proposes a map. Execute follows an approved mutation list. Deletion is never included unless a separate approval names each target. The scripts do not move files.
+
+### What is Work mode?
+
+The mode for ordinary saving, naming, indexing, and handoff in a folder other agents also use. It is not a folder reorganization. Questions about the folder itself default to Audit.
+
+### What did v1.6.1 add?
+
+Read-only `scripts/verify_records.py` for SHA-256, encoding, line endings, mojibake, relative Markdown links, and table damage. Work mode asks agents to cite that output before calling a shared-record edit verified.
+
+### Does install adopt the Project Rules?
+
+No. The optional template is 3.2.0. Adoption is a separate owner decision.
 
 ## Authority rule
 
