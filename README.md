@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.6.0` — released 2026-10-06; see `CHANGELOG.md`.
+`1.6.1` — released 2026-10-06; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.0**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.6.1**.
 
 ## Install
 
@@ -85,6 +85,10 @@ tests/                           package, regression, and Python/PowerShell pari
 ```
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
+
+## What v1.6.1 adds
+
+- `scripts/verify_records.py`: a read-only checker for shared records (UTF-8, BOM, line endings, mojibake, dead relative links, broken Markdown tables, `--compare` and `--expect-sha256`). Work mode asks agents to cite its output before calling a shared-record edit verified.
 
 ## What v1.5.3 fixes
 

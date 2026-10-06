@@ -36,7 +36,7 @@ import re
 import sys
 from urllib.parse import unquote
 
-VERSION = "1.6.0"  # must equal SKILL.md metadata.version
+VERSION = "1.6.1"  # must equal SKILL.md metadata.version
 
 BOM = b"\xef\xbb\xbf"
 # Common UTF-8-read-as-cp1252/latin-1 sequences, plus the replacement character.
