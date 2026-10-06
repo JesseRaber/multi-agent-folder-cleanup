@@ -40,7 +40,15 @@ VERSION = "1.6.0"  # must equal SKILL.md metadata.version
 
 BOM = b"\xef\xbb\xbf"
 # Common UTF-8-read-as-cp1252/latin-1 sequences, plus the replacement character.
-MOJIBAKE = re.compile("â€|â„¢|Ã[\u0080-¿]|Â[ -¿]|ï»¿|�")
+_A, _C2, _C3, _EUR = chr(0xE2), chr(0xC2), chr(0xC3), chr(0x20AC)
+MOJIBAKE = re.compile("|".join([
+    _A + _EUR,                                   # em/en dash, quotes
+    _A + chr(0x201E) + chr(0xA2),                # trademark sign
+    _C3 + "[" + chr(0x80) + "-" + chr(0xBF) + "]",  # accented letters
+    _C2 + "[" + chr(0xA0) + "-" + chr(0xBF) + "]",  # nbsp, degree, etc.
+    chr(0xEF) + chr(0xBB) + chr(0xBF),           # BOM decoded as cp1252
+    chr(0xFFFD),                                 # replacement character
+]))
 FENCE = re.compile(r"^\s*(```|~~~)")
 INLINE_CODE = re.compile(r"(`+)(.+?)\1")
 LINK = re.compile(r"!?\[[^\]]*\]\(\s*(<[^>]*>|[^)\s]+)(?:\s+\"[^\"]*\")?\s*\)")
@@ -159,7 +167,7 @@ def check_file(path, args):
         result["utf8"] = False
     else:
         result["utf8"] = True
-    if text.startswith("﻿"):
+    if text.startswith(chr(0xFEFF)):
         text = text[1:]
     result["newlines"], nl = check_newlines(data, args.newline)
     f.extend(nl)

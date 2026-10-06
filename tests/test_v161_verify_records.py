@@ -81,7 +81,9 @@ class VerifyRecordsTests(unittest.TestCase):
     def test_mojibake_fails_but_not_inside_code(self) -> None:
         damaged = "— dash".encode("utf-8").decode("cp1252").encode("utf-8")  # em dash read as cp1252
         self.assertFinding("mojibake marker", self.write("moj.md", b"text " + damaged + b"\n"))
-        self.assertPass(self.write("quoted.md", "Example: `â€”` was the bug.\n\n```\nâ€”\n```\n".encode()))
+        marker = chr(0xE2) + chr(0x20AC) + chr(0x201D)
+        quoted = "Example: `" + marker + "` was the bug.\n\n```\n" + marker + "\n```\n"
+        self.assertPass(self.write("quoted.md", quoted.encode()))
 
     def test_relative_links_resolve_and_dead_links_fail(self) -> None:
         ok = self.write("ok.md", b"[a](<sub dir/target \xc3\xa9.md>) [b](sub%20dir/target%20%C3%A9.md#x) "
