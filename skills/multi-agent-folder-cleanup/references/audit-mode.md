@@ -53,7 +53,7 @@ A stale index is not only one that points at missing paths. Check the inverse to
 
 ### B3. Classify
 
-Assign every substantive file to one of the eight buckets in SKILL.md ("Classify each substantive file once"). Produce a table: path → bucket → evidence for the call. Files you cannot classify go in a short "needs owner decision" list rather than a guess. Files excluded by `--exclude` are reported as bucket 8 by pattern, not classified individually — say so.
+Assign every substantive file to one of the eight buckets in [cleanup-principles.md](cleanup-principles.md#classify-each-substantive-file-once) ("Classify each substantive file once"). Produce a table: path → bucket → evidence for the call. Files you cannot classify go in a short "needs owner decision" list rather than a guess. Files excluded by `--exclude` are reported as bucket 8 by pattern, not classified individually — say so.
 
 ### B4. Name the confusion sources
 

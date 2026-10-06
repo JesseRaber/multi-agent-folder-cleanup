@@ -44,6 +44,11 @@ class LinkedAncestorTests(unittest.TestCase):
         (self.root / "c/inside").symlink_to(self.root / "a/x.md")
         out = run(SCRIPTS / "audit_folder.py", "--root", self.root, "--hash-files").stdout
         self.assertIn("READ BLOCKED", out)
+        linked = out.split("LINKED PATH - not followed or hashed", 1)[1].split("== Identical content", 1)[0]
+        guarded = out.split("Not hashed by design (credential guard)", 1)
+        self.assertIn("c/inside", linked)
+        if len(guarded) > 1:
+            self.assertNotIn("c/inside", guarded[1].split("== LINKED PATH", 1)[0])
 
     def test_move_plan_under_linked_ancestor(self):
         m = self.root / "moves.csv"

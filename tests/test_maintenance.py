@@ -23,6 +23,8 @@ def load(name):
     return module
 
 def run(script, *args):
+    if script.endswith('.ps1') and not PS:
+        raise unittest.SkipTest('PowerShell is not available')
     cmd = ([PS, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File']
            if script.endswith('.ps1') else [sys.executable])
     return subprocess.run(cmd + [str(SCRIPTS / script), *map(str, args)],

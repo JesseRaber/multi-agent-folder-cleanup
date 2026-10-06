@@ -18,11 +18,11 @@ Preconditions: an approved literal map, zero collisions, no target over the path
 - Confirm no other agent or job is mid-write.
 - Reject junctions/symlinks in source, target and staging path components. The verifier checks existing components; a later path substitution remains possible, so retain writer coordination and recheck immediately before mutation. Its Windows exclusive-read probe is momentary, not a lease. Do not automatically remove Office lock files to make a check pass.
 
-Run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json --root <project>`. `--root` (v1.5.2) refuses any source or target outside the project; pass the same `--root` to `baseline` and `verify`. Unguarded preflight remains available for planning; execution must use the approved receipt. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
+Run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json --root <project>`. `--root` refuses any source or target outside the project; pass the same `--root` to `review`, `baseline` and `verify`. Unguarded calls remain available for compatibility but print a warning that paths are not confined. Execution recipes must use the approved receipt and explicit root. Relative paths in the map resolve against the map file's folder, and an Excel "CSV UTF-8" byte-order mark is accepted. Target collisions are checked case-insensitively, because `Plan.md` and `plan.md` are one file on Windows, OneDrive and SharePoint. It checks collisions, missing sources, existing targets, duplicated sources, path length, and cloud placeholders in one pass and exits nonzero if any fire. A nonzero exit is a stop condition — resolve and re-run, do not proceed on judgement.
 
 ### D1. Baseline hashes
 
-Hash every source file (SHA-256): `scripts/verify_move.py baseline --map moves.csv --approval <scratch>/proposal.json --out <scratch>/baseline.json`. The new baseline records plan identity and resolved pairs; it never overwrites an existing baseline. Keep the receipt and baseline immutable.
+Hash every source file (SHA-256): `scripts/verify_move.py baseline --map moves.csv --approval <scratch>/proposal.json --root <project> --out <scratch>/baseline.json`. The new baseline records plan identity and resolved pairs; it never overwrites an existing baseline. Keep the receipt and baseline immutable.
 
 Save the baseline to a scratch location **outside** the target root, e.g. `%TEMP%\cleanup-baseline-<timestamp>.json`. Move-map receipts, reviews and recovery baselines belong outside the source/target trees being reorganized; the baseline command refuses an in-tree destination. Required project session logs retain their adopted destination and are recorded as continuity deltas, not moved as test evidence. Keep the baseline until the session is fully closed out; it is the only way to reconstruct what was where if something goes wrong later.
 
@@ -32,13 +32,13 @@ Copy — do not move — into a clearly labeled staging folder, e.g. `_STAGING_<
 
 ### D3. Verify staging
 
-`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json --stage <staging-dir>`
+`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json --root <project> --stage <staging-dir>`
 
 Any mismatch or missing file: stop, report, change nothing further.
 
 ### D4. Move — no pause
 
-Immediately before movement, run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json --baseline <scratch>/baseline.json` and recheck the separately approved patches/staging/removal package under adequate writer coordination. This compares plan identity and current source hashes to the baseline. A successful check is point-in-time evidence, not an atomic lock or proof of idle cloud sync. All helpers remain non-mutating against the target; the agent performs the separately authorized moves from the approved baseline's resolved pairs, not a freshly invented or retyped list.
+Immediately before movement, run `scripts/verify_move.py preflight --map moves.csv --approval <scratch>/proposal.json --baseline <scratch>/baseline.json --root <project>` and recheck the separately approved patches/staging/removal package under adequate writer coordination. This compares plan identity and current source hashes to the baseline. A successful check is point-in-time evidence, not an atomic lock or proof of idle cloud sync. All helpers remain non-mutating against the target; the agent performs the separately authorized moves from the approved baseline's resolved pairs, not a freshly invented or retyped list.
 
 Execute the exact approved list in one uninterrupted pass. **Do not add a discretionary approval pause between already approved paths.** A partially executed move is the dual-tree failure the whole protocol exists to prevent. However, a failed safety check, changed source, missing file, collision, hash mismatch, or newly required action outside the map is a stop condition: preserve staging, stop at the safest recoverable boundary, and report the exact partial state.
 
@@ -46,7 +46,7 @@ This is consistent with normal consent practice rather than an exception to it: 
 
 ### D5. Verify final
 
-`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json`
+`scripts/verify_move.py verify --baseline <scratch>/baseline.json --approval <scratch>/proposal.json --root <project>`
 
 Final verify also fails when a source file still exists: a verified target plus a surviving source is a copy, which is the dual-tree state this protocol prevents. Use `--allow-source-present` only when the approved plan was explicitly a copy.
 

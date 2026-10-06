@@ -73,7 +73,7 @@ class WorkModeTests(unittest.TestCase):
         out = r.stdout
         self.assertIn("session logs: 2", out)
         self.assertIn("sessions missing from index: 1", out)
-        self.assertIn("| 22222222-2222-4222-8222-222222222222 | Claude | second | Shipped draft | (fill in) |", out)
+        self.assertIn("| 22222222-2222-4222-8222-222222222222 | Claude | second | (fill in) | (fill in) |", out)
         self.assertNotIn("11111111-1111-4111-8111-111111111111 | Codex", out)
         self.assertIn("index links to missing session logs: 1", out)
         self.assertIn("SESSIONS/gone_33333333", out)
@@ -83,7 +83,7 @@ class WorkModeTests(unittest.TestCase):
         r = run_py(self.root, "--orient")
         self.assertEqual(r.returncode, 0, r.stderr)
         out = r.stdout
-        self.assertIn("possibly active writers (changed in last 30 min): 1 session logs, 1 scratch folders", out)
+        self.assertIn("possibly active writers (changed in last 30 min): 1 distinct sessions, 1 unpaired scratch folders", out)
         self.assertIn("start of latest session 22222222", out)
         self.assertIn("docs/new report.md", out)
         self.assertNotIn("  old.md", out)
@@ -94,7 +94,7 @@ class WorkModeTests(unittest.TestCase):
 
     def test_session_id_excludes_self_and_moves_baseline(self):
         out = run_py(self.root, "--orient", "--session-id", "2222").stdout
-        self.assertIn("0 session logs, 1 scratch folders", out)
+        self.assertIn("0 distinct sessions, 1 unpaired scratch folders", out)
         self.assertIn("start of latest session 11111111", out)
 
     def test_never_reads_credential_names_or_writes(self):
@@ -163,9 +163,9 @@ class WorkModeTests(unittest.TestCase):
         text = source.read_text(encoding="utf-8").replace("-04:00", "")
         source.write_text(text, encoding="utf-8")
         out = self.assert_work_parity("--session-index", "--orient")
-        self.assertIn("| unknown |", out)
+        self.assertIn("[filename; no offset]", out)
         self.assertIn("(file mtime; not recorded activity)", out)
-        self.assertIn("start of latest session 11111111", out)
+        self.assertIn("start of latest session 22222222", out)
         self.assertRegex(out, r"2026-10-01T\d{2}:\d{2}[+-]\d{2}:\d{2}")
 
     def test_absent_and_guard_blocked_folder_have_distinct_states(self):

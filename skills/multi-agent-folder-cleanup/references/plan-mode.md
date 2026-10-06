@@ -20,7 +20,7 @@ Render the exact target tree as a code block, labeled `PROPOSED — not yet appl
   HANDOFF.md             current master handoff
   authority/             specs, standards, conventions
   current/               active analysis and provenance
-  backlog/               proposals, roadmaps, not-yet-real
+  <canonical tracker>     one project-named roadmap/task register from navigation
   history/               superseded evidence, dated subfolders
   inbox/                 raw, untriaged incoming
   mirrors/               read-only external checkouts (untouched)
@@ -39,10 +39,12 @@ Resolve owner choices before building executable rows. Put uncertain disposition
 For moves, enumerate files in a CSV (`source,target`, optional later columns) or JSON map; expand proposed folders to their actual files. No wildcards. Generate the approval view from the exact map using the same parser as preflight:
 
 ```bash
-python scripts/verify_move.py review --map /safe/plan/moves.csv \
+python3 scripts/verify_move.py review --map /safe/plan/moves.csv --root <project> \
   --approval-out /safe/plan/proposal.json > /safe/plan/review.md
-python scripts/verify_move.py preflight --map /safe/plan/moves.csv
+python3 scripts/verify_move.py preflight --map /safe/plan/moves.csv --root <project>
 ```
+
+On Windows, `python` or `py -3` may replace `python3`. For folder audits, use the fallbacks in [audit-tools.md](audit-tools.md): `powershell.exe` when `pwsh` is absent and `python3` when `python` is absent. The Microsoft Copilot/Grok package intentionally has no `audit_folder.ps1`; use its Python helper.
 
 Use new session-owned output paths. The generated view contains ordinal row IDs, resolved absolute paths, raw map SHA-256, resolved-pairs SHA-256 and row count. Present that view directly; do not hand-retype a second table. Reasons/classification may be supplied separately keyed to those IDs. A receipt identifies a proposal; creating it is not human approval. Paths containing Markdown delimiters are escaped by the renderer.
 

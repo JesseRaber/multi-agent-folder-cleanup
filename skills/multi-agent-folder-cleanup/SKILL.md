@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.5.2"
+  version: "1.5.3"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.2**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.5.3**.
 
 ## Choose the operating mode
 

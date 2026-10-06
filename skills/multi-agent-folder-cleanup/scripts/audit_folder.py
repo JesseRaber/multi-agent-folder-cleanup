@@ -44,7 +44,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime
 
-VERSION = "1.5.2"  # must equal SKILL.md metadata.version
+VERSION = "1.5.3"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -387,15 +387,15 @@ def is_secret_hint_name(name):
                for sep in separators)
 
 
-def content_read_allowed(path):
-    """Fail closed before content I/O; metadata-only discovery is unaffected."""
+def content_read_block_reason(path):
+    """Return the fail-closed reason without performing content I/O."""
     current = os.path.abspath(path)
     if AUDIT_ROOT:
         try:
             if os.path.normcase(os.path.commonpath([current, AUDIT_ROOT])) != os.path.normcase(AUDIT_ROOT):
-                return False
+                return "unreadable"
         except ValueError:
-            return False
+            return "unreadable"
     # Check the file and its folders up to, not including, the chosen root.
     # Links above the root (a redirected profile, macOS /tmp) are the owner's
     # choice of location, not traversal out of the audit.
@@ -404,14 +404,21 @@ def content_read_allowed(path):
         if stop and os.path.normcase(current) == stop:
             break
         if is_secret_hint_name(os.path.basename(current)):
-            return False
+            return "credential"
         if os.path.islink(current) or _is_windows_reparse(current):
-            return False
+            return "link"
         parent = os.path.dirname(current)
         if parent == current:
             break
         current = parent
-    return not _cloud_only(path)
+    if _cloud_only(path):
+        return "unreadable"
+    return None
+
+
+def content_read_allowed(path):
+    """Fail closed before content I/O; metadata-only discovery is unaffected."""
+    return content_read_block_reason(path) is None
 
 
 def require_content_read(path):
@@ -726,7 +733,12 @@ def host_length(relpath, host_base_len):
 SESSION_NAME_RE = re.compile(
     r"^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_("
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.md$")
-SESSION_FIELD_RE = re.compile(r"^-\s*(Session ID|Started|Tool/runtime)\s*:\s*(.+?)\s*$", re.MULTILINE)
+SESSION_FIELD_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
+    re.MULTILINE | re.IGNORECASE)
+OUTCOME_FIELD_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$",
+    re.MULTILINE | re.IGNORECASE)
 TURN_HEAD_RE = re.compile(r"^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$", re.MULTILINE)
 ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?")
 ROOT_STARTUP_NAMES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md")
@@ -820,25 +832,35 @@ def load_sessions(root, sessions_rel):
         if text is None:
             blocked.append(name)
             continue
-        fields = {k: v for k, v in SESSION_FIELD_RE.findall(text[:4096])}
+        fields = {k.lower(): v for k, v in SESSION_FIELD_RE.findall(text[:4096])}
         m = SESSION_NAME_RE.match(name)
-        sid = fields.get("Session ID") or (m.group(5) if m else "")
+        sid = fields.get("session id") or (m.group(5) if m else "")
         uid = UUID_RE.search(sid or name)
         if not uid:
             nonstandard.append(name + " (no session UUID; not treated as a session log)")
             continue
         sid = uid.group(0).lower()
-        tool = fields.get("Tool/runtime") or (m.group(3) if m else "unknown")
+        tool = fields.get("tool/runtime") or (m.group(3) if m else "unknown")
         tool = tool.split("(")[0].strip() or "unknown"
         topic = m.group(4).replace("-", " ") if m else os.path.splitext(name)[0]
-        started = recorded_time(fields.get("Started", ""))
+        start_value = next((fields[k] for k in ("started", "start", "start time")
+                            if fields.get(k)), "")
+        started = recorded_time(start_value)
+        start_source = "recorded"
+        if started is None and m and m.group(2) != "unknown-time":
+            try:
+                started = datetime.strptime(m.group(1) + m.group(2), "%Y-%m-%d%H%M%S").timestamp()
+                start_source = "filename; no offset"
+            except ValueError:
+                pass
         turns = TURN_HEAD_RE.findall(text)
         last_title, last_time = "", None
         if turns:
             tail = turns[-1][1]
             last_time = recorded_time(tail)
-            last_title = re.sub(r"^[\s\u2014|:-]*", "", ISO_RE.sub("", tail, count=1))
-            last_title = re.sub(r"^[\s\u2014|:-]*", "", last_title).strip()
+        outcomes = OUTCOME_FIELD_RE.findall(text)
+        if outcomes:
+            last_title = outcomes[-1].strip()
         try:
             mtime = os.stat(full).st_mtime
         except OSError:
@@ -849,7 +871,7 @@ def load_sessions(root, sessions_rel):
         sessions.append({
             "name": name, "id": sid, "tool": tool, "topic": topic,
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
-            "last_time": last_time, "mtime": mtime,
+            "last_time": last_time, "mtime": mtime, "start_source": start_source,
         })
     sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"]))
     return sdir, sessions, nonstandard, blocked
@@ -883,7 +905,7 @@ def report_session_index(root, args, limited):
     print(f"  duplicate session IDs: {len(duplicates)} (no proposed rows for ambiguous IDs)")
     for sid in limited(sorted(duplicates)):
         print(f"    {sid}")
-    print("  recorded times require timezone offsets; unknown is not inferred from filenames")
+    print("  filename timestamps are used only as fallbacks and labelled no-offset")
     missing = [s for s in sessions if s["id"] not in duplicates and s["id"].lower() not in index_text.lower()
                and s["name"] not in index_text]
     print(f"  sessions missing from index: {len(missing)}")
@@ -892,7 +914,8 @@ def report_session_index(root, args, limited):
         print("  Proposed rows (review Latest outcome and Status before saving):")
         for s in limited(missing):
             outcome = s["last_title"] or "(fill in)"
-            print(f"  | {fmt_time(s['started'])} | {work_activity(s)} | {s['id']} | {_md_cell(s['tool'])} | "
+            start = fmt_time(s['started']) + (" [filename; no offset]" if s["start_source"] != "recorded" else "")
+            print(f"  | {start} | {work_activity(s)} | {s['id']} | {_md_cell(s['tool'])} | "
                   f"{_md_cell(s['topic'])} | {_md_cell(outcome)} | (fill in) | "
                   f"[Session]({rel_dir}/{urllib.parse.quote(s['name'])}) |")
     stale = []
@@ -995,13 +1018,17 @@ def report_orient(root, args, limited):
         mine = args.session_id.lower()
         active = [s for s in active if not s["id"].startswith(mine)]
         active_scratch = [n for n in active_scratch if not n.lower().startswith(mine)]
+    active_ids = {s["id"] for s in active}
+    paired_scratch = [n for n in active_scratch
+                      if any(n.lower().startswith(sid) for sid in active_ids)]
+    unpaired_scratch = [n for n in active_scratch if n not in paired_scratch]
     print(f"  possibly active writers (changed in last {args.active_minutes} min): "
-          f"{len(active)} session logs, {len(active_scratch)} scratch folders")
+          f"{len(active_ids)} distinct sessions, {len(unpaired_scratch)} unpaired scratch folders")
     for s in limited(active):
         print(f"    session {s['id'][:8]} {s['tool']} {s['topic']}")
-    for name in limited(active_scratch):
-        print(f"    scratch/{name}")
-    if active or active_scratch:
+    for name in limited(unpaired_scratch):
+        print(f"    unpaired scratch/{name}")
+    if active or unpaired_scratch:
         print("    -> another agent may be working: coordinate shared edits before writing;")
         print("       stage exact pending edits in your scratch if coordination is unavailable.")
 
@@ -1059,7 +1086,7 @@ def report_orient(root, args, limited):
             print(f"    {r}")
     else:
         print(f"  index {', '.join(index_paths)}: NOT FOUND or unreadable; unindexed check skipped")
-    return {"possibly active writers": len(active) + len(active_scratch),
+    return {"possibly active writers": len(active_ids) + len(unpaired_scratch),
             "changed since baseline": len(changed),
             "changed but unnamed in index": len(unindexed) if index_text else "n/a",
             "quick context over size": "yes" if qc_flag else "no"}
@@ -1461,18 +1488,29 @@ def run_report(args, root, coverage_pairs):
                 with zipfile.ZipFile(p) as zf:
                     names = zf.namelist()
                     print(f"   entries: {len(names)}")
-                    bad = [n for n in names
-                           if re.search(r'[:*?"<>|]', n) or n.startswith(("/", "\\", ".."))]
+                    def unsafe_member(name):
+                        normalized = name.replace("\\", "/")
+                        parts = normalized.split("/")
+                        return (normalized.startswith("/") or
+                                bool(re.match(r"^[A-Za-z]:", normalized)) or
+                                ".." in parts or
+                                bool(re.search(r'[:*?"<>|]', normalized)))
+                    bad = [n for n in names if unsafe_member(n)]
                     if bad:
                         print(f"   INVALID/UNSAFE NAMES: {len(bad)}")
+                        for n in bad[:member_cap]:
+                            print(f"     {n}")
+                        if len(bad) > member_cap:
+                            print("     ...")
+                    else:
+                        for n in names[:member_cap]:
+                            print(f"     {n}")
+                        if len(names) > member_cap:
+                            print("     ...")
                     long_n = [n for n in names
                               if host_base_len + 1 + len(n) > args.path_threshold]
                     if long_n:
                         print(f"   would exceed path threshold: {len(long_n)}")
-                    for n in names[:member_cap]:
-                        print(f"     {n}")
-                    if len(names) > member_cap:
-                        print("     ...")
             except Exception as exc:  # noqa: BLE001
                 print(f"   unreadable: {exc}")
 
@@ -1520,6 +1558,8 @@ def run_report(args, root, coverage_pairs):
         by_hash = defaultdict(list)
         hashes = {}
         unreadable = []
+        guarded = []
+        linked = []
         for p, _, _ in files:
             try:
                 h = sha256(p)
@@ -1527,10 +1567,34 @@ def run_report(args, root, coverage_pairs):
                 # Never drop these silently: an unhashed file is a hole in the
                 # coverage claim, and on OneDrive it usually means a
                 # placeholder or a lock, both of which block an Execute pass.
-                unreadable.append((p, 'READ BLOCKED' if not content_read_allowed(p) else 'UNREADABLE'))
+                reason = content_read_block_reason(p)
+                if reason == "credential":
+                    guarded.append(p)
+                elif reason == "link":
+                    linked.append(p)
+                else:
+                    unreadable.append((p, 'UNREADABLE'))
                 continue
             hashes[p] = h
             by_hash[h].append(p)
+
+        if guarded:
+            section("Not hashed by design (credential guard)")
+            for p in guarded[:cap(25)]:
+                print(f"  CREDENTIAL GUARD   {rel(p, root)}")
+            if len(guarded) > cap(25):
+                print(f"  ... and {len(guarded) - cap(25)} more")
+            print(f"  {len(guarded)} file(s) were not hashed by design. "
+                  "Their content-read guard remains active.")
+
+        if linked:
+            section("LINKED PATH - not followed or hashed")
+            for p in linked[:cap(25)]:
+                print(f"  READ BLOCKED       {rel(p, root)}")
+            if len(linked) > cap(25):
+                print(f"  ... and {len(linked) - cap(25)} more")
+            print(f"  {len(linked)} linked path(s) were not followed or hashed. "
+                  "Their content-read guard remains active.")
 
         if unreadable:
             section("UNREADABLE - could not hash")

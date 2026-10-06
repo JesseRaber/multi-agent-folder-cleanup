@@ -8,13 +8,13 @@ Exits nonzero on any measured condition that should stop a move.
 Move map: CSV with `source,target` (header optional) or JSON list of
 {"source": ..., "target": ...}.
 
-    python verify_move.py review --map moves.csv --approval-out /tmp/proposal.json
-    python verify_move.py preflight --map moves.csv --approval /tmp/proposal.json
-    python verify_move.py baseline --map moves.csv --approval /tmp/proposal.json --out /tmp/baseline.json
-    python verify_move.py preflight --map moves.csv --approval /tmp/proposal.json --baseline /tmp/baseline.json
-    python verify_move.py verify --baseline /tmp/baseline.json [--stage DIR] [--approval /tmp/proposal.json]
+    python verify_move.py review --map moves.csv --root PROJECT --approval-out /tmp/proposal.json
+    python verify_move.py preflight --map moves.csv --root PROJECT --approval /tmp/proposal.json
+    python verify_move.py baseline --map moves.csv --root PROJECT --approval /tmp/proposal.json --out /tmp/baseline.json
+    python verify_move.py preflight --map moves.csv --root PROJECT --approval /tmp/proposal.json --baseline /tmp/baseline.json
+    python verify_move.py verify --baseline /tmp/baseline.json --root PROJECT [--stage DIR] [--approval /tmp/proposal.json]
 
-Pass --root PROJECT to preflight, baseline and verify to refuse any source or
+Pass --root PROJECT to review, preflight, baseline and verify to refuse any source or
 target outside the project folder (and any baseline written inside it).
 
 A proposal receipt identifies a plan; it does not prove owner consent.
@@ -42,7 +42,7 @@ import stat
 import sys
 from collections import Counter, defaultdict
 
-VERSION = "1.5.2"  # must equal SKILL.md metadata.version
+VERSION = "1.5.3"  # must equal SKILL.md metadata.version
 
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 
@@ -276,6 +276,11 @@ def markdown_path(value):
 
 def cmd_review(args):
     pairs, identity = read_plan(args.map)
+    unsafe = root_problems(pairs, args.root)
+    if unsafe:
+        for path, why in unsafe:
+            print(f'  UNSAFE PATH: {path}: {why}')
+        return 1
     check_plan_unchanged(args.map, identity)
     if args.approval_out:
         # A receipt identifies a proposal; its existence is not human approval.
@@ -594,6 +599,7 @@ def main():
 
     r = sub.add_parser("review", help="Render the exact map and optionally save its proposal identity")
     r.add_argument("--map", required=True)
+    r.add_argument("--root", help=ROOT_HELP)
     r.add_argument("--approval-out", help="New receipt path; never overwrites an existing file")
     r.set_defaults(fn=cmd_review)
 
@@ -617,6 +623,10 @@ def main():
     v.set_defaults(fn=cmd_verify)
 
     args = ap.parse_args()
+    if not args.root:
+        location = os.path.abspath(os.path.dirname(getattr(args, "map", None) or args.baseline))
+        print("WARNING: --root was not supplied; source and target paths are not confined "
+              f"to a project folder. Relative paths resolve against {location}", file=sys.stderr)
     try:
         sys.exit(args.fn(args))
     except (OSError, ValueError, KeyError, TypeError) as exc:

@@ -27,7 +27,7 @@ Shared rules:
 
 ## Ground rules for agents
 - Follow the adopted instructions identified in `AUTHORITY.md`; verify their adoption and scope. Folder placement alone does not make a document governing.
-- `backlog/` is proposed, not real. Never cite it as current state.
+- The one canonical tracker named in project navigation contains proposed and deferred work; never create a competing backlog or cite a proposal as current state.
 - `history/` preserves prior material. Verify which claims were actually superseded; history labels do not retire active decisions.
 - `mirrors/` is read-only and externally owned. Do not modify.
 - New material arrives in `inbox/` and remains unreviewed until assessed. Classification alone does not adopt it as authority.
@@ -85,7 +85,7 @@ Follow the host instruction hierarchy, applicable explicit owner directions and 
 | Path | Bucket | What it is | State |
 |---|---|---|---|
 | `authority/spec.md` | authority | <one line> | verified |
-| `backlog/roadmap.md` | backlog | <one line> | proposed |
+| `<canonical tracker path>` | backlog | one authoritative roadmap/task register named by project navigation | proposed |
 ```
 
 The index must describe **final** paths. An index still showing proposed paths means the cleanup is not finished.
