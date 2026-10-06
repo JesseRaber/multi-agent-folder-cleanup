@@ -8,9 +8,9 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.5.2` — see `CHANGELOG.md`.
+`1.5.3` — local candidate; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.5.2**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.5.3**.
 
 ## Install
 
@@ -85,6 +85,12 @@ tests/                           package, regression, and Python/PowerShell pari
 ```
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
+
+## What v1.5.3 fixes
+
+- Move-verification recipes consistently pass `--root`; unguarded calls remain compatible but emit a clear confinement warning.
+- ZIP member safety, credential-guard hash reporting, session-header parsing and distinct-writer counting now agree across Python and PowerShell.
+- Work/Plan command fallbacks, audit and record-edit routing, optional-rules package wording, and canonical-tracker guidance are corrected.
 
 ## What v1.5.2 fixes
 
@@ -166,15 +172,15 @@ python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
   --expected-upload-manifest expected-files.csv
 
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py review \
-  --map moves.csv --approval-out proposal.json > review.md
+  --map moves.csv --root <project> --approval-out proposal.json > review.md
 # After owner approval of that exact review and the complete non-move package:
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py preflight \
-  --map moves.csv --approval proposal.json --path-threshold 240
+  --map moves.csv --approval proposal.json --root <project> --path-threshold 240
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py baseline \
-  --map moves.csv --approval proposal.json --out /safe/audit/baseline.json
+  --map moves.csv --approval proposal.json --root <project> --out /safe/audit/baseline.json
 # Recheck with preflight --approval proposal.json --baseline /safe/audit/baseline.json before moving.
 python skills/multi-agent-folder-cleanup/scripts/verify_move.py verify \
-  --baseline /safe/audit/baseline.json
+  --baseline /safe/audit/baseline.json --root <project>
 ```
 
 Python 3.8+, standard library only. On Windows or OneDrive, prefer `audit_folder.ps1` (PowerShell 5.1 or 7+) because it can inspect placeholder attributes. On other platforms, record hydration as unverified until checked on Windows.

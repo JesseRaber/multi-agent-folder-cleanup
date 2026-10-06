@@ -6,6 +6,8 @@ Use only for an approved literal list of factual record changes (D8, D9 for conn
 
 Use this subtype for an approved literal list of factual corrections where no file moves. It covers navigation, status, authority maps, handoffs, and separately approved factual instruction-entrypoint corrections. It does not authorize new behavioral rules, authority changes, permission changes, or any file omitted from the approved list.
 
+Before D8 or D9 edits, establish a supported conditional update, a cooperating lock of adequate scope, or a designated single writer covering the relevant writers/devices. Rereads, timestamps, hashes, ETags and fingerprints are integrity/conflict checks, not proof of exclusivity. If coordination is unavailable, stage the exact edit as pending and defer only the unsafe shared mutation.
+
 1. Record the exact approved files and the intended factual changes. Name any instruction file separately.
 2. Immediately before editing, capture SHA-256 and modified time for every approved file plus any authority or instruction files that must remain unchanged.
 3. Re-read the live files. If a hash or modified time changed after review, another writer is active: do not force the old text back. Re-stage from the new version, merge only the approved facts, and repeat the guard.

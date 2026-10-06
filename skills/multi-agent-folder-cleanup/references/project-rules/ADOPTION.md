@@ -22,6 +22,6 @@ Adds one short subsection, "Day-to-day saving and indexing", that points agents 
 
 ## Maintenance and scope
 
-`AGENTS.proposed.md` is the single reusable source distributed in every skill package. Its version is independent of the skill version. Adapted project copies must record their template version and local changes; upgrading the skill does not silently replace adopted policies. A root `AGENTS.md` in the skill's Git repository, if separately adopted there, governs repository development and is distinct from this template.
+`AGENTS.proposed.md` is the single reusable source distributed in the universal, plugin and `-project-rules-optional` packages. Gemini Apps and Opal packages intentionally omit `references/project-rules/`; obtain the optional rules package or repository source instead of reconstructing it. Its version is independent of the skill version. Adapted project copies must record their template version and local changes; upgrading the skill does not silently replace adopted policies. A root `AGENTS.md` in the skill's Git repository, if separately adopted there, governs repository development and is distinct from this template.
 
 No installer, background logging service or universal host compatibility is promised. Adoption and delivery must be verified for the actual project and host.

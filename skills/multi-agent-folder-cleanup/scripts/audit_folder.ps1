@@ -116,7 +116,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.5.2'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.5.3'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -683,27 +683,36 @@ if ($Orient -or $SessionIndex) {
             if ($null -eq $text) { $blk.Add($f.Name); continue }
             $head = if ($text.Length -gt 4096) { $text.Substring(0, 4096) } else { $text }
             $fields = @{}
-            foreach ($fm in [regex]::Matches($head, '(?m)^-\s*(Session ID|Started|Tool/runtime)\s*:\s*(.+?)\s*$')) { $fields[$fm.Groups[1].Value] = $fm.Groups[2].Value }
+            foreach ($fm in [regex]::Matches($head, '(?im)^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$')) { $fields[$fm.Groups[1].Value.ToLower()] = $fm.Groups[2].Value }
             $nm = [regex]::Match($f.Name, $SessionNameRx)
-            $sid = if ($fields['Session ID']) { $fields['Session ID'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
+            $sid = if ($fields['session id']) { $fields['session id'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
             $uid = [regex]::Match($(if ($sid) { $sid } else { $f.Name }), $UuidPattern)
             if (-not $uid.Success) { $non.Add($f.Name + ' (no session UUID; not treated as a session log)'); continue }
-            $tool = if ($fields['Tool/runtime']) { $fields['Tool/runtime'] } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
+            $tool = if ($fields['tool/runtime']) { $fields['tool/runtime'] } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
             $tool = $tool.Split('(')[0].Trim(); if (-not $tool) { $tool = 'unknown' }
             $topic = if ($nm.Success) { $nm.Groups[4].Value.Replace('-', ' ') } else { [IO.Path]::GetFileNameWithoutExtension($f.Name) }
-            $started = ConvertFrom-RecordedTime $fields['Started']
+            $startValue = @('started', 'start', 'start time') | ForEach-Object { if ($fields[$_]) { $fields[$_] } } | Select-Object -First 1
+            $started = ConvertFrom-RecordedTime $startValue
+            $startSource = 'recorded'
+            if ($null -eq $started -and $nm.Success -and $nm.Groups[2].Value -ne 'unknown-time') {
+                [datetime]$fallback = [datetime]::MinValue
+                if ([datetime]::TryParseExact($nm.Groups[1].Value + $nm.Groups[2].Value, 'yyyy-MM-ddHHmmss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal, [ref]$fallback)) {
+                    $started = [DateTimeOffset]$fallback
+                    $startSource = 'filename; no offset'
+                }
+            }
             $turns = [regex]::Matches($text, $TurnRx)
             $ids = @{}; foreach ($t in $turns) { $ids[$t.Groups[1].Value] = 1 }
             $lastTitle = ''; $lastTime = $null
             if ($turns.Count) {
                 $tail = $turns[$turns.Count - 1].Groups[2].Value
                 $lastTime = ConvertFrom-RecordedTime $tail
-                $lastTitle = [regex]::Replace(([regex]::new($IsoRx)).Replace($tail, '', 1), '^[\s\u2014|:-]*', '')
-                $lastTitle = ([regex]::Replace($lastTitle, '^[\s\u2014|:-]*', '')).Trim()
             }
+            $outcomes = [regex]::Matches($text, '(?im)^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$')
+            if ($outcomes.Count) { $lastTitle = $outcomes[$outcomes.Count - 1].Groups[1].Value.Trim() }
             if (-not $nm.Success) { $non.Add($f.Name) }
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
-                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime })
+                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource })
         }
         $res.Sessions = @($list | Sort-Object -Property @{ Expression = { $null -eq $_.Started } }, @{ Expression = { if ($_.Started) { $_.Started.UtcTicks } else { 0 } } }, @{ Expression = { $_.Id } })
         $res.Nonstandard = @($non); $res.Blocked = @($blk)
@@ -770,10 +779,13 @@ if ($Orient -or $SessionIndex) {
             $active = @($active | Where-Object { -not (Test-Mine $_.Id) })
             $activeScratch = @($activeScratch | Where-Object { -not (Test-Mine $_) })
         }
-        Write-Line ("  possibly active writers (changed in last {0} min): {1} session logs, {2} scratch folders" -f $ActiveMinutes, $active.Count, $activeScratch.Count)
+        $activeIds = @($active | ForEach-Object { $_.Id } | Select-Object -Unique)
+        $pairedScratch = @($activeScratch | Where-Object { $n = $_; @($activeIds | Where-Object { $n.ToLower().StartsWith($_) }).Count })
+        $unpairedScratch = @($activeScratch | Where-Object { $_ -notin $pairedScratch })
+        Write-Line ("  possibly active writers (changed in last {0} min): {1} distinct sessions, {2} unpaired scratch folders" -f $ActiveMinutes, $activeIds.Count, $unpairedScratch.Count)
         Write-Capped @($active | ForEach-Object { "session {0} {1} {2}" -f $_.Id.Substring(0, 8), $_.Tool, $_.Topic })
-        Write-Capped @($activeScratch | ForEach-Object { "scratch/$_" })
-        if ($active.Count -or $activeScratch.Count) {
+        Write-Capped @($unpairedScratch | ForEach-Object { "unpaired scratch/$_" })
+        if ($active.Count -or $unpairedScratch.Count) {
             Write-Line '    -> another agent may be working: coordinate shared edits before writing;'
             Write-Line '       stage exact pending edits in your scratch if coordination is unavailable.'
         }
@@ -836,7 +848,7 @@ if ($Orient -or $SessionIndex) {
             Write-Line ("  changed files the index never names: {0} (folder-level coverage may already include them)" -f $unindexed.Count)
             Write-Capped $unindexed
         } else { Write-Line ("  index {0}: NOT FOUND or unreadable; unindexed check skipped" -f ($idxList -join ', ')) }
-        $glance['possibly active writers'] = $active.Count + $activeScratch.Count
+        $glance['possibly active writers'] = $activeIds.Count + $unpairedScratch.Count
         $glance['changed since baseline'] = $changedS.Count
         $glance['changed but unnamed in index'] = $(if ($idxText) { $unindexed.Count } else { 'n/a' })
         $glance['quick context over size'] = $(if ($qcFlag) { 'yes' } else { 'no' })
@@ -867,7 +879,7 @@ if ($Orient -or $SessionIndex) {
             $duplicates = @(Get-DuplicateIds $sessions)
             Write-Line ("  duplicate session IDs: {0} (no proposed rows for ambiguous IDs)" -f $duplicates.Count)
             Write-Capped $duplicates
-            Write-Line '  recorded times require timezone offsets; unknown is not inferred from filenames'
+            Write-Line '  filename timestamps are used only as fallbacks and labelled no-offset'
             $low = $idx.ToLower()
             $missing = @($sessions | Where-Object { $_.Id -notin $duplicates -and -not $low.Contains($_.Id.ToLower()) -and -not $idx.Contains($_.Name) })
             Write-Line ("  sessions missing from index: {0}" -f $missing.Count)
@@ -879,7 +891,8 @@ if ($Orient -or $SessionIndex) {
                 function Get-Cell($v) { ([string]$v).Replace('|', '\|').Replace("`n", ' ').Trim() }
                 Write-Capped @($missing | ForEach-Object {
                     $outcomeText = if ($_.LastTitle) { $_.LastTitle } else { '(fill in)' }
-                    "| {0} | {1} | {2} | {3} | {4} | {5} | (fill in) | [Session]({6}/{7}) |" -f (Format-WorkTime $_.Started), (Format-Activity $_), $_.Id, (Get-Cell $_.Tool), (Get-Cell $_.Topic), (Get-Cell $outcomeText), $relDir, [Uri]::EscapeDataString($_.Name) }) '  '
+                    $startText = (Format-WorkTime $_.Started) + $(if ($_.StartSource -ne 'recorded') { ' [filename; no offset]' } else { '' })
+                    "| {0} | {1} | {2} | {3} | {4} | {5} | (fill in) | [Session]({6}/{7}) |" -f $startText, (Format-Activity $_), $_.Id, (Get-Cell $_.Tool), (Get-Cell $_.Topic), (Get-Cell $outcomeText), $relDir, [Uri]::EscapeDataString($_.Name) }) '  '
             }
             $stale = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
             if ($idx) {
@@ -1135,12 +1148,23 @@ if ($InspectZip) {
             $zip = [System.IO.Compression.ZipFile]::OpenRead($z.FullName)
             try {
                 Write-Line ("   entries: " + $zip.Entries.Count)
-                $bad = @($zip.Entries | Where-Object { $_.FullName -match '[:*?"<>|]' -or $_.FullName -match '^(/|\\|\.\.)' })
-                if ($bad.Count) { Write-Line ("   INVALID/UNSAFE NAMES: " + $bad.Count) -ForegroundColor Yellow }
+                $bad = @($zip.Entries | Where-Object {
+                    $normalized = $_.FullName.Replace('\', '/')
+                    $parts = @($normalized.Split('/'))
+                    $normalized.StartsWith('/') -or $normalized -match '^[A-Za-z]:' -or
+                        $parts -contains '..' -or $normalized -match '[:*?"<>|]'
+                })
+                if ($bad.Count) {
+                    Write-Line ("   INVALID/UNSAFE NAMES: " + $bad.Count) -ForegroundColor Yellow
+                    $bad | Select-Object -First $memberCap -ExpandProperty FullName | ForEach-Object { Write-Line "     $_" }
+                    if ($bad.Count -gt $memberCap) { Write-Line '     ...' }
+                }
+                else {
+                    $zip.Entries | Select-Object -First $memberCap -ExpandProperty FullName | ForEach-Object { Write-Line "     $_" }
+                    if ($zip.Entries.Count -gt $memberCap) { Write-Line '     ...' }
+                }
                 $longE = @($zip.Entries | Where-Object { ($HostBase.Length + 1 + $_.FullName.Length) -gt $PathThreshold })
                 if ($longE.Count) { Write-Line ("   would exceed path threshold: " + $longE.Count) -ForegroundColor Yellow }
-                $zip.Entries | Select-Object -First $memberCap -ExpandProperty FullName | ForEach-Object { Write-Line "     $_" }
-                if ($zip.Entries.Count -gt $memberCap) { Write-Line "     ..." }
             }
             finally { $zip.Dispose() }
         }
@@ -1195,6 +1219,7 @@ else { Write-Line "  none" }
 
 if ($HashFiles) {
     $unreadable = [System.Collections.ArrayList]::new()
+    $guarded = [System.Collections.ArrayList]::new()
     $hashes = foreach ($f in $files) {
         try {
             Assert-ContentRead $f.FullName
@@ -1208,9 +1233,17 @@ if ($HashFiles) {
             # Never drop these silently: an unhashed file is a hole in the
             # coverage claim, and on OneDrive it usually means a placeholder
             # or a lock, both of which block an Execute pass.
-            $why = if (Test-ContentReadAllowed $f.FullName) { 'UNREADABLE' } else { 'READ BLOCKED' }
-            [void]$unreadable.Add([pscustomobject]@{ Path = $f.FullName; Why = $why })
+            if (Test-ContentReadAllowed $f.FullName) {
+                [void]$unreadable.Add([pscustomobject]@{ Path = $f.FullName; Why = 'UNREADABLE' })
+            } else { [void]$guarded.Add($f.FullName) }
         }
+    }
+
+    if ($guarded.Count) {
+        Write-Section 'Not hashed by design (credential guard)'
+        $guarded | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("  CREDENTIAL GUARD   " + (Get-Short $_)) }
+        if ($guarded.Count -gt (Get-Cap 25)) { Write-Line ("  ... and " + ($guarded.Count - (Get-Cap 25)) + " more") }
+        Write-Line ("  " + $guarded.Count + " file(s) were not hashed by design. Their content-read guard remains active.")
     }
 
     if ($unreadable.Count) {

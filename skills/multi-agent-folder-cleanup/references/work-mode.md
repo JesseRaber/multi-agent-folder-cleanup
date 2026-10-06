@@ -12,9 +12,11 @@ The project's adopted instructions win. Where they name other paths or formats, 
 4. If scripts can run, check for other writers and recent changes:
 
 ```
-python scripts/audit_folder.py --root <project> --orient --session-id <your-id>
+python3 scripts/audit_folder.py --root <project> --orient --session-id <your-id>
 pwsh -File scripts/audit_folder.ps1 -Root <project> -Orient -SessionId <your-id>
 ```
+
+On Windows, `python` or `py -3` may replace `python3`; use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` when `pwsh` is absent. The Microsoft Copilot/Grok package intentionally omits `audit_folder.ps1`, so use its Python helper. See [audit-tools.md](audit-tools.md) for the complete fallbacks.
 
 It lists recently active session logs and scratch folders, files changed since the latest session started, and changed files the index never names. Times are local modified times: leads, not proof. Without scripts, use available listings and read the relevant recent logs. With connector-only or partial access, state the coverage limit; do not claim a writer is absent from missing activity signals. Use the helper path in the installed skill, not a presumed project-relative scripts directory.
 
