@@ -8,7 +8,7 @@ Wiki: https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki
 
 ## Version
 
-`1.6.0` — local candidate; see `CHANGELOG.md`. The latest published release remains v1.5.3 until an authorized release occurs.
+`1.6.0` — released 2026-10-06; see `CHANGELOG.md`.
 
 Report as: **Loaded Multi-Agent Folder Cleanup v1.6.0**.
 

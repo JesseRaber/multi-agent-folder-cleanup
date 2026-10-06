@@ -1,6 +1,6 @@
 # Changelog
 
-### 1.6.0 candidate — shared-record, rerun and privacy safeguards
+### 1.6.0 (released 2026-10-06) — shared-record, rerun and privacy safeguards
 
 - Fixed pre-existing R100 parity under Windows PowerShell 5.1 by giving tied session timestamps and duplicate IDs the same ordinal, case-insensitive relative-filename tie-breaker in both helpers. Added a tied-timestamp regression fixture plus a dependency-gated runner and pinned PyYAML development requirement.
 - Require item-level tracker mapping and a completion/supersession false-gap check before a source is treated as merged or retired (R140).
