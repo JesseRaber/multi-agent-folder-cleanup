@@ -126,7 +126,7 @@ class WorkModeTests(unittest.TestCase):
                                 capture_output=True, text=True, encoding="utf-8")
             self.assertEqual(pw.returncode, 0, pw.stderr)
             norm = lambda text: [line.rstrip() for line in text.splitlines()
-                                 if not line.startswith(("Generated ", "Read-only work-mode"))]
+                                 if not line.startswith(("Generated ", "Read-only work-mode", "Helper: "))]
             self.assertEqual(norm(py.stdout), norm(pw.stdout), pw.stderr)
         return py.stdout
 
@@ -172,7 +172,7 @@ class WorkModeTests(unittest.TestCase):
         text = source.read_text(encoding="utf-8").replace("-04:00", "")
         source.write_text(text, encoding="utf-8")
         out = self.assert_work_parity("--session-index", "--orient")
-        self.assertIn("[filename; no offset]", out)
+        self.assertIn("(filename; offset unknown)", out)
         self.assertIn("(file mtime; not recorded activity)", out)
         self.assertIn("start of latest session 22222222", out)
         self.assertRegex(out, r"2026-10-01T\d{2}:\d{2}[+-]\d{2}:\d{2}")
@@ -207,7 +207,7 @@ class WorkModeTests(unittest.TestCase):
             pw = subprocess.run([ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PS),
                                  "-Root", str(self.root), *sa], capture_output=True, text=True, encoding="utf-8")
             norm = lambda t: [l.rstrip() for l in t.splitlines()
-                              if not l.startswith(("Generated ", "Read-only work-mode"))]
+                              if not l.startswith(("Generated ", "Read-only work-mode", "Helper: "))]
             self.assertEqual(norm(py.stdout), norm(pw.stdout), pw.stderr)
 
     def test_quick_context_structure_warning(self):

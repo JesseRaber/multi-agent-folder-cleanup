@@ -8,7 +8,7 @@ Ask the owner to explicitly adopt the template for the named project. Use that h
 
 ## Existing project
 
-Inspect the current root/scoped policies, adoption evidence, actual continuity paths and populated records. Stage a concrete merge preserving project-specific instructions. Follow section 11 of the template for migration, transition obligations and a verified activation event. Never overwrite an existing `AGENTS.md`, journal or index with a blank template. Policy installation is separate from folder cleanup and needs its own authorization.
+Inspect the current root/scoped policies, adoption evidence, actual continuity paths and populated records. Stage a concrete merge preserving project-specific instructions. Name pre-edit and migration backup copies of instruction files so hosts do not load them, for example `AGENTS.md.before-<sha8>` or `AGENTS.before.md`; do not save a literal `AGENTS.md` under scratch or backup. Follow section 11 of the template for migration, transition obligations and a verified activation event. Never overwrite an existing `AGENTS.md`, journal or index with a blank template. Policy installation is separate from folder cleanup and needs its own authorization.
 
 ## Owner request to copy and adapt
 

@@ -1,5 +1,11 @@
 # Changelog
 
+### 1.6.3 (candidate) — portfolio audit corrections
+
+- Preserve filename-derived session times without a machine offset, report nonstandard session filename tool slugs and IDs, and show every portfolio child in brief mode (R158–R160).
+- Identify the running audit helper path and version during orientation, and label provider sync/index state unchecked (R164, R167).
+- Clarify non-loading instruction backups, pending-edit retention, and the device helper access route (R157, R162, R163).
+
 ### 1.6.2 — release safety
 
 - Grok routed to the `-microsoft-copilot-agent-only` package in README and `INSTALL-universal.md` (owner upload test 2026-10-05: Universal rejected for `.ps1`, Copilot ZIP accepted).

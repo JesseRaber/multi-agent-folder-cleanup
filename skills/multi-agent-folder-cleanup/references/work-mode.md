@@ -27,6 +27,7 @@ Treat summaries as leads. Verify anything your task depends on against the actua
 ## W2. Claim your own space
 
 - For a new chat or uncertain writer handoff, create your own log with a generated UUID: `AI_CONTEXT/SESSIONS/YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`. Preserve source-session links separately. Within the same established session and writer, append to that log; do not create one per request. Resume after a restart only with established writer continuity, or follow an evidenced transfer under the project policy. If identity is uncertain, start a linked continuation.
+- Use a lowercase tool slug in that filename and the `Tool/runtime` header: `claude`, `claude-code`, `codex`, `antigravity`, `gemini`, `copilot`, `manus`, `opal`, or `grok`. Use a canonical UUID for the ID segment.
 - Use the project's established format. Include session ID, start time with timezone when known, writer instance, source-chat identity or unavailable, and coverage start. Record each request/outcome with a stable turn ID; verify previous content is preserved and the entry appears once.
 - Keep drafts and temporary work in `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder.
 - If another writer looks active, do your independent work anyway and be extra careful with shared files (W5).
@@ -75,7 +76,7 @@ Shared records are the index, quick context, session index and any file other ag
 
 Before editing, establish a supported conditional update, a cooperating lock covering the relevant writers/devices, or a designated single writer. A local lock does not exclude remote cloud writers. Rereading and hash checks verify integrity; they do not establish exclusive ownership. If coordination is unavailable, save the exact intended edit in your session scratch folder, mark it PENDING in your log, and continue independent work.
 
-Unless the target may contain credentials, first save a byte-for-byte pre-edit copy in your project session scratch area; a tool-private temporary folder is not a durable recovery location. Never copy a credential-bearing file for this purpose. Record the complete before SHA-256, then preserve the target's encoding, line endings and structure while editing. For Markdown tables, keep each row inside the table, with no blank lines, and retain the table's established sort order.
+Unless the target may contain credentials, first save a byte-for-byte pre-edit copy in your project session scratch area; a tool-private temporary folder is not a durable recovery location. Use a non-loading filename for an instruction-file copy, such as `AGENTS.md.before-<sha8>` or `AGENTS.before.md`, never a literal `AGENTS.md` under scratch. Never copy a credential-bearing file for this purpose. Record the complete before SHA-256, then preserve the target's encoding, line endings and structure while editing. For Markdown tables, keep each row inside the table, with no blank lines, and retain the table's established sort order.
 
 1. Re-read the file immediately before writing.
 2. Make the smallest exact edit (a bounded replace or a true append). Never rebuild a whole shared file from an older or truncated copy.
@@ -96,7 +97,7 @@ Session/turn: <source ID and turn>
 Reconcile: <condition required before applying>
 ```
 
-When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Record the applied/superseded/conflicted outcome in your own session log, citing the source session and turn; only the source session's writer appends to that session's log (W3). A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
+When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Record the Applied/superseded/conflicted outcome in your own session log, citing the source session and turn; only the source session's writer appends to that session's log (W3). Leave the staged file in place after applying another session's edit. Removing it is cleanup requiring per-target approval; a blanket "do any cleanup you need" does not approve that deletion. A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
 
 Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superseded**, **Conflicted** or **Unverifiable**. Compare the current target with the exact proposed change; filename age and the old base hash are not enough. Retain the source-session link and outcome even after the staged payload is no longer actionable.
 
