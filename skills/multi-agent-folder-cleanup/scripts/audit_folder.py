@@ -42,9 +42,9 @@ import time
 import urllib.parse
 import zipfile
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 
-VERSION = "1.6.2"  # must equal SKILL.md metadata.version
+VERSION = "1.6.3"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -733,6 +733,8 @@ def host_length(relpath, host_base_len):
 SESSION_NAME_RE = re.compile(
     r"^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_("
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.md$")
+CANONICAL_TOOL_SLUGS = frozenset(("claude", "claude-code", "codex", "antigravity",
+                                  "gemini", "copilot", "manus", "opal", "grok"))
 SESSION_FIELD_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
@@ -847,10 +849,12 @@ def load_sessions(root, sessions_rel):
                             if fields.get(k)), "")
         started = recorded_time(start_value)
         start_source = "recorded"
+        filename_start = None
         if started is None and m and m.group(2) != "unknown-time":
             try:
-                started = datetime.strptime(m.group(1) + m.group(2), "%Y-%m-%d%H%M%S").timestamp()
-                start_source = "filename; no offset"
+                filename_start = datetime.strptime(m.group(1) + m.group(2), "%Y-%m-%d%H%M%S")
+                started = filename_start.replace(tzinfo=timezone.utc).timestamp()
+                start_source = "filename; offset unknown"
             except ValueError:
                 pass
         turns = TURN_HEAD_RE.findall(text)
@@ -867,11 +871,14 @@ def load_sessions(root, sessions_rel):
             blocked.append(name)
             continue
         if not m:
-            nonstandard.append(name)
+            nonstandard.append(name + " (nonstandard filename)")
+        elif m.group(3) not in CANONICAL_TOOL_SLUGS:
+            nonstandard.append(name + " (nonstandard tool slug)")
         sessions.append({
             "name": name, "id": sid, "tool": tool, "topic": topic,
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
             "last_time": last_time, "mtime": mtime, "start_source": start_source,
+            "filename_start": filename_start,
         })
     # Use a complete deterministic key. Duplicate IDs and equal timestamps are
     # valid audit findings, so neither may leave ordering to directory enumeration
@@ -909,7 +916,7 @@ def report_session_index(root, args, limited):
     print(f"  duplicate session IDs: {len(duplicates)} (no proposed rows for ambiguous IDs)")
     for sid in limited(sorted(duplicates)):
         print(f"    {sid}")
-    print("  filename timestamps are used only as fallbacks and labelled no-offset")
+    print("  filename timestamps are used only as fallbacks and labelled offset unknown")
     missing = [s for s in sessions if s["id"] not in duplicates and s["id"].lower() not in index_text.lower()
                and s["name"] not in index_text]
     print(f"  sessions missing from index: {len(missing)}")
@@ -918,7 +925,8 @@ def report_session_index(root, args, limited):
         print("  Proposed rows (review Latest outcome and Status before saving):")
         for s in limited(missing):
             outcome = s["last_title"] or "(fill in)"
-            start = fmt_time(s['started']) + (" [filename; no offset]" if s["start_source"] != "recorded" else "")
+            start = (s["filename_start"].strftime("%Y-%m-%dT%H:%M") + " (filename; offset unknown)"
+                     if s["filename_start"] else fmt_time(s['started']))
             print(f"  | {start} | {work_activity(s)} | {s['id']} | {_md_cell(s['tool'])} | "
                   f"{_md_cell(s['topic'])} | {_md_cell(outcome)} | (fill in) | "
                   f"[Session]({rel_dir}/{urllib.parse.quote(s['name'])}) |")
@@ -1062,7 +1070,9 @@ def report_orient(root, args, limited):
             continue
         changed.append((r, mtime))
     changed.sort(key=lambda x: (-x[1], x[0]))
-    print(f"  files changed since {fmt_time(since)} ({basis}), excluding session logs and scratch: {len(changed)}")
+    since_label = (latest["filename_start"].strftime("%Y-%m-%dT%H:%M") + " (filename; offset unknown)"
+                   if not args.since and dated and latest["filename_start"] else fmt_time(since))
+    print(f"  files changed since {since_label} ({basis}), excluding session logs and scratch: {len(changed)}")
     for r, mtime in limited(changed):
         print(f"    {fmt_time(mtime)}  {r}")
     if walk.unvisited:
@@ -1107,6 +1117,8 @@ def run_work_helpers(args, root):
         if len(items) > cap(len(items)):
             print(f"      ... and {len(items) - cap(len(items))} more")
     print(f"Read-only work-mode check of {root}")
+    if args.orient:
+        print(f"Helper: {os.path.abspath(__file__)} (audit_folder.py {VERSION})")
     print(f"Generated {datetime.now():%Y-%m-%d %H:%M}")
     glance = {}
     if args.orient:
@@ -1362,7 +1374,7 @@ def run_report(args, root, coverage_pairs):
             print(f"  {why:26} {rel(path, root)}")
         if len(walk.pruned) > cap(25):
             print(f"  ... and {len(walk.pruned) - cap(25)} more")
-        print("  Generated state, not evidence. Still synced and indexed by cloud providers.")
+        print("  Generated state, not evidence. Provider sync/index state not checked.")
 
     if args.exclude:
         section("Excluded from detail sections (counted, not examined)")
@@ -1795,7 +1807,7 @@ def run_report(args, root, coverage_pairs):
         rows = portfolio_rows(root, args.entrypoint)
         print("  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Entrypoints present")
         if rows:
-            for name, count, present, state, sessions, missing, pending in limited(rows):
+            for name, count, present, state, sessions, missing, pending in rows:
                 value = ", ".join(present) if present else "(none detected)"
                 print(f"  {name} | root-level | {state} | {count} | {sessions} | {missing} | {pending} | {value}")
         else:

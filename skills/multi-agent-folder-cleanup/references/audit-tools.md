@@ -49,17 +49,17 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.2
-python3 scripts/verify_move.py --version     # verify_move.py 1.6.2
-python3 scripts/verify_records.py --version  # verify_records.py 1.6.2
-pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.2
+python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.3
+python3 scripts/verify_move.py --version     # verify_move.py 1.6.3
+python3 scripts/verify_records.py --version  # verify_records.py 1.6.3
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.3
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
 
 In v1.4.1, credential-name hints, link traversal and detected cloud placeholders block content reads (hashes, archive inspection, pointer/skill/index/manifest reads). Metadata remains counted. These guards do not identify every secret or prove cloud synchronization. Inline Markdown destinations support balanced parentheses and escaped parentheses; reference-style definitions and full CommonMark parsing remain out of scope. Root-only fallback matches are labeled separately rather than silently treated as document-relative links.
 
-Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. Pass `--root <project>` to `review`, `preflight`, `baseline` and `verify` so any source or target outside the project is refused as OUTSIDE ROOT and a baseline written inside the project is refused. Unguarded calls remain compatible in v1.6.2 but warn that paths are not confined. Case-only renames (`readme.md` to `README.md`) on case-insensitive volumes are not reported as TARGET EXISTS, maps spanning top-level folders do not refuse every baseline location, macOS paths compare case-insensitively, and Windows probes use the extended-length form for long paths. Re-review on a different host; never treat receipt equality as cross-device authorization.
+Move preflight rejects linked source/target components and probes Windows sources for exclusive read access. This momentary check closes its handle immediately; it does not reserve files, prove application inactivity, or replace writer coordination. Baseline and verification refuse linked paths and detected placeholders before hashing. Receipt identity is unchanged and does not bind a host or volume. Pass `--root <project>` to `review`, `preflight`, `baseline` and `verify` so any source or target outside the project is refused as OUTSIDE ROOT and a baseline written inside the project is refused. Unguarded calls remain compatible but warn that paths are not confined. Case-only renames (`readme.md` to `README.md`) on case-insensitive volumes are not reported as TARGET EXISTS, maps spanning top-level folders do not refuse every baseline location, macOS paths compare case-insensitively, and Windows probes use the extended-length form for long paths. Re-review on a different host; never treat receipt equality as cross-device authorization.
 
 ## Work-mode checks (v1.5)
 
@@ -122,7 +122,7 @@ pwsh -File scripts/audit_folder.ps1 -Root <root> -HashFiles -Out C:\Temp\report.
 | Route | Shell | Typical limits | Hydration check |
 |---|---|---|---|
 | Windows desktop agent (Codex, Claude Code, Antigravity) | PowerShell and/or Python on Windows | None beyond the agent's own timeout | Yes, with `audit_folder.ps1` or Windows Python |
-| Cloud agent linked to a Windows PC through a bridge | Often Linux over a mounted copy | Per-command time cap; background jobs may be killed; PowerShell may be absent | No; report it as unchecked |
+| Cloud agent linked to a Windows PC through a bridge | Often Linux over a mounted copy | The installed skill lives in the cloud container; obtain device helpers from the project's verified `Release Packages/<ver>/…UNIVERSAL-skill.zip` after checking `SHA256SUMS.txt`, or from the canonical repository. Run on the device when available; if a helper cannot run, name and report an equivalent check as equivalent, not helper execution. Per-command time caps and missing PowerShell may still limit checks. | No; report it as unchecked |
 | Cloud sandbox with uploaded files | Linux | Files are a snapshot, not the live folder | No |
 | Connector or web listing only | None | See [connector-audit.md](connector-audit.md) | No |
 

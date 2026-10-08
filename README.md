@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. Current release: **v1.6.2**.
+Canonical source for the skill and its OpenAI and Claude plugin packages. This branch is a **v1.6.3 candidate**; published releases are listed on GitHub.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`1.6.2`; see `CHANGELOG.md`.
+`1.6.3` candidate; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.2**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.6.3 (SKILL.md at <path>; helpers <version>)**.
 
 ## Install
 
@@ -88,7 +88,7 @@ tests/                           package, regression, and Python/PowerShell pari
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
 
-## What v1.6.2 changes
+## Release safety and host routing
 
 - Grok now points to the `-microsoft-copilot-agent-only` package in the README and install guide (Grok rejects `.ps1`).
 - Releases are created as **drafts**; the workflow refuses to touch an existing release and never replaces published assets. Assets are verified against a local candidate before publishing.
