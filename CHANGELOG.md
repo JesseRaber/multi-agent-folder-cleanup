@@ -1,5 +1,11 @@
 # Changelog
 
+### 1.6.2 (local candidate) — portfolio audit corrections
+
+- Preserve filename-derived session times without a machine offset, report nonstandard session filename tool slugs and IDs, and show every portfolio child in brief mode (R158–R160).
+- Identify the running audit helper path and version during orientation, and label provider sync/index state unchecked (R164, R167).
+- Clarify non-loading instruction backups, pending-edit retention, and the device helper access route (R157, R162, R163).
+
 ### 1.6.1 (released 2026-10-06) — record verification
 
 - Added read-only `scripts/verify_records.py` (R150, R154): per-file SHA-256, UTF-8 validity, BOM, CRLF/LF/lone-CR counts, mojibake markers outside code, unresolved Markdown relative links and table damage, plus `--compare` (exact / newline-normalized / whitespace-only / differ) and `--expect-sha256`. Work mode now asks agents to cite its output before calling a shared-record edit verified. Regression tests cover each check and confirm inputs are never modified.

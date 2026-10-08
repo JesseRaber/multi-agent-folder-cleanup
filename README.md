@@ -12,7 +12,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 `1.6.1` — released 2026-10-06; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.1**.
+`1.6.2` — local candidate; see `packaging/RELEASE_NOTES_v1.6.2.md`.
+
+Candidate arrival line: **Loaded Multi-Agent Folder Cleanup v1.6.2 (SKILL.md at <path>; helpers <version>)**.
 
 ## Install
 

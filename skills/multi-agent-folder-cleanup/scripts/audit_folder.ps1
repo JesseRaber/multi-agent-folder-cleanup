@@ -116,7 +116,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.6.1'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.6.2'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -629,6 +629,7 @@ function Test-LinkDirectory($item) {
 # ---------------------------------------------------------------------------
 if ($Orient -or $SessionIndex) {
     $SessionNameRx = '^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_(' + $UuidPattern + ')\.md$'
+    $CanonicalToolSlugs = @('claude', 'claude-code', 'codex', 'antigravity', 'gemini', 'copilot', 'manus', 'opal', 'grok')
     $IsoRx = '\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?'
     $TurnRx = '(?m)^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$'
     $WorkCap = if ($Brief) { 10 } else { 15 }
@@ -712,12 +713,13 @@ if ($Orient -or $SessionIndex) {
             $topic = if ($nm.Success) { $nm.Groups[4].Value.Replace('-', ' ') } else { [IO.Path]::GetFileNameWithoutExtension($f.Name) }
             $startValue = @('started', 'start', 'start time') | ForEach-Object { if ($fields[$_]) { $fields[$_] } } | Select-Object -First 1
             $started = ConvertFrom-RecordedTime $startValue
-            $startSource = 'recorded'
+            $startSource = 'recorded'; $filenameStart = $null
             if ($null -eq $started -and $nm.Success -and $nm.Groups[2].Value -ne 'unknown-time') {
                 [datetime]$fallback = [datetime]::MinValue
-                if ([datetime]::TryParseExact($nm.Groups[1].Value + $nm.Groups[2].Value, 'yyyy-MM-ddHHmmss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal, [ref]$fallback)) {
-                    $started = [DateTimeOffset]$fallback
-                    $startSource = 'filename; no offset'
+                if ([datetime]::TryParseExact($nm.Groups[1].Value + $nm.Groups[2].Value, 'yyyy-MM-ddHHmmss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$fallback)) {
+                    $filenameStart = $fallback.ToString("yyyy-MM-dd'T'HH:mm")
+                    $started = [DateTimeOffset]::new($fallback, [TimeSpan]::Zero)
+                    $startSource = 'filename; offset unknown'
                 }
             }
             $turns = [regex]::Matches($text, $TurnRx)
@@ -729,9 +731,10 @@ if ($Orient -or $SessionIndex) {
             }
             $outcomes = [regex]::Matches($text, '(?im)^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$')
             if ($outcomes.Count) { $lastTitle = $outcomes[$outcomes.Count - 1].Groups[1].Value.Trim() }
-            if (-not $nm.Success) { $non.Add($f.Name) }
+            if (-not $nm.Success) { $non.Add($f.Name + ' (nonstandard filename)') }
+            elseif ($CanonicalToolSlugs -cnotcontains $nm.Groups[3].Value) { $non.Add($f.Name + ' (nonstandard tool slug)') }
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
-                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource })
+                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource; FilenameStart = $filenameStart })
         }
         $res.Sessions = @($list | Sort-Ordinal -Key { Get-SessionLoadKey $_ })
         $res.Nonstandard = @($non); $res.Blocked = @($blk)
@@ -741,6 +744,7 @@ if ($Orient -or $SessionIndex) {
     function Test-Mine($id) { return ($SessionId -and $id.ToLower().StartsWith($SessionId.ToLower())) }
 
     Write-Line "Read-only work-mode check of $RootFull"
+    if ($Orient) { Write-Line ("Helper: {0} (audit_folder.ps1 {1})" -f $PSCommandPath, $ScriptVersion) }
     Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
     $glance = [ordered]@{}
 
@@ -852,7 +856,8 @@ if ($Orient -or $SessionIndex) {
             if ($envP) { $prunedCount++ }
         }
         $changedS = @($changed | Sort-Object -Property @{ Expression = { $_.MTime.UtcTicks }; Descending = $true }, @{ Expression = { $_.Rel }; Descending = $false })
-        Write-Line ("  files changed since {0} ({1}), excluding session logs and scratch: {2}" -f (Format-WorkTime $sinceT), $basis, $changedS.Count)
+        $sinceLabel = if (-not $Since -and $dated.Count -and $latest.FilenameStart) { $latest.FilenameStart + ' (filename; offset unknown)' } else { Format-WorkTime $sinceT }
+        Write-Line ("  files changed since {0} ({1}), excluding session logs and scratch: {2}" -f $sinceLabel, $basis, $changedS.Count)
         Write-Capped @($changedS | ForEach-Object { "{0}  {1}" -f (Format-WorkTime $_.MTime), $_.Rel })
         if ($unvisitedW) { Write-Line "  WALK INCOMPLETE: $unvisitedW folders not visited (--max-seconds)" }
         if ($prunedCount) { Write-Line "  generated-state folders not walked: $prunedCount" }
@@ -898,7 +903,7 @@ if ($Orient -or $SessionIndex) {
             $duplicates = @(Get-DuplicateIds $sessions)
             Write-Line ("  duplicate session IDs: {0} (no proposed rows for ambiguous IDs)" -f $duplicates.Count)
             Write-Capped $duplicates
-            Write-Line '  filename timestamps are used only as fallbacks and labelled no-offset'
+            Write-Line '  filename timestamps are used only as fallbacks and labelled offset unknown'
             $low = $idx.ToLower()
             $missing = @($sessions | Where-Object { $_.Id -notin $duplicates -and -not $low.Contains($_.Id.ToLower()) -and -not $idx.Contains($_.Name) })
             Write-Line ("  sessions missing from index: {0}" -f $missing.Count)
@@ -910,7 +915,7 @@ if ($Orient -or $SessionIndex) {
                 function Get-Cell($v) { ([string]$v).Replace('|', '\|').Replace("`n", ' ').Trim() }
                 Write-Capped @($missing | ForEach-Object {
                     $outcomeText = if ($_.LastTitle) { $_.LastTitle } else { '(fill in)' }
-                    $startText = (Format-WorkTime $_.Started) + $(if ($_.StartSource -ne 'recorded') { ' [filename; no offset]' } else { '' })
+                    $startText = if ($_.FilenameStart) { $_.FilenameStart + ' (filename; offset unknown)' } else { Format-WorkTime $_.Started }
                     "| {0} | {1} | {2} | {3} | {4} | {5} | (fill in) | [Session]({6}/{7}) |" -f $startText, (Format-Activity $_), $_.Id, (Get-Cell $_.Tool), (Get-Cell $_.Topic), (Get-Cell $outcomeText), $relDir, [Uri]::EscapeDataString($_.Name) }) '  '
             }
             $stale = [Collections.Generic.SortedSet[string]]::new([StringComparer]::Ordinal)
@@ -1056,7 +1061,7 @@ if ($pruned.Count) {
         Write-Line ("  {0,-26} {1}" -f $_.Why, (Get-Short $_.Path))
     }
     if ($pruned.Count -gt (Get-Cap 25)) { Write-Line ("  ... and " + ($pruned.Count - (Get-Cap 25)) + " more") }
-    Write-Line "  Generated state, not evidence. Still synced and indexed by cloud providers."
+    Write-Line "  Generated state, not evidence. Provider sync/index state not checked."
 }
 
 if ($Exclude.Count) {
@@ -1445,7 +1450,7 @@ if ($Portfolio) {
     Write-Line "  Project | State | Count scope | Root items | Entrypoints present | Sessions | Missing index rows | Pending updates"
     $children = @(Get-ChildItem -LiteralPath $RootFull -Directory -Force -ErrorAction SilentlyContinue | Sort-Ordinal -Key { $_.Name.ToLower() })
     if ($children.Count) {
-        foreach ($child in @($children | Select-BriefItems)) {
+        foreach ($child in $children) {
             $count = @(Get-ChildItem -LiteralPath $child.FullName -Force -ErrorAction SilentlyContinue).Count
             $present = @($checks | Where-Object { Test-Path -LiteralPath (Join-Path $child.FullName $_) })
             $value = if ($present.Count) { $present -join ', ' } else { '(none detected)' }
