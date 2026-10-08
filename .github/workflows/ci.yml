@@ -36,6 +36,11 @@ jobs:
           python /tmp/validate_plugin.py .
       - name: Run package checks
         run: python -m unittest tests/test_package.py -v
+      - name: Version touch points, release notes and release-workflow safety
+        run: |
+          VERSION=$(python -c "import re;print(re.search(r'^  version: \"([^\"]+)\"', open('skills/multi-agent-folder-cleanup/SKILL.md', encoding='utf-8').read(), re.M)[1])")
+          python packaging/check_versions.py --repo . --config packaging/version_files.json \
+            --version "$VERSION" --workflow .github/workflows/release.yml
       - name: Compile Python scripts
         run: python -m compileall -q skills/multi-agent-folder-cleanup/scripts tests
       - name: Parse PowerShell script

@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. Current release: **v1.6.1** (2026-10-06).
+Canonical source for the skill and its OpenAI and Claude plugin packages. Current release: **v1.6.2**.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`1.6.1` — released 2026-10-06; see `CHANGELOG.md`.
+`1.6.2`; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.1**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.6.2**.
 
 ## Install
 
@@ -20,10 +20,10 @@ Prebuilt packages are attached to each [release](https://github.com/JesseRaber/m
 
 | Your AI app | Download |
 |---|---|
-| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
+| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
 | Claude Code `/plugin install` (not the Claude app uploader) | `…-claude-code-plugin.zip` |
 | Codex / ChatGPT plugin marketplace | `…-codex-chatgpt-plugin.zip` |
-| Microsoft Copilot agent skill upload | `…-microsoft-copilot-agent-only.zip` |
+| Microsoft Copilot agent skill upload, **Grok** | `…-microsoft-copilot-agent-only.zip` |
 | Gemini Apps skill upload | `…-gemini-apps-only.zip` |
 | Opal skill import | `…-opal-only.zip` |
 | Optional Project Rules template only | `…-project-rules-optional.zip` |
@@ -32,7 +32,7 @@ Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can
 
 Host-specific packages leave out what that host rejects:
 
-- `-microsoft-copilot-agent-only`: no `.ps1`; Microsoft Copilot's custom-skill sandbox supports Python and selected web/POSIX script types but rejects PowerShell skill scripts.
+- `-microsoft-copilot-agent-only`: no `.ps1`; Microsoft Copilot's custom-skill sandbox supports Python and selected web/POSIX script types but rejects PowerShell skill scripts. Grok also needs this package: it rejected the Universal ZIP for `.ps1` (owner upload test, 2026-10-05).
 - `-gemini-apps-only`: no `audit_folder.py`, `audit_folder.ps1`, `agents/openai.yaml` or project rules. Google's upload security scan rejects the audit script's credential-guard code; the package omits it rather than disguising it.
 - `-opal-only`: `SKILL.md` (name and description only in the header) plus `references/*.md`. Opal imports Markdown only, so no scripts.
 
@@ -87,6 +87,13 @@ tests/                           package, regression, and Python/PowerShell pari
 ```
 
 The skill folder contains the maintained workflow. Plugin manifests and release files package it without duplicating instructions. It does not override host instructions or adopted project policies; the bundled rules proposal requires separate adoption.
+
+## What v1.6.2 changes
+
+- Grok now points to the `-microsoft-copilot-agent-only` package in the README and install guide (Grok rejects `.ps1`).
+- Releases are created as **drafts**; the workflow refuses to touch an existing release and never replaces published assets. Assets are verified against a local candidate before publishing.
+- `packaging/check_versions.py` and `packaging/verify_release.py` (from the github-release skill) gate versions and verify published assets; `HOST_INSTALL_LOG.md` records per-host installs.
+- The packager pins ZIP metadata so Windows and Linux builds give identical archives; `.gitattributes` keeps text LF.
 
 ## What v1.6.1 adds
 
