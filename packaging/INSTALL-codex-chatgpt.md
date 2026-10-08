@@ -21,7 +21,7 @@ multi-agent-folder-cleanup/
 3. Refresh ChatGPT or Codex, install the plugin from the local marketplace, and start a new conversation.
 4. Test with: “Audit this portfolio of project folders and separate documentary claims from operationally verified state.”
 
-A loaded skill should report **Loaded Multi-Agent Folder Cleanup v1.6.1** and begin with **Mode: Audit** and offer read-only inspection before proposing changes. Publishing to the universal ChatGPT and Codex plugin directory requires a separate OpenAI submission and review; this archive is prepared for that workflow but is not represented as already published.
+A loaded skill should report **Loaded Multi-Agent Folder Cleanup v1.6.2** and begin with **Mode: Audit** and offer read-only inspection before proposing changes. Publishing to the universal ChatGPT and Codex plugin directory requires a separate OpenAI submission and review; this archive is prepared for that workflow but is not represented as already published.
 
 ## Install as a personal standalone skill
 

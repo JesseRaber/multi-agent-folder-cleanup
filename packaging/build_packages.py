@@ -121,10 +121,12 @@ def write_zip(archive, items, folder_entries):
     with zipfile.ZipFile(archive, 'x', compression=zipfile.ZIP_DEFLATED) as z:
         for d in sorted(dirs):
             info = zipfile.ZipInfo(d, date_time=STAMP)
+            info.create_system = 3  # same bytes on Windows and POSIX builders
             info.external_attr = 0o40755 << 16 | 0x10
             z.writestr(info, b'')
         for n in names:
             info = zipfile.ZipInfo(n, date_time=STAMP)
+            info.create_system = 3
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             z.writestr(info, items[n])

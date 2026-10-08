@@ -1,0 +1,21 @@
+{
+  "files": [
+    {"path": "skills/multi-agent-folder-cleanup/SKILL.md", "pattern": "^  version: \"{v}\""},
+    {"path": "skills/multi-agent-folder-cleanup/SKILL.md", "pattern": "Loaded Multi-Agent Folder Cleanup v{v}"},
+    {"path": "skills/multi-agent-folder-cleanup/scripts/audit_folder.py", "pattern": "VERSION = \"{v}\""},
+    {"path": "skills/multi-agent-folder-cleanup/scripts/verify_move.py", "pattern": "VERSION = \"{v}\""},
+    {"path": "skills/multi-agent-folder-cleanup/scripts/verify_records.py", "pattern": "VERSION = \"{v}\""},
+    {"path": "skills/multi-agent-folder-cleanup/scripts/audit_folder.ps1", "pattern": "ScriptVersion = '{v}'"},
+    {"path": "skills/multi-agent-folder-cleanup/references/audit-tools.md", "pattern": "audit_folder.py {v}"},
+    {"path": ".claude-plugin/plugin.json", "pattern": "\"version\": \"{v}\""},
+    {"path": ".codex-plugin/plugin.json", "pattern": "\"version\": \"{v}\""},
+    {"path": "packaging/INSTALL-universal.md", "pattern": "Loaded Multi-Agent Folder Cleanup v{v}"},
+    {"path": "packaging/INSTALL-claude-code.md", "pattern": "v{v}"},
+    {"path": "packaging/INSTALL-codex-chatgpt.md", "pattern": "v{v}"},
+    {"path": "packaging/INSTALL-microsoft-copilot.md", "pattern": "v{v}"},
+    {"path": "README.md", "pattern": "Loaded Multi-Agent Folder Cleanup v{v}"},
+    {"path": "tests/test_v152_fixes.py", "pattern": "\"{v}\""},
+    {"path": "CHANGELOG.md", "pattern": "^### {v} "}
+  ],
+  "history": ["CHANGELOG.md", "packaging/RELEASE_NOTES_v*.md", "HOST_INSTALL_LOG.md"]
+}

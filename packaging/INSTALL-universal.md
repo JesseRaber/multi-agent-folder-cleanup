@@ -6,10 +6,10 @@ folder unless the table below names a host-specific package.
 
 | Your AI app | Download |
 |---|---|
-| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, Grok, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
+| **Almost everything**: Claude app skill upload, ChatGPT/Codex standalone skills, local models, any skills folder | `…-UNIVERSAL-skill.zip` |
 | Claude Code `/plugin install` (not the Claude app uploader) | `…-claude-code-plugin.zip` |
 | Codex / ChatGPT plugin marketplace | `…-codex-chatgpt-plugin.zip` |
-| Microsoft Copilot agent skill upload | `…-microsoft-copilot-agent-only.zip` |
+| Microsoft Copilot agent skill upload, **Grok** | `…-microsoft-copilot-agent-only.zip` |
 | Gemini Apps skill upload | `…-gemini-apps-only.zip` |
 | Opal skill import | `…-opal-only.zip` |
 | Optional Project Rules template only | `…-project-rules-optional.zip` |
@@ -26,7 +26,7 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Work / Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.6.1.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.6.2.
 > Read `references/preconditions.md` before any run, then only the file for the
 > mode: `work-mode.md`, `audit-mode.md`, `plan-mode.md`, `execute-moves.md` or
 > `execute-records.md`. If `SKILL.md` is loaded, follow its mode routing.
@@ -50,8 +50,9 @@ files and paste the instruction block above.
 
 ## Grok
 
-1. Upload the whole `multi-agent-folder-cleanup/` folder (or this ZIP) to the
-   conversation or workspace.
+1. Upload `…-microsoft-copilot-agent-only.zip`. Grok rejected the Universal
+   ZIP because of `audit_folder.ps1` and accepted the Copilot package (owner
+   upload test, 2026-10-05).
 2. Paste the instruction block at the top of this file.
 3. In a Grok sandbox with Python, run the scripts directly:
 
@@ -88,7 +89,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.6.1**.
+**Loaded Multi-Agent Folder Cleanup v1.6.2**.
 
 ---
 

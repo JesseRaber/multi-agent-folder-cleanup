@@ -1,5 +1,13 @@
 # Changelog
 
+### 1.6.2 — release safety
+
+- Grok routed to the `-microsoft-copilot-agent-only` package in README and `INSTALL-universal.md` (owner upload test 2026-10-05: Universal rejected for `.ps1`, Copilot ZIP accepted).
+- Release workflow: draft-first, refuses an existing release, requires the notes file, no `--clobber`, checkout without persisted credentials, `github.event_name == 'push'` guards; comment corrected to seven archives.
+- Added `packaging/check_versions.py`, `packaging/verify_release.py`, `packaging/version_files.json` (from the github-release skill) and `HOST_INSTALL_LOG.md`.
+- Packager pins ZIP `create_system`; `.gitattributes` forces LF, so Windows and Linux builds match.
+- Source: github-release project, Claude session `fc8b2159-5283-4880-9b59-739c33b8de8f`.
+
 ### 1.6.1 (released 2026-10-06) — record verification
 
 - Added read-only `scripts/verify_records.py` (R150, R154): per-file SHA-256, UTF-8 validity, BOM, CRLF/LF/lone-CR counts, mojibake markers outside code, unresolved Markdown relative links and table damage, plus `--compare` (exact / newline-normalized / whitespace-only / differ) and `--expect-sha256`. Work mode now asks agents to cite its output before calling a shared-record edit verified. Regression tests cover each check and confirm inputs are never modified.

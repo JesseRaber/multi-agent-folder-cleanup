@@ -19,6 +19,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false  # later steps run downloaded code
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.11'
@@ -64,6 +66,21 @@ jobs:
               sys.exit('marketplace.json does not list multi-agent-folder-cleanup')
           print(f"All package versions agree: {tag}")
           EOF
+
+      - name: Refuse if a release for this tag already exists
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "A release for $GITHUB_REF_NAME already exists. Published bytes are never replaced; ship a new version."
+            exit 1
+          fi
+
+      - name: Version touch points, release notes and workflow safety
+        run: |
+          python3 packaging/check_versions.py --repo . --config packaging/version_files.json \
+            --version "${{ steps.ver.outputs.version }}" --workflow .github/workflows/release.yml
 
       - name: Run OpenAI skill validator
         run: |
@@ -156,7 +173,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf dist
-          # Builds all six archives, byte-checks every member against source,
+          # Builds all seven archives, byte-checks every member against source,
           # smoke-tests the packaged scripts and writes SHA256SUMS.txt.
           python3 packaging/build_packages.py dist --status "release build ${GITHUB_REF_NAME}"
           rm -f dist/BUILD_EVIDENCE.json
@@ -170,27 +187,17 @@ jobs:
           name: packages-${{ steps.ver.outputs.version }}
           path: dist/
 
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Create DRAFT release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           NOTES=packaging/RELEASE_NOTES_v$VERSION.md
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS.txt --clobber
-            if [ -f "$NOTES" ]; then
-              gh release edit "$GITHUB_REF_NAME" --notes-file "$NOTES"
-            fi
-          elif [ -f "$NOTES" ]; then
-            gh release create "$GITHUB_REF_NAME" \
-              --title "Multi-Agent Folder Cleanup v$VERSION" \
-              --notes-file "$NOTES" \
-              dist/*.zip dist/SHA256SUMS.txt
-          else
-            gh release create "$GITHUB_REF_NAME" \
-              --title "Multi-Agent Folder Cleanup v$VERSION" \
-              --generate-notes \
-              dist/*.zip dist/SHA256SUMS.txt
-          fi
+          if [ ! -f "$NOTES" ]; then echo "Missing $NOTES; refusing to create a release without reviewed notes."; exit 1; fi
+          gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --verify-tag \
+            --title "Multi-Agent Folder Cleanup v$VERSION" \
+            --notes-file "$NOTES" \
+            dist/*.zip dist/SHA256SUMS.txt
+          echo "Draft created. Verify the downloaded assets before publishing (github-release skill, publish.md)."
