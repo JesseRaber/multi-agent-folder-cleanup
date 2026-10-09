@@ -6,7 +6,7 @@ A stable release meant to stay installed. It folds the unreleased 1.6.4 candidat
 
 ## For agents working in a shared folder (Work mode)
 
-- **Sequential writers.** When a project declares "one owner, agents work one after another" (Project Rules 3.3.0 ships this by default), the active agent edits shared records directly with read-back verification instead of staging PENDING files. Multi-operator projects keep staging.
+- **Sequential writers.** When the owner opts a project in with a `Sequential writers:` line (asked once at adoption; off by default), the active agent edits shared records directly with read-back verification instead of staging PENDING files. Multi-operator projects keep staging.
 - **Leftover pending files.** One name (`PENDING_<TARGET>.md`, `Status:` first line). The next qualifying writer applies those whose base still matches, verifies them and marks them APPLIED; mismatches are reported as Conflicted.
 - **Sync conflict copies.** Shared files are edited in place; no second same-name file in one folder; `(1)` and `-COMPUTER` copies and missing originals are checked at arrival and before the final answer.
 - **Cloud connectors.** Every listing states its view and time; files are handled by id; replacements are staged in scratch and carry `Replaces: <old id>`; one file type per shared record; replicas under other providers are declared.
@@ -27,7 +27,7 @@ Both `audit_folder.py` and `audit_folder.ps1`, same output, read-only:
 
 ## Optional Project Rules 3.3.0
 
-Additive lines in sections 3, 4, 5 and 7, including the default sequential-writer declaration. Gemini Apps and Opal packages do not include `references/project-rules/`.
+Additive lines in sections 3, 4, 5 and 7, including the opt-in `Sequential writers:` rule (off unless the owner adds the line). Gemini Apps and Opal packages do not include `references/project-rules/`.
 
 ## Not included
 

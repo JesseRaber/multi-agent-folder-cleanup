@@ -29,8 +29,9 @@ class TemplateTests(unittest.TestCase):
 
     def test_section5_sequential_writer_default(self):
         s5 = section(self.t, "## 5.", "## 6.")
-        self.assertIn("Sequential-writer declaration (default; delete this bullet to declare the project multi-operator)", s5)
-        self.assertIn("read-back verification", s5)
+        self.assertIn("Sequential writers (opt-in): only when the owner adds a line beginning `Sequential writers:`", s5)
+        self.assertIn("Even with it, stage when another writer may be active", s5)
+        self.assertNotRegex(s5, r"(?m)^[ \t]*(?:[-*][ \t]*)?Sequential writers:", "template must not opt in by itself")
 
     def test_section5_same_name_and_conflict_copies(self):
         s5 = section(self.t, "## 5.", "## 6.")
@@ -54,7 +55,7 @@ class TemplateTests(unittest.TestCase):
     def test_adoption_notes(self):
         a = read("references/project-rules/ADOPTION.md")
         self.assertIn("needs Project Rules 3.1.0 or later", a)
-        self.assertIn("Delete that bullet when adopting to declare the project multi-operator", a)
+        self.assertIn("Only if the owner says yes, add `Sequential writers:", a)
 
 
 class WorkModeTests(unittest.TestCase):
@@ -87,6 +88,7 @@ class WorkModeTests(unittest.TestCase):
         w5 = section(self.w, "## W5.", "## W6.")
         self.assertIn("**Sequential-writer declaration.**", w5)
         self.assertIn("a quiet `--orient` result, an absent lock or an old timestamp never does", w5)
+        self.assertIn("Even with the line, stage your edit when `--orient`", w5)
         self.assertIn("`PENDING_<TARGET>.md`", w5)
         self.assertIn("**Apply leftover pending files.**", w5)
         self.assertIn("`Status: APPLIED <after-sha8> by <session>/<turn>`", w5)

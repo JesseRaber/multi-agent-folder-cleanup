@@ -630,7 +630,9 @@ function Test-LinkDirectory($item) {
 $PendingNameRx = '(?i)^pending[._ -]|\.pending[.-]'
 $ConflictParenRx = '^(.+?) \((\d{1,3})\)(\.[^.]+)?$'
 $ConflictHostRx = '^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$'
-$DeclarationRx = '(?i)sequential-writer declaration|agents work one after another'
+# The owner's opt-in line (Project Rules 3.3.0 section 5): a line that begins
+# "Sequential writers:". Prose that merely describes the rule does not count.
+$DeclarationRx = '(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:'
 $RulesVersionRx = '(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)'
 $StatusLineRx = '^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)'
 $Hex64Rx = '\b[0-9a-fA-F]{64}\b'
@@ -1209,7 +1211,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
         if ($active.Count -or $unpairedScratch.Count) {
             Write-Line '    -> another agent may be working: coordinate shared edits before writing;'
             Write-Line '       stage exact pending edits in your scratch if coordination is unavailable.'
-            if ($declared.Count) { Write-Line '       The declaration covers agents working one after another, not overlap: verify by read-back.' }
+            if ($declared.Count) { Write-Line '       The declaration covers agents working one after another, not overlap: stage shared-record edits this session.' }
         }
 
         # Declared startup read order (README_FIRST links, in order).

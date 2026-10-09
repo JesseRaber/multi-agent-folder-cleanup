@@ -660,7 +660,9 @@ PENDING_NAME_RE = re.compile(r"(?i)^pending[._ -]|\.pending[.-]")
 PENDING_EXTS = (".md", ".json")
 CONFLICT_PAREN_RE = re.compile(r"^(.+?) \((\d{1,3})\)(\.[^.]+)?$")
 CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
-DECLARATION_RE = re.compile(r"(?i)sequential-writer declaration|agents work one after another")
+# The owner's opt-in line (Project Rules 3.3.0 section 5): a line that begins
+# "Sequential writers:". Prose that merely describes the rule does not count.
+DECLARATION_RE = re.compile(r"(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:")
 RULES_VERSION_RE = re.compile(r"(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)")
 STATUS_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)")
 HEX64_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
@@ -1455,7 +1457,7 @@ def report_orient(root, args, limited):
         print("    -> another agent may be working: coordinate shared edits before writing;")
         print("       stage exact pending edits in your scratch if coordination is unavailable.")
         if declared:
-            print("       The declaration covers agents working one after another, not overlap: verify by read-back.")
+            print("       The declaration covers agents working one after another, not overlap: stage shared-record edits this session.")
 
     # Declared startup read order (README_FIRST links, in order).
     read_order_kb = "none found"

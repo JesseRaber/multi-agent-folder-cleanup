@@ -40,7 +40,8 @@ def build(base):
     a = base / "port" / "projA"
     w(a / "AGENTS.md", TEMPLATE.read_text(encoding="utf-8"))
     w(a / "AI_CONTEXT/README_FIRST.md", "Read [quick](PROJECT_QUICK_CONTEXT.md) then `PROJECT_INDEX.md`.\n")
-    w(a / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md", "# QC\nstate\n")
+    w(a / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md",
+      "# QC\nstate\nSequential writers: one owner; agents work one after another (owner, 2026-10-09)\n")
     w(a / "PROJECT_INDEX.md", "# Index\n- docs/plan.md\n")
     w(a / "docs/plan.md", "plan\n")
     w(a / "docs/plan (1).md", "plan copy\n")
@@ -204,7 +205,7 @@ class HelperChecks(unittest.TestCase):
 
     def test_orient_new_checks(self):
         out = run_py(self.root, "--orient", "--since", "2020-01-01T00:00")
-        self.assertIn("coordination: sequential-writer declaration found (AGENTS.md)", out)
+        self.assertIn("coordination: sequential-writer declaration found (AI_CONTEXT/PROJECT_QUICK_CONTEXT.md)", out)
         self.assertIn("declared read order (AI_CONTEXT/README_FIRST.md", out)
         self.assertIn("AI_CONTEXT/PROJECT_QUICK_CONTEXT.md  0 KB", out)
         self.assertIn("    PROJECT_INDEX.md  0 KB", out)
@@ -221,7 +222,8 @@ class HelperChecks(unittest.TestCase):
         self.assertIn("sequential-writer declaration    yes", out)
 
     def test_orient_without_declaration(self):
-        (self.root / "AGENTS.md").write_text("# Rules\nVersion: 3.2.0\n", encoding="utf-8")
+        # The bundled template describes the rule but is not the owner's opt-in line.
+        (self.root / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md").write_text("# QC\nstate\n", encoding="utf-8")
         out = run_py(self.root, "--orient")
         self.assertIn("coordination: no sequential-writer declaration; stage PENDING edits", out)
 
