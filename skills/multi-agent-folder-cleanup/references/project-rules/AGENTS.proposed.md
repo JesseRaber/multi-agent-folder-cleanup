@@ -104,7 +104,7 @@ Project: <name>; root: <path or provider id>; canonical source if any: <repo/url
 Adopted: 4.0.0 on <date> by <owner statement>; activation event: <id> in AI_CONTEXT/POLICY_INSTALLATION.md
 Owner timezone: <IANA zone>
 Tracker: <path>            (default PROJECT_ROADMAP_STATUS.md; the only place this default is set)
-Sequential writers: one owner; agents work one after another (owner, <date>)   ← delete this line if agents run concurrently
+<only if the owner says agents never work at the same time, replace this line with: Sequential writers: one owner; agents work one after another (owner, <date>); otherwise delete it>
 Active-writer window: 30 minutes
 Tool slugs in use: <slug → runtime, one per line when two hosts could collide>
 Established paths differing from section 3: <none | mapping>

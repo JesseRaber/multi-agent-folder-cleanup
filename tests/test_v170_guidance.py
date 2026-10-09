@@ -57,7 +57,7 @@ class TemplateTests(unittest.TestCase):
     def test_adoption_notes(self):
         a = read("references/project-rules/ADOPTION.md")
         self.assertIn("# Optional Project Rules 4.0.0", a)
-        self.assertIn("Keep the line only if the owner says yes", a)
+        self.assertIn("Only if the owner says yes, replace the placeholder", a)
 
 
 class WorkModeTests(unittest.TestCase):

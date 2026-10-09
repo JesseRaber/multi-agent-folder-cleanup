@@ -39,8 +39,8 @@ def w(path, data):
 
 def build(base):
     a = base / "port" / "projA"
-    # Rules 4.0.0 section 13 carries a `Sequential writers:` line to delete when agents run
-    # concurrently; this fixture models that choice so the declaration comes from quick context.
+    # The declaration must come from quick context here; the 4.0.0 template's section 13 ships the
+    # opt-in as a placeholder (the substitution is a guard in case a filled line ever returns).
     w(a / "AGENTS.md", re.sub(r"(?m)^Sequential writers:.*\n", "", TEMPLATE.read_text(encoding="utf-8")))
     w(a / "AI_CONTEXT/README_FIRST.md", "Read [quick](PROJECT_QUICK_CONTEXT.md) then `PROJECT_INDEX.md`.\n")
     w(a / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md",

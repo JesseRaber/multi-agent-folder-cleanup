@@ -184,6 +184,24 @@ class PortfolioTests(unittest.TestCase):
                 self.assertEqual(pick(out), pick(ps))
 
 
+class TemplateOptInTests(unittest.TestCase):
+    def test_unfilled_template_never_opts_in(self):
+        template = (RULES / "AGENTS.proposed.md").read_text(encoding="utf-8")
+        self.assertNotRegex(template, r"(?m)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            w(root, "AGENTS.md", template)
+            out = run_py(root, "--orient")
+            self.assertIn("coordination: no sequential-writer declaration", out)
+            filled = template.replace(
+                "<only if the owner says agents never work at the same time, replace this line with: "
+                "Sequential writers: one owner; agents work one after another (owner, <date>); otherwise delete it>",
+                "Sequential writers: one owner; agents work one after another (owner, 2026-10-09)")
+            self.assertNotEqual(filled, template)
+            w(root, "AGENTS.md", filled)
+            self.assertIn("coordination: sequential-writer declaration found (AGENTS.md)", run_py(root, "--orient"))
+
+
 class VerifyRecordsTests(unittest.TestCase):
     def run_vr(self, data):
         with tempfile.TemporaryDirectory() as tmp:
