@@ -1,6 +1,6 @@
 # multi-agent-folder-cleanup 1.7.0
 
-Status: candidate, not released.
+Status: released 2026-10-09.
 
 A stable release meant to stay installed. It folds the unreleased 1.6.4 candidate (R187–R191) together with the items approved on 2026-10-08 (R030, R195, R197–R199, R201, R203–R209, R211–R215) and the Batch B items R155, R161, R165/R166, R168, R169 and the declaration part of R156.
 

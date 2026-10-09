@@ -1,6 +1,6 @@
 # Changelog
 
-### 1.7.0 (candidate) — stable release: add-only agents, sequential writers, sync-copy and pending-file checks
+### 1.7.0 (released 2026-10-09) — stable release: add-only agents, sequential writers, sync-copy and pending-file checks
 
 - Add-only agent fallback in Work mode: an agent that can only add files uploads into a dated `Incoming/` folder (never a new top-level folder) with a `_PROVENANCE.md` listing tool, time with timezone, files, status and PENDING index/tracker/session-index rows; the next agent with edit access applies them. An upload with neither a log nor a provenance file is incomplete. End-of-request checklist item added.
 - `muse` added to tool slugs; an unlisted tool uses its own short lowercase name and never skips the session log.
