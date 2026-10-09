@@ -1,8 +1,8 @@
 # multi-agent-folder-cleanup 1.7.1
 
-Status: candidate — not tagged or published (owner go required).
+Status: released 2026-10-09.
 
-Aligns the skill with Project Rules 4.0.0 (register R227–R233, R235; R234 skill-size audit not included).
+Aligns the skill with Project Rules 4.0.0 (register R227–R233, R235; R234 skill-size audit not included). Independently reviewed by Antigravity before release; its seven findings are fixed here.
 
 ## Optional Project Rules 4.0.0
 
@@ -23,3 +23,7 @@ The bundled template is now Project Rules 4.0.0: section 0 (the minimum rules an
 - `--pending`: lists provenance PENDING lines.
 - `--portfolio`: core match over sections 0–12; `Section 13 complete` column.
 - `verify_records.py`: flags NUL bytes, UTF-16 segments and mis-decoded UTF-16 line breaks.
+- `audit_folder.ps1` no longer depends on `Get-FileHash`, which fails when Windows PowerShell 5.1 is started from PowerShell 7.
+- A session that was closed and then resumed is treated as open; only its latest turn decides.
+
+The bundled section 13 template ships the `Sequential writers:` line as a placeholder, so an unfilled copy never opts a project in.
