@@ -13,6 +13,9 @@
   - `--portfolio` (R165/R166/R231): core match compares sections 0–12 (1–12 for older rules); new `Section 13 complete` column.
   - `verify_records.py` (R235): flags NUL bytes, UTF-16LE/BE segments, a UTF-16 BOM and mis-decoded UTF-16 line breaks (U+0A0D/U+0D0A/U+0D00/U+0A00) — damage that still decodes as valid UTF-8 and previously passed.
 - Behaviour change to note: an empty scratch folder no longer counts as writer activity (folder times are not used).
+- Rules template: the section 13 `Sequential writers:` line ships as a placeholder, so an unfilled copy never opts a project in (sections 0–12 unchanged).
+- Independent review fixes (Antigravity, `Audits/2026-10-09_Antigravity_v171_PR24_Review.md` in the project folder): PowerShell 5.1 warning goes to stderr (F1); provenance headings are not PENDING rows (F2); Python reads UTF-16/UTF-8-BOM logs like PowerShell (F3); only the last turn or a close entry after it closes a session, so a resumed session stays open (F4); work-mode code spans (F5); `Sequential writers:` lives in section 13 under 4.0.0 (F6); slug check compares runtime names, not header detail (F7).
+- `audit_folder.ps1` hashes with .NET instead of `Get-FileHash`, which fails when Windows PowerShell 5.1 is started from PowerShell 7 (pending targets showed "unreadable"). CI now runs the full suite under Windows PowerShell 5.1 as well.
 - Sources: Project Rules 4.0.0 reviews and adoption 2026-10-09 (Claude session 1cdc3b65; Codex 501eca96/1490b5cc; Antigravity 3a4f02c7; Cursor Grok Bot 435368cf); build by Claude session 86263f12.
 
 ### 1.7.0 (released 2026-10-09) — stable release: add-only agents, sequential writers, sync-copy and pending-file checks
