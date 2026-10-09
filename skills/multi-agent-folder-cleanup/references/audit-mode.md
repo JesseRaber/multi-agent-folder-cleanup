@@ -78,6 +78,15 @@ The point of the audit. Typical findings, in rough order of damage:
 - **Stale or mixed skill copies inside the project.** Copies at different versions, or a new `SKILL.md` over older scripts, give agents a protocol the helpers do not implement. Compare each with the canonical release and the helper `--version`.
 - **An index that omits files that exist.** A session or file index that never mentions existing records tells the next agent they do not exist.
 
+### B5. Attribute activity
+
+When asked whether an agent was active, or who changed the folder:
+
+1. Search contents and filenames for the agent's name, but treat no hits as no evidence either way. Add-only agents often leave files that never name them.
+2. List files and folders created or changed in the window, and match each one to a session log or `_PROVENANCE.md`. Report every unmatched item as an **unattributed-activity finding**. A new top-level folder is a finding on its own.
+3. Convert every timestamp to the owner's local timezone before comparing it with reported times. Shells and sync clients often report UTC.
+4. Say "consistent with <agent>" when the evidence is only timing. Say "is <agent>" only when a record in the folder names it.
+
 Stop here in Audit mode. Do not create navigation files. Do not move anything. The one exception is a journal entry the folder's own instructions require (see A5 in [preconditions.md](preconditions.md)) — that is the owner's directive, and the report must state it was the only write.
 
 ## G. Audit report format

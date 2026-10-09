@@ -27,7 +27,7 @@ Treat summaries as leads. Verify anything your task depends on against the actua
 ## W2. Claim your own space
 
 - For a new chat or uncertain writer handoff, create your own log with a generated UUID: `AI_CONTEXT/SESSIONS/YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`. Preserve source-session links separately. Within the same established session and writer, append to that log; do not create one per request. Resume after a restart only with established writer continuity, or follow an evidenced transfer under the project policy. If identity is uncertain, start a linked continuation.
-- Use a lowercase tool slug in that filename and the `Tool/runtime` header: `claude`, `claude-code`, `codex`, `antigravity`, `gemini`, `copilot`, `manus`, `opal`, or `grok`. Use a canonical UUID for the ID segment.
+- Use a lowercase tool slug in that filename and the `Tool/runtime` header: `claude`, `claude-code`, `codex`, `antigravity`, `gemini`, `copilot`, `manus`, `opal`, `grok`, or `muse`. An unlisted tool uses its own short lowercase name. Never skip the session log because your tool is unlisted. Use a canonical UUID for the ID segment.
 - Use the project's established format. Include session ID, start time with timezone when known, writer instance, source-chat identity or unavailable, and coverage start. Record each request/outcome with a stable turn ID; verify previous content is preserved and the entry appears once.
 - Keep drafts and temporary work in `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder.
 - If another writer looks active, do your independent work anyway and be extra careful with shared files (W5).
@@ -40,7 +40,7 @@ Write only in your own session log. If another agent's work needs correction, re
 |---|---|
 | Finished deliverable | The project area the index names for that kind of work. No obvious area: the closest existing folder, and say so in the index row. |
 | Draft, test output, intermediate data | `AI_CONTEXT/scratch/<your-session-id>/` |
-| Material from another model, chat or person, not yet reviewed | `Incoming/` (or the project's inbox), as a dated folder with a short provenance note |
+| Material from another model, chat or person, not yet reviewed | `Incoming/` (or the project's inbox), as a dated folder with a short provenance note. Do not create a new top-level folder for it. |
 | A newer version of an existing file | Edit the file in place when you are authorized to change it. Otherwise save beside it as a proposal and say what it would replace. Never create `final_v2_REAL` siblings. |
 | A proposed rule or instruction file | A non-loading name such as `AGENTS.proposed.md`, never a live instruction filename |
 | Candidate or release package | Keep candidates in a clearly named candidate/staging area, released artifacts in the release area, and superseded packages in History or `_superseded/`. Never place a same-version candidate beside a released package without an unmistakable status label and canonical pointer. |
@@ -53,6 +53,24 @@ Naming:
 - Follow established naming and native formats. For a new standalone Markdown report without a convention, use `YYYY-MM-DD_<short-topic>.md`. Add the tool name only when several models produce parallel versions of the same thing.
 - Use plain words, hyphens or underscores, and no characters that break on Windows, OneDrive or URLs (`: * ? " < > |`, trailing dots or spaces).
 - Keep paths short and check the actual host/application limits; do not treat a single character count as a universal limit.
+
+### Add-only agents
+
+If you can only add files (a browser upload, or a connector without edit or append) and cannot append to a log or edit shared records:
+
+1. Do not create a new top-level folder. Upload into `Incoming/YYYY-MM-DD_<tool>_<topic>/` or the project's established inbox.
+2. Upload a `_PROVENANCE.md` with the files. It lists:
+   - tool and session (or "browser upload")
+   - time with timezone
+   - each file with its purpose
+   - status (unreviewed or ready)
+   - the exact index row, tracker row and session-index row you propose, each marked **PENDING**
+3. If you can add files to `AI_CONTEXT/SESSIONS/`, also add your own new session log there. Creating a new file is allowed even when editing existing ones is not.
+4. Tell the owner in your reply that shared records are still pending.
+
+The next agent with edit access that finds PENDING rows in a `_PROVENANCE.md` applies them under W5, then marks each one applied in that file, citing its own session and turn.
+
+An upload with no session log and no provenance file is incomplete work.
 
 ## W4. Make every new document self-explaining
 
@@ -122,6 +140,7 @@ Before each final answer, so the work survives if the chat stops here:
 - [ ] Session log entry: request, what you did, files changed, what's verified, what's open
 - [ ] `Limits/open work` names every known unresolved item, including owner decisions created by this turn; write `None` only when nothing remains. A correction to an earlier turn restates the complete current open-work list.
 - [ ] Deliverables are saved in the authorized place and format with appropriate provenance (W3–W4)
+- [ ] New uploads have a log or a `_PROVENANCE.md` (Add-only agents)
 - [ ] Index row added or updated for new deliverables (W6)
 - [ ] Quick context updated if the state changed
 - [ ] Every newly proposed, deferred or discovered future task is added to the one canonical tracker (or one exact pending insertion is recorded); no competing task list was created

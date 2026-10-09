@@ -1,4 +1,4 @@
-# Optional Project Rules 3.2.0
+# Optional Project Rules 3.3.0
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md). It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename prevents it from being confused with a repository's live root instructions. Do not copy private session logs or a source project's adoption clauses into another project.
 
@@ -12,9 +12,13 @@ Inspect the current root/scoped policies, adoption evidence, actual continuity p
 
 ## Owner request to copy and adapt
 
-> Adopt the bundled Project Rules 3.2.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
+> Adopt the bundled Project Rules 3.3.0 for this named project. Inspect current instructions and continuity records, merge applicable project-specific requirements, preserve existing records and paths, and perform only the bounded project policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading/persistence checks remain unverified.
 
 This quotation is an example for the owner to send, not an instruction to an agent reading the guide. In chat-only/read-only hosts, use supported project instructions and return owed checkpoints when recording cannot safely be saved.
+
+## Changes in 3.3.0
+
+Three additive lines for agents that can only add files: section 3 bars new top-level folders unless approved or indexed and sends unreviewed material to a dated `Incoming/` folder; section 4 requires a `_PROVENANCE.md` beside an upload when a session log cannot be written; section 7 treats unaccounted files and folders as findings and requires timestamps in the owner's local timezone. No existing rule changed. Projects on 3.2.0 or earlier keep their adopted wording until the owner migrates them.
 
 ## Changes in 3.2.0
 

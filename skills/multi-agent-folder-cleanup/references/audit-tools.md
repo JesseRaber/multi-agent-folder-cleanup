@@ -49,10 +49,10 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.3
-python3 scripts/verify_move.py --version     # verify_move.py 1.6.3
-python3 scripts/verify_records.py --version  # verify_records.py 1.6.3
-pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.3
+python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.4
+python3 scripts/verify_move.py --version     # verify_move.py 1.6.4
+python3 scripts/verify_records.py --version  # verify_records.py 1.6.4
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.4
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.

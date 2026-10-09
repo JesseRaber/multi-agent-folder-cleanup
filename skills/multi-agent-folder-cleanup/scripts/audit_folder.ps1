@@ -116,7 +116,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.6.3'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.6.4'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
