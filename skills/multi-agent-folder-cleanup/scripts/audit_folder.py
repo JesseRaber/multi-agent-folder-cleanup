@@ -1166,6 +1166,9 @@ CLOSE_ENTRY_RE = re.compile(
 CLOSE_TITLE_RE = re.compile(r"(?i)(?:\bsession\s+clos(?:e|ed|ing)\b|\|\s*(?:session\s+)?clos(?:e|ed)\s*$)")
 FINISHED_STATUSES = frozenset(("completed", "complete", "closed", "done", "finished",
                                "abandoned", "superseded", "stopped", "ended"))
+GENERIC_RUNTIME_WORDS = frozenset(("desktop", "app", "cli", "web", "ide", "device", "cloud", "session",
+                                   "powershell", "python", "windows", "mac", "linux", "agent",
+                                   "local", "user", "chat", "the"))
 SLUG_LINE_RE = re.compile(r"(?im)^\s*Tool slugs in use\s*:\s*(.+)$")
 WINDOW_LINE_RE = re.compile(r"(?im)^\s*Active-writer window\s*:\s*(\d+)\s*min")
 SESSION_FIELD_RE = re.compile(
@@ -1359,13 +1362,22 @@ def scope_info(root):
     return {"slugs": slugs, "window": window}
 
 
+def runtime_name(header):
+    """The runtime part of a Tool/runtime header. Model, machine, connector and surface detail
+    (parentheses, text after , ; / ` | or ' on '/' via '/' - ', and generic surface words) is dropped,
+    so 'codex desktop, gpt-x' and 'codex' agree while 'grok' and 'grok bot' do not."""
+    text = re.sub(r"\([^)]*\)", " ", (header or "").lower())
+    text = re.split(r"[,;/`|]| on | via | - ", text)[0]
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9.-]*", text) if w not in GENERIC_RUNTIME_WORDS]
+    return " ".join(words)
+
+
 def slug_header_variants(sessions):
     """{slug: sorted distinct Tool/runtime headers} where one slug carries several (R228)."""
     seen = {}
     for s in sessions:
-        runtime = re.sub(r"\s+", " ", re.sub(r"\([^)]*\)", " ", s["header"] or "")).strip().lower()
+        runtime = runtime_name(s["header"])
         if s["slug"] and runtime:
-            # Parentheticals carry model, machine or connector detail; only the runtime name counts.
             seen.setdefault(s["slug"], set()).add(runtime)
     return {k: sorted(v) for k, v in seen.items() if len(v) > 1}
 

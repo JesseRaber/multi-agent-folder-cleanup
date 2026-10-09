@@ -217,6 +217,26 @@ class ReviewFixTests(unittest.TestCase):
                 self.assertEqual(norm(out), norm(run_ps(root, "-SessionIndex")))
 
 
+class RuntimeNameTests(unittest.TestCase):
+    """F7 follow-up: real project headers (2026-10-09) must not count as different runtimes."""
+
+    def test_runtime_name(self):
+        sys.path.insert(0, str(SKILL / "scripts"))
+        try:
+            import audit_folder as a
+        finally:
+            sys.path.pop(0)
+        same = {"claude": ["claude", "claude , linked to owner pc via device bridge", "Claude (Opus 5; cloud)"],
+                "codex": ["codex", "codex / windows powershell and python", "Codex desktop, gpt-6 sol"],
+                "manus": ["manus device desktop powershell", "manus on user desktop `device:9c1ff412`"],
+                "antigravity": ["antigravity", "antigravity (gemini 3.8 flash high)"]}
+        for want, headers in same.items():
+            for h in headers:
+                self.assertEqual(a.runtime_name(h), want, h)
+        self.assertEqual(a.runtime_name("Grok Bot (Cursor agent)"), "grok bot")
+        self.assertEqual(a.runtime_name("grok (xAI Grok app)"), "grok")
+
+
 class TemplateOptInTests(unittest.TestCase):
     def test_unfilled_template_never_opts_in(self):
         template = (RULES / "AGENTS.proposed.md").read_text(encoding="utf-8")

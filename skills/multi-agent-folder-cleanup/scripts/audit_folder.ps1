@@ -1020,12 +1020,19 @@ function Get-ScopeInfo([string]$project) {
     }
     return [pscustomobject]@{ Slugs = @($slugs); Window = $window }
 }
+$GenericRuntimeWords = @('desktop', 'app', 'cli', 'web', 'ide', 'device', 'cloud', 'session', 'powershell', 'python', 'windows', 'mac', 'linux', 'agent', 'local', 'user', 'chat', 'the')
+function Get-RuntimeName([string]$header) {
+    # The runtime part of a Tool/runtime header (same rules as runtime_name in audit_folder.py).
+    $text = [regex]::Replace(([string]$header).ToLowerInvariant(), '\([^)]*\)', ' ')
+    $text = [regex]::Split($text, '[,;/`|]| on | via | - ')[0]
+    $words = @([regex]::Matches($text, '[a-z0-9][a-z0-9.-]*') | ForEach-Object { $_.Value } | Where-Object { $GenericRuntimeWords -notcontains $_ })
+    return ($words -join ' ')
+}
 function Get-SlugVariants($sessions) {
     # Slugs that appear with more than one Tool/runtime header (R228).
     $seen = @{}
     foreach ($s in @($sessions)) {
-        # Parentheticals carry model, machine or connector detail; only the runtime name counts.
-        $runtime = ([regex]::Replace([regex]::Replace([string]$s.Header, '\([^)]*\)', ' '), '\s+', ' ')).Trim().ToLowerInvariant()
+        $runtime = Get-RuntimeName $s.Header
         if ($s.Slug -and $runtime) {
             if (-not $seen.ContainsKey($s.Slug)) { $seen[$s.Slug] = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal) }
             [void]$seen[$s.Slug].Add($runtime)
