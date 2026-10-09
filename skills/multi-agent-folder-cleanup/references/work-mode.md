@@ -130,6 +130,19 @@ Session/turn: <source ID and turn>
 Reconcile: <condition required before applying>
 ```
 
+One target per file, `Status:` on the first line, and the real SHA-256 of the target as you read it. For example, `AI_CONTEXT/scratch/<your-session-id>/PENDING_SESSION_INDEX.md`:
+
+```text
+Status: PENDING
+Target: AI_CONTEXT/SESSION_INDEX.md
+Base: 3f0ac80650cf8f20e44c4f61790a554d085d4f7b9dd9c00eb7df15e87710e891
+Edit: append after the last table row
+New: | 2026-10-09T00:23-04:00 | 2026-10-09T00:35-04:00 | <session-uuid> | Antigravity | <topic> | <outcome> | Completed | [Session](SESSIONS/<log file>.md) |
+Reason: no sequential-writer declaration in this project
+Session/turn: <session-uuid> / T002
+Reconcile: apply if Base still matches or the last row is unchanged; verify by read-back
+```
+
 When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Record the Applied/superseded/conflicted outcome in your own session log, citing the source session and turn; only the source session's writer appends to that session's log (W3). Leave the staged file in place after applying another session's edit. Removing it is cleanup requiring per-target approval; a blanket "do any cleanup you need" does not approve that deletion. A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
 
 **Apply leftover pending files.** A qualifying writer (the sequential-writer declaration is present, or other coordination is established) that finds `AI_CONTEXT/scratch/*/PENDING_*` files with `Status: PENDING` applies each one whose `Base` hash still equals the current target, or whose exact old text or anchor still appears exactly once. Verify by read-back as in step 3, rewrite that file's first line to `Status: APPLIED <after-sha8> by <session>/<turn>`, and record the outcome in your own log. Anything else is **Conflicted**: leave it, report it, and do not guess. `--pending` (`-Pending`) lists these files and their state when scripts can run; it reports and never applies.

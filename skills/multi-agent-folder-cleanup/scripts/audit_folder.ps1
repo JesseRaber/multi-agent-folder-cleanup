@@ -599,7 +599,7 @@ if ($Out) {
     if (Test-Path -LiteralPath $OutFull) { throw "-Out already exists; choose a new file: $OutFull" }
 }
 
-if (-not ($Orient -or $SessionIndex)) {
+if (-not ($Orient -or $SessionIndex -or $Pending)) {
     Write-Line "Read-only audit of $RootFull"
     Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 }
@@ -627,7 +627,7 @@ function Test-LinkDirectory($item) {
 # v1.7 checks: sync conflict copies, pending files, rules matrix, continuity
 # folders. Report only; same output as audit_folder.py.
 # ---------------------------------------------------------------------------
-$PendingNameRx = '(?i)(?:^|[._ -])pending(?:[._ -]|$)'
+$PendingNameRx = '(?i)^pending[._ -]|\.pending[.-]'
 $ConflictParenRx = '^(.+?) \((\d{1,3})\)(\.[^.]+)?$'
 $ConflictHostRx = '^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$'
 $DeclarationRx = '(?i)sequential-writer declaration|agents work one after another'
@@ -679,7 +679,7 @@ function Write-Limited($items, [string]$indent) {
 }
 function Test-PendingName([string]$name) {
     $low = $name.ToLower()
-    if (-not ($low.EndsWith('.md') -or $low.EndsWith('.json') -or $low.EndsWith('.txt'))) { return $false }
+    if (-not ($low.EndsWith('.md') -or $low.EndsWith('.json'))) { return $false }
     return [regex]::IsMatch($name, $PendingNameRx)
 }
 function Get-OrdinalKey([string]$s) { return $s.ToLowerInvariant() + [char]0 + $s }
@@ -864,8 +864,10 @@ function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
     if (@($block.Old).Count -and -not (@(@($block.Old) | ForEach-Object { (Get-SubstringCount $current $_) -eq 1 }) -contains $false)) {
         return @('Pending (anchor matches)', $target)
     }
-    if ($sourceId -and $current.ToLower().Contains($sourceId)) { return @('Superseded (likely: source session ID in target)', $target) }
-    if ($base.Success) { return @('Conflicted (base differs, text absent)', $target) }
+    if ($base.Success -or ($sourceId -and $current.ToLower().Contains($sourceId))) {
+        $why = if ($sourceId -and $current.ToLower().Contains($sourceId)) { '; source session ID in target' } else { '' }
+        return @(('Conflicted (text absent' + $(if ($base.Success) { ', base differs' } else { '' }) + $why + ')'), $target)
+    }
     if (@($block.New).Count) { return @('Unverifiable (text absent; no base or anchor)', $target) }
     return @('Unverifiable (no edit text)', $target)
 }
@@ -1451,6 +1453,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
         Write-Line ("  _PROVENANCE.md files with PENDING rows: {0}" -f $prov.Count)
         Write-Capped @($prov)
         if (@(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/')).Count) { Write-Line "  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5)." }
+        Write-Line '  Conflicted means compare by hand: the edit may already be in the target in other words,'
+        Write-Line '  or may still be needed. Never discard or apply on the label alone.'
         Write-Line '  Nothing was applied. Apply under Work mode W5, then set the first line to'
         Write-Line "  'Status: APPLIED <after-sha8> by <session>/<turn>'."
         $glance['pending files'] = $pfound.Count
@@ -1892,12 +1896,12 @@ $pendingUpdates = @($files | Where-Object { Test-PendingName $_.Name } | ForEach
         [pscustomobject]@{ Rel = (Get-RelSlash $_.FullName); Mark = $mark } } | Sort-Ordinal -Key { $_.Rel + [char]0 + $_.Mark })
 $packageChannels = @($files | Where-Object { $_.Extension.ToLower() -eq '.zip' -and (Get-Short $_.FullName) -match '(?i)(candidate|superseded|release)' })
 Write-Line ("  handoff/next-prompt files outside non-governing areas: " + $handoffs.Count)
-$handoffs | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
+Write-Limited @($handoffs | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
 Write-Line ("  pending shared-update artifacts: {0} (without a Status: first line: {1})" -f $pendingUpdates.Count, @($pendingUpdates | Where-Object { $_.Mark -eq 'no Status:' }).Count)
 Write-Limited @($pendingUpdates | ForEach-Object { "{0,-12} {1}" -f $_.Mark, $_.Rel }) '    '
 if ($pendingUpdates.Count) { Write-Line '  Run --pending for target and base checks; a status here is only what the file records.' }
 Write-Line ("  candidate/release/superseded ZIPs requiring channel review: " + $packageChannels.Count)
-$packageChannels | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
+Write-Limited @($packageChannels | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
 $glance['handoffs'] = $handoffs.Count; $glance['pending_updates'] = $pendingUpdates.Count; $glance['package_channels'] = $packageChannels.Count
 
 Write-Section "Possible orphaned temporary files"

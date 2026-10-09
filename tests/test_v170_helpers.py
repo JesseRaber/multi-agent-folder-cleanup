@@ -136,7 +136,7 @@ class HelperChecks(unittest.TestCase):
             "PENDING_PROJECT_INDEX.md": "Pending (base matches)",
             "PENDING_ANCHOR.md": "Pending (anchor matches)",
             "PENDING_V1_SHARED.json": "Pending (anchor matches)",
-            "PENDING_QC.md": "Conflicted (base differs, text absent)",
+            "PENDING_QC.md": "Conflicted (text absent, base differs)",
             "PENDING_DONE.md": "Applied (recorded)",
             "PENDING_GONE.md": "Unverifiable (target not found)",
             "pending-index.md": "Applied (not marked)",
@@ -170,7 +170,8 @@ class HelperChecks(unittest.TestCase):
         w(s2 / "PENDING_PROSE.md", "PENDING (staging): in AI_CONTEXT/SESSION_INDEX.md, set last activity.\n")
         out = run_py(self.root, "--pending")
         line = lambda part: next(l for l in out.splitlines() if part in l)
-        self.assertIn("Superseded (likely: source session ID in target)", line("PENDING_SHARED_EDITS.md [1/2]"))
+        self.assertIn("Conflicted (text absent, base differs; source session ID in target)", line("PENDING_SHARED_EDITS.md [1/2]"))
+        self.assertNotIn("Superseded", out)
         self.assertIn("-> AI_CONTEXT/SESSION_INDEX.md", line("PENDING_SHARED_EDITS.md [1/2]"))
         self.assertIn("[Status: not first line]", line("PENDING_SHARED_EDITS.md [1/2]"))
         self.assertIn("Pending (base matches)", line("PENDING_SHARED_EDITS.md [2/2]"))
@@ -179,6 +180,27 @@ class HelperChecks(unittest.TestCase):
         self.assertIn("[Status: not first line]", line("PENDING_PROSE.md"))
         if powershell():
             self.assertEqual(norm(run_py(self.root, "--pending")), norm(run_ps(self.root, "-Pending")))
+
+    def test_pending_review_regressions(self):
+        """Independent review 2026-10-09 (Antigravity 91d481c7) and trial (9b3ad1d2)."""
+        s1 = self.root / "AI_CONTEXT/scratch/s1"
+        # An empty New: block must never make an edit look applied.
+        w(s1 / "PENDING_EMPTY_NEW.md", "Status: PENDING\nTarget: PROJECT_INDEX.md\nNew:\n```\n```\n")
+        # Helper output saved into scratch is not a pending file.
+        w(s1 / "py_pending.txt", "pending files: 7\n")
+        w(self.root / "pending_blocks.txt", "[]\n")
+        w(s1 / "notes.pending-12345678.md", "Status: PENDING\nTarget: PROJECT_INDEX.md\n")
+        out = run_py(self.root, "--pending")
+        line = lambda part: next(l for l in out.splitlines() if part in l)
+        self.assertIn("Unverifiable (no edit text)", line("PENDING_EMPTY_NEW.md"))
+        self.assertNotIn("py_pending.txt", out)
+        self.assertNotIn("pending_blocks.txt", out)
+        self.assertIn("notes.pending-12345678.md", out)
+        self.assertIn("Never discard or apply on the label alone.", out)
+        if powershell():
+            raw = run_ps(self.root, "-Pending")
+            self.assertTrue(raw.lstrip("\ufeff").startswith("Read-only work-mode check of"), raw[:200])
+            self.assertEqual(norm(out), norm(raw))
 
     def test_orient_new_checks(self):
         out = run_py(self.root, "--orient", "--since", "2020-01-01T00:00")

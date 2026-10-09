@@ -656,8 +656,8 @@ def has_segment(relpath, name):
 # folders. Report only; same output as audit_folder.ps1.
 # ---------------------------------------------------------------------------
 
-PENDING_NAME_RE = re.compile(r"(?i)(?:^|[._ -])pending(?:[._ -]|$)")
-PENDING_EXTS = (".md", ".json", ".txt")
+PENDING_NAME_RE = re.compile(r"(?i)^pending[._ -]|\.pending[.-]")
+PENDING_EXTS = (".md", ".json")
 CONFLICT_PAREN_RE = re.compile(r"^(.+?) \((\d{1,3})\)(\.[^.]+)?$")
 CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
 DECLARATION_RE = re.compile(r"(?i)sequential-writer declaration|agents work one after another")
@@ -870,10 +870,13 @@ def classify_block(block, root, source_id=""):
         return "Pending (base matches)", target
     if block["old"] and all(current.count(v) == 1 for v in block["old"]):
         return "Pending (anchor matches)", target
-    if source_id and source_id in current.lower():
-        return "Superseded (likely: source session ID in target)", target
-    if base:
-        return "Conflicted (base differs, text absent)", target
+    # Text absent and base changed (or the source session already appears in the
+    # target): a person or the applying writer must compare. Never call it
+    # superseded here; a session-index update for an existing row looks the same.
+    sid_seen = bool(source_id and source_id in current.lower())
+    if base or sid_seen:
+        return ("Conflicted (text absent" + (", base differs" if base else "")
+                + ("; source session ID in target" if sid_seen else "") + ")"), target
     if block["new"]:
         return "Unverifiable (text absent; no base or anchor)", target
     return "Unverifiable (no edit text)", target
@@ -1633,6 +1636,8 @@ def report_pending(root, args, limited):
         print(f"    {r}")
     if declaration_sources(root, args.quick_context.replace("\\", "/")):
         print("  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5).")
+    print("  Conflicted means compare by hand: the edit may already be in the target in other words,")
+    print("  or may still be needed. Never discard or apply on the label alone.")
     print("  Nothing was applied. Apply under Work mode W5, then set the first line to")
     print("  'Status: APPLIED <after-sha8> by <session>/<turn>'.")
     return {"pending files": len(found), "pending edit blocks": len(states),
