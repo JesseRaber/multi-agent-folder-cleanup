@@ -14,6 +14,12 @@
 - Audit guidance: AGENTS.md size warning above 16 KB, high above 32 KiB (R214); declared startup read order (R213); retired journals reported once (R161); unpacked packages and repo-shaped folders without `.git` (R207, R208); `AI_CONTEXT/` misuse (R215); B5 does not rely on modified time alone (R209); portfolio rules matrix with rules version, Work routing and core-match columns (R165, R166).
 - Project Rules 3.3.0 (unreleased until now) also gains: section 3 `AI_CONTEXT/` continuity-only line, section 5 declaration and same-name/conflict-copy lines, section 7 session-index row at creation.
 - Version renamed from the unreleased 1.6.4 candidate to 1.7.0 (owner decision 2026-10-08 23:27 ET) and Batch B folded in, except the mutating `apply_record_patch.py` helper (still deferred).
+- Helpers (Python and PowerShell, same output; all read-only):
+  - `--pending` / `-Pending` (R155, R201, R212): lists pending files in the root, `AI_CONTEXT/` and scratch session folders (any case, `pending-*` variants) and classifies each as Pending (base or anchor matches), Applied (not marked), Conflicted, Unverifiable or its recorded status; flags files without a `Status:` first line; counts PENDING rows in `Incoming/*/_PROVENANCE.md`.
+  - `--orient` (R189, R209, R211, R213, R195): sequential-writer declaration found/none; declared read order from `README_FIRST.md`; changed files no session log or `_PROVENANCE.md` names (the check deferred in the 1.6.4 candidate); identical-timestamp clusters; sync conflict copies and case-only collisions. Sibling projects are never read from `--orient`.
+  - Full audit (R030, R161, R207, R208, R214, R215): new "Sync copies, unpacked packages and continuity folders" section; retired journals reported once; `AGENTS.md` warning above 16 KB; pending lifecycle uses the new name detection and reads `Status:`.
+  - `--portfolio` (R165, R166, R168, R206): rules version, Work routing, core match against the bundled template (`unknown` where the package has no template), sequential-writer declaration, copy-suffix replicas, handoffs addressed to another child, `PORTFOLIO.md` presence. Python and PowerShell now print the same columns and pending counts (previously they differed).
+  - `muse` added to the helpers' canonical tool slugs (R188 follow-through).
 - Sources: owner handoffs from Muse, GaugeWorx, Windows PC Monitor, GitHub Release Skill and jesseraber.net reviews, 2026-10-08; Claude sessions `0e9d1f7d`, `6dbd138b`, `99022649`.
 
 ### 1.6.3 (released 2026-10-08) — portfolio audit corrections

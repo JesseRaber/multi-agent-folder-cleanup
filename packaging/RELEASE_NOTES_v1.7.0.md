@@ -10,11 +10,20 @@ A stable release meant to stay installed. It folds the unreleased 1.6.4 candidat
 - **Leftover pending files.** One name (`PENDING_<TARGET>.md`, `Status:` first line). The next qualifying writer applies those whose base still matches, verifies them and marks them APPLIED; mismatches are reported as Conflicted.
 - **Sync conflict copies.** Shared files are edited in place; no second same-name file in one folder; `(1)` and `-COMPUTER` copies and missing originals are checked at arrival and before the final answer.
 - **Cloud connectors.** Every listing states its view and time; files are handled by id; replacements are staged in scratch and carry `Replaces: <old id>`; one file type per shared record; replicas under other providers are declared.
-- Add-only agents upload into a dated `Incoming/` folder with `_PROVENANCE.md`; `muse` joins the tool slugs (from 1.6.4).
+- Add-only agents upload into a dated `Incoming/` folder with `_PROVENANCE.md`; `muse` joins the tool slugs; Audit mode B5 attributes activity (from the 1.6.4 candidate).
 
 ## For audits
 
 New report-only guidance for conflict copies, unpacked packages, repository working copies without `.git`, deliverables in `AI_CONTEXT/`, retired journals, the project's declared startup read order and a lower `AGENTS.md` size warning (16 KB). The portfolio template gains a rules matrix.
+
+## Helpers
+
+Both `audit_folder.py` and `audit_folder.ps1`, same output, read-only:
+
+- `--pending` lists leftover pending files and says whether each can still be applied, is already applied, conflicts or cannot be checked.
+- `--orient` adds the sequential-writer declaration, the declared read order, changed files no log names, identical-timestamp clusters and sync conflict copies.
+- The full audit adds a section for conflict copies, unpacked skill trees, working copies without `.git` and `AI_CONTEXT/` misuse; retired journals are no longer proposed for rotation; `AGENTS.md` over 16 KB is a warning.
+- `--portfolio` adds rules version, Work routing, core match and declaration columns, likely replicas and cross-project handoffs.
 
 ## Optional Project Rules 3.3.0
 

@@ -16,6 +16,8 @@ python3 scripts/audit_folder.py --root <project> --orient --session-id <your-id>
 pwsh -File scripts/audit_folder.ps1 -Root <project> -Orient -SessionId <your-id>
 ```
 
+Add `--pending` (`-Pending`) to list leftover pending files and whether each can still be applied (W5).
+
 On Windows, `python` or `py -3` may replace `python3`; use `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` when `pwsh` is absent. The Microsoft Copilot/Grok package intentionally omits `audit_folder.ps1`, so use its Python helper. See [audit-tools.md](audit-tools.md) for the complete fallbacks.
 
 It lists recently active session logs and scratch folders, files changed since the latest session started, and changed files the index never names. Times are local modified times: leads, not proof. Without scripts, use available listings and read the relevant recent logs. With connector-only or partial access, state the coverage limit; do not claim a writer is absent from missing activity signals. Use the helper path in the installed skill, not a presumed project-relative scripts directory.
@@ -23,7 +25,7 @@ It lists recently active session logs and scratch folders, files changed since t
 Also check, with the helper or by listing:
 
 - **Sync conflict copies.** `name (1).ext`, `name-<COMPUTER>.ext`, case-only name collisions and, through a connector, same-name siblings with different file ids; also a copy whose original is missing. Reconcile them before editing shared records, and check again before your final answer. Never merge, rename or delete them without the applicable approval.
-- **Undelivered handoffs.** New items in `Incoming/`, and handoffs in sibling projects' `Handoffs/` whose `To:` names this project.
+- **Undelivered handoffs.** New items in `Incoming/`, and handoffs in sibling projects' `Handoffs/` whose `To:` names this project (`--portfolio` on the parent folder lists them; `--orient` never reads outside the project).
 - **Cloud folders.** For a connector or a synced folder that also exists under another provider, follow [Cloud connectors and sync folders](#cloud-connectors-and-sync-folders) before trusting any listing.
 
 Before expensive or portfolio-wide work, compare the request with the topic, latest outcome and open work in recent session logs. If the same task is active, coordinate rather than duplicate it. If it is complete, reuse its evidence and inspect only changes or gaps. Record the current request promptly in your own session log; that log is the in-progress signal, so do not create a separate shared claim file.

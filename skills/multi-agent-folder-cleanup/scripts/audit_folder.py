@@ -32,6 +32,7 @@ Token and time control (v1.4):
 import argparse
 import contextlib
 import io
+import json
 import csv
 import fnmatch
 import hashlib
@@ -585,6 +586,7 @@ def portfolio_rows(root, expected):
                 "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md",
                 "AI_CONTEXT/PROJECT_ACTIVITY_JOURNAL.md", "AI_CONTEXT/CHAT_INDEX.md"]
     checks = list(dict.fromkeys(defaults + list(expected or [])))
+    tcore, _tver = template_core()
     rows = []
     try:
         children = sorted((e for e in os.scandir(root) if e.is_dir(follow_symlinks=False)),
@@ -610,24 +612,15 @@ def portfolio_rows(root, expected):
                                     for n in session_names)
         # Keep portfolio mode bounded: inspect conventional record locations,
         # never recursively traverse an entire project merely to count hints.
-        pending_dirs = [child.path, os.path.join(child.path, "AI_CONTEXT")]
-        scratch = os.path.join(child.path, "AI_CONTEXT", "scratch")
-        if os.path.isdir(scratch) and not os.path.islink(scratch):
-            pending_dirs.append(scratch)
-            try:
-                pending_dirs.extend(e.path for e in os.scandir(scratch)
-                                    if e.is_dir(follow_symlinks=False))
-            except OSError:
-                pass
-        pending = 0
-        for base in pending_dirs:
-            try:
-                names = [e.name for e in os.scandir(base) if e.is_file(follow_symlinks=False)]
-            except OSError:
-                continue
-            pending += sum(bool(re.search(r"(?i)pending.*(navigation|shared|index)|(navigation|shared).*pending", n))
-                           for n in names)
-        rows.append((child.name, root_items, present, state, session_count, missing_count, pending))
+        pend = find_pending(child.path)
+        no_status = 0
+        for pf in pend:
+            t = read_small_text(pf)
+            if t is None or parse_pending(t, os.path.basename(pf))["status"] is None:
+                no_status += 1
+        pending = f"{len(pend)} ({no_status} no Status)"
+        rows.append((child.name, root_items, present, state, session_count, missing_count, pending)
+                    + rules_info(child.path, tcore))
     return rows
 
 def _safe_stdout():
@@ -656,6 +649,342 @@ def is_non_governing(relpath):
 
 def has_segment(relpath, name):
     return name in relpath.lower().split("/")[:-1]
+
+
+# ---------------------------------------------------------------------------
+# v1.7 checks: sync conflict copies, pending files, rules matrix, continuity
+# folders. Report only; same output as audit_folder.ps1.
+# ---------------------------------------------------------------------------
+
+PENDING_NAME_RE = re.compile(r"(?i)(?:^|[._ -])pending(?:[._ -]|$)")
+PENDING_EXTS = (".md", ".json", ".txt")
+CONFLICT_PAREN_RE = re.compile(r"^(.+?) \((\d{1,3})\)(\.[^.]+)?$")
+CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
+DECLARATION_RE = re.compile(r"(?i)sequential-writer declaration|agents work one after another")
+RULES_VERSION_RE = re.compile(r"(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)")
+STATUS_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)")
+PENDING_FIELD_RE = r"(?im)^\s*(?:[-*]\s*)?\**{0}\**\s*:\s*(.*)$"
+PENDING_NEW_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**(?:New(?: text| line| row)?|Insert(?: text| line| row)?|Add(?: line| row)?)\**\s*:[ \t]*(.*)$")
+PENDING_OLD_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**(?:Old(?: text| line)?|Anchor|Insert after|After)\**\s*:[ \t]*(.*)$")
+FENCE_AFTER_RE = re.compile(r"\A[ \t]*\r?\n```[^\n]*\n(.*?)\r?\n```", re.DOTALL)
+HEX64_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
+TO_LINE_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$")
+KNOWN_CONTINUITY = {"project_quick_context.md", "session_index.md", "policy_installation.md",
+                    "readme_first.md", "chat_index.md", "project_activity_journal.md"}
+CONTINUITY_TEXT_EXTS = {".md", ".txt", ".json", ".csv", ".yml", ".yaml", ".log"}
+TEMPLATE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "references",
+                             "project-rules", "AGENTS.proposed.md")
+AGENTS_WARN_BYTES = 16384
+
+
+def is_pending_name(name):
+    return name.lower().endswith(PENDING_EXTS) and bool(PENDING_NAME_RE.search(name))
+
+
+def conflict_copies(rels):
+    """Sync-client conflict copies among root-relative '/' paths (report only)."""
+    present = {r.lower() for r in rels}
+    out = []
+    for r in rels:
+        folder, _, name = r.rpartition("/")
+        prefix = folder + "/" if folder else ""
+        m = CONFLICT_PAREN_RE.match(name)
+        if m:
+            original = prefix + m.group(1) + (m.group(3) or "")
+            state = "original present" if original.lower() in present else "ORIGINAL MISSING"
+            out.append(("(n) copy", state, r))
+            continue
+        m = CONFLICT_HOST_RE.match(name)
+        if m and re.search(r"[A-Z]", m.group(2)):
+            original = prefix + m.group(1) + m.group(3)
+            if original.lower() in present:
+                out.append(("-HOST copy", "original present", r))
+    return sorted(out, key=lambda x: (x[2].lower(), x[2]))
+
+
+def case_collisions(rels):
+    groups = defaultdict(set)
+    for r in rels:
+        groups[r.lower()].add(r)
+    return sorted((sorted(v) for v in groups.values() if len(v) > 1), key=lambda g: g[0].lower())
+
+
+def print_conflict_block(rels, limited, indent="  "):
+    copies = conflict_copies(rels)
+    collisions = case_collisions(rels)
+    missing = sum(1 for c in copies if c[1] == "ORIGINAL MISSING")
+    print(f"{indent}sync conflict copies: {len(copies)} (original missing: {missing})")
+    for kind, state, r in limited(copies):
+        print(f"{indent}  {kind:<10} {state:<16} {r}")
+    print(f"{indent}case-only name collisions: {len(collisions)}")
+    for g in limited(collisions):
+        print(f"{indent}  " + " | ".join(g))
+    if copies or collisions:
+        print(f"{indent}  Reconcile before shared-record edits; never merge, rename or delete without approval.")
+    return len(copies), len(collisions)
+
+
+def first_status(text):
+    for line in text.splitlines():
+        if line.strip():
+            m = STATUS_LINE_RE.match(line)
+            return m.group(1).upper() if m else None
+    return None
+
+
+def _pending_value(text, field):
+    m = re.search(PENDING_FIELD_RE.format(field), text)
+    return m.group(1).strip() if m else ""
+
+
+def _edit_values(text, rx):
+    vals = []
+    for m in rx.finditer(text):
+        v = m.group(1).strip()
+        if not v:
+            f = FENCE_AFTER_RE.match(text[m.end():])
+            v = f.group(1) if f else ""
+        elif len(v) > 2 and v.startswith("`") and v.endswith("`"):
+            v = v[1:-1]
+        v = v.strip()
+        if len(v) >= 12:
+            vals.append(v)
+    return vals
+
+
+def parse_pending(text, name):
+    """Status, target, base hash and edit texts from a W5 pending file."""
+    info = {"status": None, "target": "", "base": "", "new": [], "old": []}
+    if name.lower().endswith(".json"):
+        try:
+            obj = json.loads(text)
+        except ValueError:
+            obj = None
+        if isinstance(obj, dict):
+            st = obj.get("status") or obj.get("Status")
+            info["status"] = str(st).split()[0].upper() if st else None
+            info["target"] = str(obj.get("target") or obj.get("Target") or obj.get("path") or "")
+            info["base"] = str(obj.get("base") or obj.get("base_sha256") or "")
+            for e in obj.get("edits") or []:
+                if isinstance(e, dict):
+                    for key, bucket in (("new", "new"), ("new_line", "new"), ("new_text", "new"),
+                                        ("old", "old"), ("insert_after", "old"), ("anchor", "old")):
+                        v = e.get(key)
+                        if isinstance(v, str) and len(v.strip()) >= 12:
+                            info[bucket].append(v.strip())
+        return info
+    info["status"] = first_status(text)
+    info["target"] = _pending_value(text, "Target")
+    info["base"] = _pending_value(text, "Base")
+    info["new"] = _edit_values(text, PENDING_NEW_RE)
+    info["old"] = _edit_values(text, PENDING_OLD_RE)
+    return info
+
+
+def classify_pending(path, root):
+    """Return (state, target label, malformed)."""
+    text = read_small_text(path)
+    if text is None:
+        return "Unverifiable (unreadable)", "", False
+    info = parse_pending(text, os.path.basename(path))
+    malformed = info["status"] is None
+    recorded = {"APPLIED": "Applied", "SUPERSEDED": "Superseded", "CONFLICTED": "Conflicted",
+                "UNVERIFIABLE": "Unverifiable"}
+    target = clean_local_reference(info["target"].strip("`'\" ")) if info["target"] else ""
+    if info["status"] in recorded:
+        return recorded[info["status"]] + " (recorded)", target, False
+    if not target:
+        return "Unverifiable (no Target)", "", malformed
+    full = os.path.join(root, *target.replace("\\", "/").lstrip("/").split("/"))
+    if not os.path.isfile(full):
+        return "Unverifiable (target not found)", target, malformed
+    current = read_small_text(full)
+    if current is None:
+        return "Unverifiable (target unreadable)", target, malformed
+    try:
+        digest = sha256(full)
+    except (OSError, PermissionError, RuntimeError):
+        return "Unverifiable (target unreadable)", target, malformed
+    base = HEX64_RE.search(info["base"] or "")
+    present = [v in current for v in info["new"]]
+    if present and all(present):
+        return "Applied (not marked)", target, malformed
+    if any(present):
+        return "Conflicted (partly present)", target, malformed
+    if base and base.group(0).lower() == digest:
+        return "Pending (base matches)", target, malformed
+    if info["old"] and all(current.count(v) == 1 for v in info["old"]):
+        return "Pending (anchor matches)", target, malformed
+    if base:
+        return "Conflicted (base differs)", target, malformed
+    return "Unverifiable (no base or edit text)", target, malformed
+
+
+def pending_scan_dirs(project, scratch_rel="AI_CONTEXT/scratch"):
+    dirs = [project, os.path.join(project, "AI_CONTEXT")]
+    scratch = os.path.join(project, *scratch_rel.replace("\\", "/").split("/"))
+    if os.path.isdir(scratch) and not os.path.islink(scratch):
+        dirs.append(scratch)
+        try:
+            dirs.extend(sorted(e.path for e in os.scandir(scratch)
+                               if e.is_dir(follow_symlinks=False)))
+        except OSError:
+            pass
+    return dirs
+
+
+def find_pending(project, scratch_rel="AI_CONTEXT/scratch"):
+    found = []
+    for base in pending_scan_dirs(project, scratch_rel):
+        try:
+            names = [e.name for e in os.scandir(base) if e.is_file(follow_symlinks=False)]
+        except OSError:
+            continue
+        found.extend(os.path.join(base, n) for n in names if is_pending_name(n))
+    return sorted(set(found), key=lambda p: (relslash(p, project).lower(), relslash(p, project)))
+
+
+def declaration_sources(project, quick_rel="AI_CONTEXT/PROJECT_QUICK_CONTEXT.md"):
+    out = []
+    for rel_name in ("AGENTS.md", "CLAUDE.md", quick_rel):
+        text = read_small_text(os.path.join(project, *rel_name.split("/")))
+        if text and DECLARATION_RE.search(text):
+            out.append(rel_name)
+    return out
+
+
+def rules_core(text):
+    lines = text.splitlines()
+    start = next((i for i, ln in enumerate(lines) if re.match(r"^## 1\.", ln)), None)
+    if start is None:
+        return None
+    end = next((i for i in range(start + 1, len(lines)) if re.match(r"^## 13\.", lines[i])), len(lines))
+    return [ln.strip() for ln in lines[start:end] if ln.strip()]
+
+
+def core_difference(a, b):
+    ca, cb = defaultdict(int), defaultdict(int)
+    for x in a:
+        ca[x] += 1
+    for x in b:
+        cb[x] += 1
+    return sum(abs(ca[k] - cb[k]) for k in set(ca) | set(cb))
+
+
+def template_core():
+    # The skill's own bundled template: outside the audited root by design, so
+    # it is opened directly rather than through the root-confined reader.
+    try:
+        with open(TEMPLATE_PATH, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+    except OSError:
+        text = None
+    if not text:
+        return None, None
+    m = RULES_VERSION_RE.search(text)
+    return rules_core(text), (m.group(1) if m else "?")
+
+
+def rules_info(project, tcore):
+    """(rules version, work routing, core match, sequential writer) for one project."""
+    agents = os.path.join(project, "AGENTS.md")
+    text = read_small_text(agents) if os.path.isfile(agents) else None
+    seq = "yes" if declaration_sources(project) else "no"
+    if text is None:
+        return "n/a", "n/a", "n/a", seq
+    source, by_ref = text, ""
+    m = RULES_VERSION_RE.search(text)
+    if not m:
+        head = "\n".join(text.splitlines()[:20])
+        for target in markdown_targets(head):
+            clean = clean_local_reference(target)
+            if re.search(r"(?i)rules[^/]*\.md$", clean):
+                full = os.path.join(project, *clean.replace("\\", "/").lstrip("/").split("/"))
+                ref = read_small_text(full) if os.path.isfile(full) else None
+                if ref and RULES_VERSION_RE.search(ref):
+                    source, by_ref, m = ref, " (by reference)", RULES_VERSION_RE.search(ref)
+                    break
+    version = (m.group(1) + by_ref) if m else "unversioned"
+    routing = "yes" if ("Day-to-day saving and indexing" in source
+                        or "multi-agent-folder-cleanup" in source) else "no"
+    core = rules_core(source)
+    if tcore is None:
+        match = "unknown (no template bundled)"
+    elif core is None:
+        match = "unknown (no sections 1-12)"
+    else:
+        n = core_difference(core, tcore)
+        match = "match" if n == 0 else f"differs ({n} lines)"
+    return version, routing, match, seq
+
+
+def journal_retired(path, root, rules_major, context_text):
+    r = relslash(path, root)
+    segs = r.lower().split("/")[:-1]
+    if any(("history" in s or "_superseded" in s or "archive" in s) for s in segs):
+        return "under a History/archive path"
+    name = os.path.basename(path)
+    for line in context_text.splitlines():
+        if name in line and re.search(r"(?i)retired|legacy|history", line):
+            return "declared retired in AGENTS.md or quick context"
+    sessions = os.path.join(os.path.dirname(path), "SESSIONS")
+    if rules_major >= 3 and os.path.isdir(sessions):
+        try:
+            if any(n.lower().endswith(".md") for n in os.listdir(sessions)):
+                return "superseded by SESSIONS/ logs (rules 3.x)"
+        except OSError:
+            pass
+    return None
+
+
+def common_folder(rels):
+    parts = [r.split("/")[:-1] for r in rels]
+    out = []
+    for segs in zip(*parts):
+        if all(s == segs[0] for s in segs):
+            out.append(segs[0])
+        else:
+            break
+    return "/".join(out) if out else "."
+
+
+def timestamp_clusters(files, root, minimum=10):
+    groups = defaultdict(list)
+    for full, _size, mtime in files:
+        groups[int(mtime)].append(relslash(full, root))
+    clusters = [(len(v), t, common_folder(v)) for t, v in groups.items() if len(v) >= minimum]
+    return sorted(clusters, key=lambda x: (-x[0], x[1]))[:3]
+
+
+def ai_context_misuse(rel_sizes):
+    out = []
+    for r, size in rel_sizes:
+        segs = r.split("/")
+        if len(segs) < 2 or segs[0].lower() != "ai_context":
+            continue
+        if len(segs) > 2 and segs[1].lower() in ("scratch", "sessions"):
+            continue
+        ext = os.path.splitext(segs[-1])[1].lower()
+        if ext not in CONTINUITY_TEXT_EXTS:
+            out.append((r, size, "non-text file"))
+        elif len(segs) == 2 and segs[1].lower() not in KNOWN_CONTINUITY:
+            out.append((r, size, "loose file"))
+    return sorted(out, key=lambda x: (x[0].lower(), x[0]))
+
+
+def repo_folders_without_git(rels, root):
+    dirs = set()
+    for r in rels:
+        segs = r.split("/")
+        if any(is_noise_segment(s) for s in segs[:-1]):
+            continue
+        if segs[-1].lower() in (".gitignore", ".gitattributes"):
+            dirs.add("/".join(segs[:-1]))
+        if ".github" in [s.lower() for s in segs[:-1]]:
+            i = [s.lower() for s in segs].index(".github")
+            dirs.add("/".join(segs[:i]))
+    out = [d for d in dirs if not os.path.exists(os.path.join(root, *(d.split("/") if d else []), ".git"))]
+    return sorted((d or "." for d in out), key=lambda d: (d.lower(), d))
 
 
 def _cloud_only(path):
@@ -734,7 +1063,7 @@ SESSION_NAME_RE = re.compile(
     r"^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_("
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.md$")
 CANONICAL_TOOL_SLUGS = frozenset(("claude", "claude-code", "codex", "antigravity",
-                                  "gemini", "copilot", "manus", "opal", "grok"))
+                                  "gemini", "copilot", "manus", "opal", "grok", "muse"))
 SESSION_FIELD_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
@@ -1041,9 +1370,56 @@ def report_orient(root, args, limited):
         print(f"    session {s['id'][:8]} {s['tool']} {s['topic']}")
     for name in limited(unpaired_scratch):
         print(f"    unpaired scratch/{name}")
+    declared = declaration_sources(root, args.quick_context.replace("\\", "/"))
+    if declared:
+        print(f"  coordination: sequential-writer declaration found ({', '.join(declared)})")
+    else:
+        print("  coordination: no sequential-writer declaration; stage PENDING edits unless other coordination is established")
     if active or unpaired_scratch:
         print("    -> another agent may be working: coordinate shared edits before writing;")
         print("       stage exact pending edits in your scratch if coordination is unavailable.")
+        if declared:
+            print("       The declaration covers agents working one after another, not overlap: verify by read-back.")
+
+    # Declared startup read order (README_FIRST links, in order).
+    read_order_kb = "none found"
+    rf_rel = next((c for c in ("README_FIRST.md", "AI_CONTEXT/README_FIRST.md")
+                   if os.path.isfile(os.path.join(root, *c.split("/")))), None)
+    if rf_rel:
+        rf_full = os.path.join(root, *rf_rel.split("/"))
+        rf_text = read_small_text(rf_full) or ""
+        order = [rf_rel]
+        seen = {rf_rel.lower()}
+        refs = list(markdown_targets(rf_text)) + BACKTICK_PATH_RE.findall(rf_text)
+        for ref in refs:
+            clean = clean_local_reference(ref)
+            if is_external_or_nonpath(clean) or not clean.lower().endswith(".md"):
+                continue
+            hits = _resolved_paths(clean, os.path.dirname(rf_full), root)
+            if not hits or not os.path.isfile(hits[0]):
+                continue
+            hit = os.path.abspath(hits[0])
+            if not hit.lower().startswith((root.rstrip("\\/") + os.sep).lower()):
+                continue
+            key = relslash(hit, root)
+            if key.lower() in seen:
+                continue
+            seen.add(key.lower())
+            order.append(key)
+        order_total = 0
+        lines = []
+        for key in order:
+            size = os.path.getsize(os.path.join(root, *key.split("/")))
+            order_total += size
+            lines.append(f"{key}  {size // 1024} KB" + ("  LARGE: read by section/ID or tail" if size > CODEX_DOC_LIMIT else ""))
+        print(f"  declared read order ({rf_rel} and the .md files it links, in order; may include optional reads): {len(order)} files")
+        for ln in limited(lines):
+            print(f"    {ln}")
+        print(f"    total {order_total // 1024} KB (budget {args.read_budget_kb} KB)"
+              + ("  OVER BUDGET" if order_total > args.read_budget_kb * 1024 else ""))
+        read_order_kb = f"{order_total // 1024} KB"
+    else:
+        print("  declared read order: no README_FIRST.md at the root or in AI_CONTEXT/")
 
     # Changed since baseline.
     if args.since:
@@ -1080,6 +1456,36 @@ def report_orient(root, args, limited):
     if walk.pruned:
         print(f"  generated-state folders not walked: {len(walk.pruned)}")
 
+    # Activity no record accounts for (R189/R209).
+    record_texts = []
+    if sessions_available:
+        for name in sorted(os.listdir(sdir)):
+            if name.lower().endswith(".md"):
+                t = read_small_text(os.path.join(sdir, name))
+                if t:
+                    record_texts.append(t)
+    for full, _size, _mtime in walk.files:
+        if os.path.basename(full).lower() == "_provenance.md":
+            t = read_small_text(full)
+            if t:
+                record_texts.append(t)
+    unattributed = [r for r, _m in changed
+                    if not any(r in t or r.split("/")[-1] in t for t in record_texts)]
+    print(f"  changed files no session log or _PROVENANCE.md names: {len(unattributed)}"
+          " (leads; a log may cover them by folder)")
+    for r in limited(unattributed):
+        print(f"    {r}")
+    for count, t, folder in timestamp_clusters(walk.files, root):
+        where = "the root" if folder == "." else folder + "/"
+        print(f"  identical modified times: {count} files at {fmt_time(t)} under {where}"
+              " (typical of archive extraction; not activity evidence)")
+    rels_all = [relslash(full, root) for full, _s, _m in walk.files]
+    copies_n, collisions_n = print_conflict_block(rels_all, limited)
+
+    # Sibling projects are outside this root, so their contents are never read here.
+    print("  handoffs from sibling projects: not read (outside this root);"
+          " run --portfolio on the parent folder to list handoffs addressed to this project")
+
     # New files the index never mentions.
     index_paths = list(args.index_path or ["PROJECT_INDEX.md"])
     index_text = ""
@@ -1104,7 +1510,51 @@ def report_orient(root, args, limited):
     return {"possibly active writers": len(active_ids) + len(unpaired_scratch),
             "changed since baseline": len(changed),
             "changed but unnamed in index": len(unindexed) if index_text else "n/a",
-            "quick context over size": "yes" if qc_flag else "no"}
+            "quick context over size": "yes" if qc_flag else "no",
+            "sequential-writer declaration": "yes" if declared else "no",
+            "declared read order": read_order_kb,
+            "changed but unattributed": len(unattributed),
+            "sync conflict copies": copies_n,
+            "case-only name collisions": collisions_n}
+
+
+def report_pending(root, args, limited):
+    section("Pending files (report only)")
+    found = find_pending(root, args.scratch_dir)
+    rows = [(relslash(p, root),) + classify_pending(p, root) for p in found]
+    malformed = sum(1 for r in rows if r[3])
+    print(f"  pending files: {len(rows)} (without a Status: first line: {malformed})")
+    for r, state, target, bad in limited(rows):
+        print(f"    {state:<34} {r} -> {target or '(no Target)'}" + ("  [no Status: line]" if bad else ""))
+    applicable = sum(1 for r in rows if r[1].startswith("Pending ("))
+    applied = sum(1 for r in rows if r[1] == "Applied (not marked)")
+    prov = []
+    inc = os.path.join(root, "Incoming")
+    try:
+        children = sorted((e for e in os.scandir(inc) if e.is_dir(follow_symlinks=False)),
+                          key=lambda e: (e.name.lower(), e.name))
+    except OSError:
+        children = []
+    for child in children:
+        try:
+            names = [n for n in os.listdir(child.path) if n.lower() == "_provenance.md"]
+        except OSError:
+            continue
+        for n in names:
+            t = read_small_text(os.path.join(child.path, n)) or ""
+            k = len(re.findall(r"PENDING", t))
+            if k:
+                prov.append(f"Incoming/{child.name}/{n} ({k} PENDING mentions)")
+    print(f"  _PROVENANCE.md files with PENDING rows: {len(prov)}")
+    for r in limited(prov):
+        print(f"    {r}")
+    if declaration_sources(root, args.quick_context.replace("\\", "/")):
+        print("  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5).")
+    print("  Nothing was applied. Apply under Work mode W5, then set the first line to")
+    print("  'Status: APPLIED <after-sha8> by <session>/<turn>'.")
+    return {"pending files": len(rows), "pending without Status line": malformed,
+            "pending applicable now": applicable, "applied but still PENDING": applied,
+            "provenance files with PENDING": len(prov)}
 
 
 def run_work_helpers(args, root):
@@ -1125,6 +1575,8 @@ def run_work_helpers(args, root):
         glance.update(report_orient(root, args, limited))
     if args.session_index:
         glance.update(report_session_index(root, args, limited))
+    if args.pending:
+        glance.update(report_pending(root, args, limited))
     section("Findings at a glance")
     for k, v in glance.items():
         print(f"  {k:<32} {v}")
@@ -1176,6 +1628,8 @@ def main():
                            "files changed since the latest session, changed files the index never names.")
     work.add_argument("--session-index", action="store_true",
                       help="Compare session logs with the session index; print proposed missing rows. Writes nothing.")
+    work.add_argument("--pending", action="store_true",
+                      help="Report W5 pending files (scratch, AI_CONTEXT, root) and Incoming provenance rows; read-only.")
     work.add_argument("--sessions-dir", default="AI_CONTEXT/SESSIONS")
     work.add_argument("--session-index-file", default="AI_CONTEXT/SESSION_INDEX.md")
     work.add_argument("--scratch-dir", default="AI_CONTEXT/scratch")
@@ -1248,7 +1702,7 @@ def main():
     buffer = io.StringIO()
     target = buffer if out_path else sys.stdout
     with contextlib.redirect_stdout(target):
-        if args.orient or args.session_index:
+        if args.orient or args.session_index or args.pending:
             glance = run_work_helpers(args, root)
         else:
             glance = run_report(args, root, coverage_pairs)
@@ -1719,17 +2173,20 @@ def run_report(args, root, coverage_pairs):
         name = os.path.basename(p).lower()
         if not is_non_governing(r) and ("handoff" in name or re.search(r"next[ _-].*prompt", name)):
             handoffs.append(r)
-        if re.search(r"pending.*(navigation|shared|index)|(navigation|shared).*pending", name):
-            text = read_small_text(p) or ""
-            marker = next((s for s in ("Applied", "Superseded", "Conflicted", "Pending")
-                           if re.search(rf"(?im)^\s*(status\s*:\s*)?{s}\b", text)), "Unverifiable")
+        if is_pending_name(name):
+            text = read_small_text(p)
+            status = parse_pending(text, name)["status"] if text is not None else None
+            marker = status.capitalize() if status else "no Status:"
             pending_updates.append((r, marker))
         if p.lower().endswith(".zip") and re.search(r"(?i)(candidate|superseded|release)", r):
             package_channels.append(r)
     print(f"  handoff/next-prompt files outside non-governing areas: {len(handoffs)}")
     for r in limited(sorted(handoffs)): print(f"    {r}")
-    print(f"  pending shared-update artifacts: {len(pending_updates)}")
+    print(f"  pending shared-update artifacts: {len(pending_updates)}"
+          f" (without a Status: first line: {sum(1 for _r, m in pending_updates if m == 'no Status:')})")
     for r, state in limited(sorted(pending_updates)): print(f"    {state:12} {r}")
+    if pending_updates:
+        print("  Run --pending for target and base checks; a status here is only what the file records.")
     print(f"  candidate/release/superseded ZIPs requiring channel review: {len(package_channels)}")
     for r in limited(sorted(package_channels)): print(f"    {r}")
     glance["handoffs"] = len(handoffs)
@@ -1756,15 +2213,29 @@ def run_report(args, root, coverage_pairs):
 
     section(f"Large journals (threshold {args.journal_threshold_kb} KB)")
     journal_limit = args.journal_threshold_kb * 1024
-    journals = [(p, size) for p, size, _ in all_files
-                if "journal" in os.path.basename(p).lower() and size >= journal_limit]
+    big = [(p, size) for p, size, _ in all_files
+           if "journal" in os.path.basename(p).lower() and size >= journal_limit]
+    root_agents = read_small_text(os.path.join(root, "AGENTS.md")) if os.path.isfile(os.path.join(root, "AGENTS.md")) else None
+    vm = RULES_VERSION_RE.search(root_agents or "")
+    rules_major = int(vm.group(1).split(".")[0]) if vm else 0
+    qc_text = read_small_text(os.path.join(root, "AI_CONTEXT", "PROJECT_QUICK_CONTEXT.md")) \
+        if os.path.isfile(os.path.join(root, "AI_CONTEXT", "PROJECT_QUICK_CONTEXT.md")) else None
+    context_text = (root_agents or "") + "\n" + (qc_text or "")
+    journals, retired = [], []
+    for p, size in big:
+        why = journal_retired(p, root, rules_major, context_text)
+        (retired if why else journals).append((p, size, why))
     glance["journals"] = len(journals)
+    glance["retired_journals"] = len(retired)
+    order = lambda x: (-x[1], rel(x[0], root).lower())
     if journals:
-        for path, size in limited(sorted(journals, key=lambda x: (-x[1], rel(x[0], root).lower()))):
+        for path, size, _w in limited(sorted(journals, key=order)):
             print(f"  {size:9d}  {rel(path, root)}")
         print("  Rotation is a proposal only; preserve every entry and require approval.")
     else:
         print("  none")
+    for path, size, why in limited(sorted(retired, key=order)):
+        print(f"  retired legacy journal, {size // 1024} KB: {rel(path, root)} ({why}); no rotation proposed")
 
     missing_entrypoints = 0
     if args.entrypoint:
@@ -1805,14 +2276,53 @@ def run_report(args, root, coverage_pairs):
     if args.portfolio:
         section("Portfolio root matrix (immediate children; advisory)")
         rows = portfolio_rows(root, args.entrypoint)
-        print("  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Entrypoints present")
+        _tc, tver = template_core()
+        print("  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates"
+              " | Rules version | Work routing | Core match | Sequential writer | Entrypoints present")
         if rows:
-            for name, count, present, state, sessions, missing, pending in rows:
+            for name, count, present, state, sessions, missing, pending, ver, routing, core, seq in rows:
                 value = ", ".join(present) if present else "(none detected)"
-                print(f"  {name} | root-level | {state} | {count} | {sessions} | {missing} | {pending} | {value}")
+                print(f"  {name} | root-level | {state} | {count} | {sessions} | {missing} | {pending}"
+                      f" | {ver} | {routing} | {core} | {seq} | {value}")
         else:
             print("  no immediate child directories")
         print("  Presence does not determine authority or operational state.")
+        print("  Core match compares sections 1-12 with the bundled template"
+              + (f" {tver}" if tver else " (not bundled in this package: unknown)") + ".")
+        names = [n for n, *_ in rows]
+        def base_name(n):
+            return re.sub(r"(?i)( \(\d+\)| - copy| copy|-copy)$", "", n).lower()
+        groups = defaultdict(list)
+        for n in names:
+            groups[base_name(n)].append(n)
+        twins = sorted((v for v in groups.values() if len(v) > 1), key=lambda v: v[0].lower())
+        for v in twins:
+            print("  possible replicas under this root: " + " ~ ".join(sorted(v, key=lambda x: (x.lower(), x))))
+        handoffs_to = []
+        lowered = {n.lower(): n for n in names}
+        for n in names:
+            hdir = os.path.join(root, n, "Handoffs")
+            try:
+                hnames = sorted(x for x in os.listdir(hdir) if x.lower().endswith(".md"))
+            except OSError:
+                continue
+            for h in hnames:
+                t = read_small_text(os.path.join(hdir, h))
+                m = TO_LINE_RE.search((t or "")[:4096])
+                if not m:
+                    continue
+                value = m.group(1).lower()
+                for low, other in sorted(lowered.items()):
+                    if other != n and low in value:
+                        handoffs_to.append(f"{n}/Handoffs/{h} -> {other}")
+        print(f"  handoffs addressed to another project here: {len(handoffs_to)}"
+              " (check each target's Incoming/ for a copy or pointer)")
+        for r in limited(handoffs_to):
+            print(f"    {r}")
+        if os.path.isfile(os.path.join(root, "PORTFOLIO.md")):
+            print("  replica declaration: PORTFOLIO.md present; read it before trusting any copy")
+        else:
+            print("  replica declaration: none (PORTFOLIO.md); copies under other providers cannot be seen from this root")
 
     if args.detect_pointers:
         section("Possible pointer stubs (advisory; content not authority)")
@@ -2030,8 +2540,11 @@ def run_report(args, root, coverage_pairs):
     misplaced = [p for p, _, _ in autoload if is_non_governing(relslash(p, root))]
     oversized = [(p, s) for p, s, _ in autoload
                  if os.path.basename(p).lower() == "agents.md" and s > CODEX_DOC_LIMIT]
+    agents_warn = [(p, s) for p, s, _ in autoload
+                   if os.path.basename(p).lower() == "agents.md" and AGENTS_WARN_BYTES < s <= CODEX_DOC_LIMIT]
     glance["misplaced"] = len(misplaced)
     glance["oversized"] = len(oversized)
+    glance["agents_warn"] = len(agents_warn)
     if instr:
         print("  Auto-loaded names:")
         if autoload:
@@ -2062,11 +2575,42 @@ def run_report(args, root, coverage_pairs):
         if oversized:
             print("  Codex reads at most 32 KiB of AGENTS.md by default and silently drops "
                   "the rest. Propose a shorter file that links to on-demand detail.")
+        for p, s in limited(agents_warn):
+            print(f"  OVER 16 KB, warning ({s} bytes): {rel(p, root)}")
+        if agents_warn:
+            print("  Little headroom before the 32 KiB Codex limit once project clauses are added.")
     else:
         print("  NONE FOUND ANYWHERE.")
         print("  No AGENTS.md / CLAUDE.md / README.md in the tree means every agent's "
               "instructions live outside the folder and cannot be read by the next one. "
               "Report this as a finding.")
+
+    section("Sync copies, unpacked packages and continuity folders")
+    rels_files = [relslash(p, root) for p, _s, _m in files]
+    glance["copies"], glance["collisions"] = print_conflict_block(rels_files, limited)
+    unpacked = sorted((r for r in rels_files if r.split("/")[-1].lower() == "skill.md" and is_non_governing(r)),
+                      key=lambda r: (r.lower(), r))
+    glance["unpacked"] = len(unpacked)
+    print(f"  unpacked skill trees under scratch/backup/history/incoming: {len(unpacked)}")
+    for r in limited(unpacked):
+        print(f"    {r}")
+    if unpacked:
+        print("    Keep staged or backup packages as ZIP + SHA256SUMS, or rename SKILL.md to a non-loading name.")
+    repos = repo_folders_without_git(rels_files, root)
+    glance["repos"] = len(repos)
+    print(f"  repository-shaped folders without .git: {len(repos)}")
+    for r in limited(repos):
+        print(f"    {r}")
+    if repos:
+        print("    A working copy, not a clone: the index should name the remote and the commit or tag it mirrors.")
+    misuse = ai_context_misuse([(relslash(p, root), sz) for p, sz, _m in files])
+    glance["ai_context"] = len(misuse)
+    print(f"  AI_CONTEXT/ files that are not continuity records: {len(misuse)}"
+          f" ({sum(sz for _r, sz, _w in misuse) // 1024} KB)")
+    for r, sz, why in limited(misuse):
+        print(f"    {why:<13} {sz:9d}  {r}")
+    if misuse:
+        print("    Propose a content folder the index names (for example Research/ or Proposals/); move nothing in Audit mode.")
 
     section("Findings at a glance")
     def row(label, value):
@@ -2081,6 +2625,7 @@ def run_report(args, root, coverage_pairs):
     row("Startup read set:", (f"{total_read / 1024:.1f} KB" + (" OVER BUDGET" if over else ""))
         if has_read else "not identified")
     row("AGENTS.md over 32 KiB:", glance["oversized"])
+    row("AGENTS.md over 16 KB (warning):", glance["agents_warn"])
     row("Misplaced live-loading names:", glance["misplaced"])
     skill_total, skill_multi = glance["skills"]
     row("Embedded skill copies:", f"{skill_total} ({skill_multi} name(s) with several copies)")
@@ -2093,6 +2638,12 @@ def run_report(args, root, coverage_pairs):
     row("Pending shared-update artifacts:", glance.get("pending_updates", 0))
     row("Package-channel review items:", glance.get("package_channels", 0))
     row("Large journals:", glance["journals"])
+    row("Retired journals (no rotation):", glance["retired_journals"])
+    row("Sync conflict copies:", glance["copies"])
+    row("Case-only name collisions:", glance["collisions"])
+    row("Unpacked skill trees:", glance["unpacked"])
+    row("Repo folders without .git:", glance["repos"])
+    row("AI_CONTEXT non-continuity files:", glance["ai_context"])
     print("  Counts only. Open the matching section before acting on any of them.")
 
     if args.exclude:
