@@ -633,9 +633,6 @@ $ConflictHostRx = '^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$'
 $DeclarationRx = '(?i)sequential-writer declaration|agents work one after another'
 $RulesVersionRx = '(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)'
 $StatusLineRx = '^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)'
-$PendingNewRx = '(?im)^\s*(?:[-*]\s*)?\**(?:New(?: text| line| row)?|Insert(?: text| line| row)?|Add(?: line| row)?)\**\s*:[ \t]*(.*)$'
-$PendingOldRx = '(?im)^\s*(?:[-*]\s*)?\**(?:Old(?: text| line)?|Anchor|Insert after|After)\**\s*:[ \t]*(.*)$'
-$FenceAfterRx = '(?s)\A[ \t]*\r?\n```[^\n]*\n(.*?)\r?\n```'
 $Hex64Rx = '\b[0-9a-fA-F]{64}\b'
 $ToLineRx = '(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$'
 $KnownContinuity = @('project_quick_context.md', 'session_index.md', 'policy_installation.md',
@@ -735,43 +732,65 @@ function Write-ConflictBlock([string[]]$rels) {
     if ($copies.Count -or $collisions.Count) { Write-Line '    Reconcile before shared-record edits; never merge, rename or delete without approval.' }
     return @($copies.Count, $collisions.Count)
 }
-function Get-FirstStatus([string]$text) {
-    foreach ($line in ($text -split "`n")) {
-        if ($line.Trim()) {
-            $m = [regex]::Match($line, $StatusLineRx)
-            if ($m.Success) { return $m.Groups[1].Value.ToUpper() }
-            return $null
-        }
-    }
+$StatusWords = @('PENDING', 'APPLIED', 'SUPERSEDED', 'CONFLICTED', 'UNVERIFIABLE')
+$TargetLineRx = '(?i)^\s*(?:[-*]\s*)?\**Target\**\s*:\s*(.*)$'
+$LabelLineRx = '^\s*(?:[-*]\s*)?\**([A-Za-z][A-Za-z /-]{0,40}?)\**\s*:[ \t]*(.*)$'
+$HeadingRx = '^\s*#'
+$OldWordsRx = '(?i)\b(old|anchor|after|before|replace|remove)\b'
+$NewWordsRx = '(?i)\b(new|insert|add|row|append|edit|text|line)\b'
+function Get-StatusOf([string]$line) {
+    $m = [regex]::Match($line, $StatusLineRx)
+    if ($m.Success) { return $m.Groups[1].Value.ToUpper() }
     return $null
 }
-function Get-PendingField([string]$text, [string]$field) {
-    $m = [regex]::Match($text, ('(?im)^\s*(?:[-*]\s*)?\**{0}\**\s*:\s*(.*)$' -f $field))
-    if ($m.Success) { return $m.Groups[1].Value.Trim() }
-    return ''
+function Get-FenceAt([string[]]$lines, [int]$i) {
+    while ($i -lt $lines.Count -and -not $lines[$i].Trim()) { $i++ }
+    if ($i -ge $lines.Count -or -not $lines[$i].TrimStart().StartsWith('```')) { return @($null, $i) }
+    $body = [Collections.Generic.List[string]]::new()
+    $j = $i + 1
+    while ($j -lt $lines.Count -and -not $lines[$j].TrimStart().StartsWith('```')) { $body.Add($lines[$j].TrimEnd("`r")); $j++ }
+    return @(($body -join "`n"), ($j + 1))
 }
-function Get-EditValues([string]$text, [string]$rx) {
-    $vals = [Collections.Generic.List[string]]::new()
-    foreach ($m in [regex]::Matches($text, $rx)) {
-        $v = $m.Groups[1].Value.Trim()
-        if (-not $v) {
-            $f = [regex]::Match($text.Substring($m.Index + $m.Length), $FenceAfterRx)
-            $v = if ($f.Success) { $f.Groups[1].Value } else { '' }
-        } elseif ($v.Length -gt 2 -and $v.StartsWith('`') -and $v.EndsWith('`')) { $v = $v.Substring(1, $v.Length - 2) }
-        $v = $v.Trim()
-        if ($v.Length -ge 12) { $vals.Add($v) }
+function Get-BlockEdits([string[]]$lines) {
+    $new = [Collections.Generic.List[string]]::new(); $old = [Collections.Generic.List[string]]::new()
+    $i = 0
+    while ($i -lt $lines.Count) {
+        $m = [regex]::Match($lines[$i], $LabelLineRx)
+        if (-not $m.Success) { $i++; continue }
+        $label = $m.Groups[1].Value.Trim().ToLower(); $value = $m.Groups[2].Value.Trim()
+        $kind = if ([regex]::IsMatch($label, $OldWordsRx)) { 'old' } elseif ([regex]::IsMatch($label, $NewWordsRx)) { 'new' } else { $null }
+        if (-not $kind) { $i++; continue }
+        if ($kind -eq 'old') { $bucket = $old } else { $bucket = $new }
+        if ($value -and $label -ne 'edit') {
+            if ($value.Length -gt 2 -and $value.StartsWith('`') -and $value.EndsWith('`')) { $value = $value.Substring(1, $value.Length - 2) }
+            $bucket.Add($value.Trim())
+        }
+        $fence = Get-FenceAt $lines ($i + 1)
+        if ($null -ne $fence[0]) { $bucket.Add($fence[0].Trim()); $i = $fence[1]; continue }
+        if (-not $value) {
+            $j = $i + 1
+            while ($j -lt $lines.Count -and -not $lines[$j].Trim()) { $j++ }
+            if ($j -lt $lines.Count -and -not [regex]::IsMatch($lines[$j], $LabelLineRx) -and -not [regex]::IsMatch($lines[$j], $HeadingRx)) { $bucket.Add($lines[$j].Trim()) }
+        }
+        $i++
     }
-    return , $vals.ToArray()
+    $keep = {
+        param($vals)
+        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        , @($vals | Where-Object { $_.Length -ge 12 -and $seen.Add($_) })
+    }
+    return @((& $keep $new), (& $keep $old))
 }
 function Get-PendingInfo([string]$text, [string]$name) {
-    $info = @{ Status = $null; Target = ''; Base = ''; New = @(); Old = @() }
+    $out = @{ Status = $null; StatusFirst = $false; Blocks = [Collections.Generic.List[object]]::new() }
     if ($name.ToLower().EndsWith('.json')) {
         try { $obj = $text | ConvertFrom-Json -ErrorAction Stop } catch { $obj = $null }
         if ($obj -is [pscustomobject]) {
             $st = $obj.status
-            if ($st) { $info.Status = ([string]$st).Trim().Split(@(' ', "`t", "`n"), [StringSplitOptions]::RemoveEmptyEntries)[0].ToUpper() }
-            foreach ($k in @('target', 'path')) { if (-not $info.Target -and $obj.$k) { $info.Target = [string]$obj.$k } }
-            foreach ($k in @('base', 'base_sha256')) { if (-not $info.Base -and $obj.$k) { $info.Base = [string]$obj.$k } }
+            if ($st -and ([string]$st).Trim()) { $out.Status = ([string]$st).Trim().Split([string[]]@(' ', "`t", "`r", "`n"), [StringSplitOptions]::RemoveEmptyEntries)[0].ToUpper() }
+            $out.StatusFirst = $null -ne $out.Status
+            $tgt = ''; foreach ($k in @('target', 'path')) { if (-not $tgt -and $obj.$k) { $tgt = [string]$obj.$k } }
+            $bas = ''; foreach ($k in @('base', 'base_sha256')) { if (-not $bas -and $obj.$k) { $bas = [string]$obj.$k } }
             $new = [Collections.Generic.List[string]]::new(); $old = [Collections.Generic.List[string]]::new()
             foreach ($e in @($obj.edits)) {
                 if ($e -isnot [pscustomobject]) { continue }
@@ -780,48 +799,89 @@ function Get-PendingInfo([string]$text, [string]$name) {
                     if ($v -is [string] -and $v.Trim().Length -ge 12) { $pair[1].Add($v.Trim()) }
                 }
             }
-            $info.New = $new.ToArray(); $info.Old = $old.ToArray()
+            $out.Blocks.Add([pscustomobject]@{ Status = $out.Status; Target = $tgt; Base = $bas; New = $new.ToArray(); Old = $old.ToArray() })
         }
-        return $info
+        return $out
     }
-    $info.Status = Get-FirstStatus $text
-    $info.Target = Get-PendingField $text 'Target'
-    $info.Base = Get-PendingField $text 'Base'
-    $info.New = Get-EditValues $text $PendingNewRx
-    $info.Old = Get-EditValues $text $PendingOldRx
-    return $info
+    [string[]]$lines = $text -split "`n"
+    $first = ''; foreach ($ln in $lines) { if ($ln.Trim()) { $first = $ln; break } }
+    $out.StatusFirst = $null -ne (Get-StatusOf $first)
+    foreach ($ln in $lines) { $s = Get-StatusOf $ln; if ($s) { $out.Status = $s; break } }
+    if (-not $out.Status -and $first.Trim()) {
+        $word = $first.Trim().Split(' ')[0].Trim([char[]]@('*', ':', '(')).ToUpper()
+        if ($StatusWords -contains $word) { $out.Status = $word }
+    }
+    $targets = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ([regex]::IsMatch($lines[$i], $TargetLineRx)) { $i } })
+    $starts = [Collections.Generic.List[int]]::new()
+    for ($k = 0; $k -lt $targets.Count; $k++) {
+        if ($k -eq 0) { $starts.Add(0); continue }
+        $s = $targets[$k]
+        while (($s - 1) -gt $targets[$k - 1] -and ((-not $lines[$s - 1].Trim()) -or [regex]::IsMatch($lines[$s - 1], $HeadingRx) -or (Get-StatusOf $lines[$s - 1]))) { $s-- }
+        $starts.Add($s)
+    }
+    $spans = [Collections.Generic.List[object]]::new()
+    if ($targets.Count) {
+        for ($k = 0; $k -lt $starts.Count; $k++) { $spans.Add([int[]]@($starts[$k], $(if ($k + 1 -lt $starts.Count) { $starts[$k + 1] } else { $lines.Count }))) }
+    } else { $spans.Add([int[]]@(0, $lines.Count)) }
+    for ($k = 0; $k -lt $spans.Count; $k++) {
+        $a = $spans[$k][0]; $b = $spans[$k][1]
+        [string[]]$chunk = if ($b -gt $a) { $lines[$a..($b - 1)] } else { @() }
+        $target = if ($targets.Count) { [regex]::Match($lines[$targets[$k]], $TargetLineRx).Groups[1].Value.Trim() } else { '' }
+        $st = $out.Status
+        foreach ($ln in $chunk) { $s = Get-StatusOf $ln; if ($s) { $st = $s; break } }
+        $base = ''
+        foreach ($ln in $chunk) {
+            if ($ln -match '(?i)\bbase\b') { $h = [regex]::Match($ln, $Hex64Rx); if ($h.Success) { $base = $h.Value; break } }
+        }
+        $edits = Get-BlockEdits @($chunk | Where-Object { -not [regex]::IsMatch($_, $TargetLineRx) })
+        $out.Blocks.Add([pscustomobject]@{ Status = $st; Target = $target; Base = $base; New = @($edits[0]); Old = @($edits[1]) })
+    }
+    return $out
 }
 function Get-SubstringCount([string]$hay, [string]$needle) {
     $n = 0; $i = 0
     while (($i = $hay.IndexOf($needle, $i, [StringComparison]::Ordinal)) -ge 0) { $n++; $i += $needle.Length }
     return $n
 }
-function Get-PendingState([string]$path, [string]$projectRoot) {
-    $text = Read-SmallText $path
-    if ($null -eq $text) { return @('Unverifiable (unreadable)', '', $false) }
-    $info = Get-PendingInfo $text ([IO.Path]::GetFileName($path))
-    $malformed = $null -eq $info.Status
+function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
     $recorded = @{ 'APPLIED' = 'Applied'; 'SUPERSEDED' = 'Superseded'; 'CONFLICTED' = 'Conflicted'; 'UNVERIFIABLE' = 'Unverifiable' }
-    $target = if ($info.Target) { Get-CleanReference ($info.Target.Trim([char[]]@('`', "'", '"', ' '))) } else { '' }
-    if ($info.Status -and $recorded.ContainsKey($info.Status)) { return @(($recorded[$info.Status] + ' (recorded)'), $target, $false) }
-    if (-not $target) { return @('Unverifiable (no Target)', '', $malformed) }
+    $raw = $block.Target.Trim().Trim([char[]]@('`', "'", '"', '\', ' '))
+    $target = if ($raw) { Get-CleanReference $raw } else { '' }
+    if ($block.Status -and $recorded.ContainsKey($block.Status)) { return @(($recorded[$block.Status] + ' (recorded)'), $target) }
+    if (-not $target) { return @('Unverifiable (no Target)', '') }
     $full = $projectRoot
     foreach ($seg in $target.Replace('\', '/').TrimStart('/').Split('/')) { if ($seg) { $full = [IO.Path]::Combine($full, $seg) } }
-    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target, $malformed) }
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target) }
     $current = Read-SmallText $full
-    if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target, $malformed) }
+    if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target) }
     try { $digest = (Get-FileHash -LiteralPath $full -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower() }
-    catch { return @('Unverifiable (target unreadable)', $target, $malformed) }
-    $base = [regex]::Match([string]$info.Base, $Hex64Rx)
-    $present = @($info.New | ForEach-Object { $current.Contains($_) })
-    if ($present.Count -and -not ($present -contains $false)) { return @('Applied (not marked)', $target, $malformed) }
-    if ($present -contains $true) { return @('Conflicted (partly present)', $target, $malformed) }
-    if ($base.Success -and $base.Value.ToLower() -eq $digest) { return @('Pending (base matches)', $target, $malformed) }
-    if (@($info.Old).Count -and -not (@($info.Old | ForEach-Object { (Get-SubstringCount $current $_) -eq 1 }) -contains $false)) {
-        return @('Pending (anchor matches)', $target, $malformed)
+    catch { return @('Unverifiable (target unreadable)', $target) }
+    $base = [regex]::Match([string]$block.Base, $Hex64Rx)
+    $present = @(@($block.New) | ForEach-Object { $current.Contains($_) })
+    if ($present.Count -and -not ($present -contains $false)) { return @('Applied (not marked)', $target) }
+    if ($present -contains $true) { return @('Conflicted (partly present)', $target) }
+    if ($base.Success -and $base.Value.ToLower() -eq $digest) { return @('Pending (base matches)', $target) }
+    if (@($block.Old).Count -and -not (@(@($block.Old) | ForEach-Object { (Get-SubstringCount $current $_) -eq 1 }) -contains $false)) {
+        return @('Pending (anchor matches)', $target)
     }
-    if ($base.Success) { return @('Conflicted (base differs)', $target, $malformed) }
-    return @('Unverifiable (no base or edit text)', $target, $malformed)
+    if ($sourceId -and $current.ToLower().Contains($sourceId)) { return @('Superseded (likely: source session ID in target)', $target) }
+    if ($base.Success) { return @('Conflicted (base differs, text absent)', $target) }
+    if (@($block.New).Count) { return @('Unverifiable (text absent; no base or anchor)', $target) }
+    return @('Unverifiable (no edit text)', $target)
+}
+function Get-PendingState([string]$path, [string]$projectRoot) {
+    $text = Read-SmallText $path
+    if ($null -eq $text) { return [pscustomobject]@{ Blocks = @(, @('Unverifiable (unreadable)', '')); Flag = '' } }
+    $info = Get-PendingInfo $text ([IO.Path]::GetFileName($path))
+    $flag = ''
+    if (-not $info.StatusFirst) {
+        $anyBlock = @($info.Blocks | Where-Object { $_.Status }).Count
+        $flag = if (-not $anyBlock -and $null -eq $info.Status) { 'no Status: line' } else { 'Status: not first line' }
+    }
+    $m = [regex]::Match((Get-RelUnder $path $projectRoot), $UuidPattern)
+    $sid = if ($m.Success) { $m.Value.ToLower() } else { '' }
+    $blocks = @(foreach ($b in $info.Blocks) { , (Get-BlockState $b $projectRoot $sid) })
+    return [pscustomobject]@{ Blocks = $blocks; Flag = $flag }
 }
 function Get-RelUnder([string]$full, [string]$base) {
     $b = $base.TrimEnd('\', '/')
@@ -1351,12 +1411,26 @@ if ($Orient -or $SessionIndex -or $Pending) {
     if ($Pending) {
         Write-Section 'Pending files (report only)'
         $pfound = @(Find-PendingFiles $RootFull $ScratchDir)
-        $prows = @($pfound | ForEach-Object { $st = Get-PendingState $_ $RootFull; [pscustomobject]@{ Rel = (Get-RelSlash $_); State = $st[0]; Target = $st[1]; Bad = [bool]$st[2] } })
-        $malformedN = @($prows | Where-Object { $_.Bad }).Count
-        Write-Line ("  pending files: {0} (without a Status: first line: {1})" -f $prows.Count, $malformedN)
-        Write-Capped @($prows | ForEach-Object { ("{0,-34} {1} -> {2}" -f $_.State, $_.Rel, $(if ($_.Target) { $_.Target } else { '(no Target)' })) + $(if ($_.Bad) { '  [no Status: line]' } else { '' }) })
-        $applicableN = @($prows | Where-Object { $_.State.StartsWith('Pending (') }).Count
-        $appliedN = @($prows | Where-Object { $_.State -eq 'Applied (not marked)' }).Count
+        $plines = [Collections.Generic.List[string]]::new(); $pstates = [Collections.Generic.List[string]]::new()
+        $missingN = 0; $lateN = 0
+        foreach ($pf in $pfound) {
+            $res = Get-PendingState $pf $RootFull
+            if ($res.Flag -eq 'no Status: line') { $missingN++ }
+            if ($res.Flag -eq 'Status: not first line') { $lateN++ }
+            $nb = @($res.Blocks).Count
+            for ($k = 0; $k -lt $nb; $k++) {
+                $bst = @($res.Blocks)[$k]
+                $pstates.Add($bst[0])
+                $part = if ($nb -gt 1) { " [{0}/{1}]" -f ($k + 1), $nb } else { '' }
+                $tg = if ($bst[1]) { $bst[1] } else { '(no Target)' }
+                $plines.Add((("{0,-49} {1}{2} -> {3}" -f $bst[0], (Get-RelSlash $pf), $part, $tg) + $(if ($res.Flag -and $k -eq 0) { "  [$($res.Flag)]" } else { '' })))
+            }
+        }
+        Write-Line ("  pending files: {0}, edit blocks: {1} (no Status: line: {2}; Status: not first line: {3})" -f $pfound.Count, $pstates.Count, $missingN, $lateN)
+        Write-Capped @($plines)
+        $applicableN = @($pstates | Where-Object { $_.StartsWith('Pending (') }).Count
+        $appliedN = @($pstates | Where-Object { $_ -eq 'Applied (not marked)' }).Count
+        $malformedN = $missingN
         $prov = [Collections.Generic.List[string]]::new()
         $inc = Join-RootRel 'Incoming'
         if (Test-Path -LiteralPath $inc -PathType Container) {
@@ -1373,7 +1447,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
         if (@(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/')).Count) { Write-Line "  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5)." }
         Write-Line '  Nothing was applied. Apply under Work mode W5, then set the first line to'
         Write-Line "  'Status: APPLIED <after-sha8> by <session>/<turn>'."
-        $glance['pending files'] = $prows.Count
+        $glance['pending files'] = $pfound.Count
+        $glance['pending edit blocks'] = $pstates.Count
         $glance['pending without Status line'] = $malformedN
         $glance['pending applicable now'] = $applicableN
         $glance['applied but still PENDING'] = $appliedN

@@ -663,10 +663,6 @@ CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
 DECLARATION_RE = re.compile(r"(?i)sequential-writer declaration|agents work one after another")
 RULES_VERSION_RE = re.compile(r"(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)")
 STATUS_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)")
-PENDING_FIELD_RE = r"(?im)^\s*(?:[-*]\s*)?\**{0}\**\s*:\s*(.*)$"
-PENDING_NEW_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**(?:New(?: text| line| row)?|Insert(?: text| line| row)?|Add(?: line| row)?)\**\s*:[ \t]*(.*)$")
-PENDING_OLD_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**(?:Old(?: text| line)?|Anchor|Insert after|After)\**\s*:[ \t]*(.*)$")
-FENCE_AFTER_RE = re.compile(r"\A[ \t]*\r?\n```[^\n]*\n(.*?)\r?\n```", re.DOTALL)
 HEX64_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
 TO_LINE_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$")
 KNOWN_CONTINUITY = {"project_quick_context.md", "session_index.md", "policy_installation.md",
@@ -724,37 +720,70 @@ def print_conflict_block(rels, limited, indent="  "):
     return len(copies), len(collisions)
 
 
-def first_status(text):
-    for line in text.splitlines():
-        if line.strip():
-            m = STATUS_LINE_RE.match(line)
-            return m.group(1).upper() if m else None
-    return None
+STATUS_WORDS = ("PENDING", "APPLIED", "SUPERSEDED", "CONFLICTED", "UNVERIFIABLE")
+TARGET_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Target\**\s*:\s*(.*)$", re.IGNORECASE)
+LABEL_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**([A-Za-z][A-Za-z /-]{0,40}?)\**\s*:[ \t]*(.*)$")
+HEADING_RE = re.compile(r"^\s*#")
+OLD_WORDS_RE = re.compile(r"(?i)\b(old|anchor|after|before|replace|remove)\b")
+NEW_WORDS_RE = re.compile(r"(?i)\b(new|insert|add|row|append|edit|text|line)\b")
 
 
-def _pending_value(text, field):
-    m = re.search(PENDING_FIELD_RE.format(field), text)
-    return m.group(1).strip() if m else ""
+def _status_of(line):
+    m = STATUS_LINE_RE.match(line)
+    return m.group(1).upper() if m else None
 
 
-def _edit_values(text, rx):
-    vals = []
-    for m in rx.finditer(text):
-        v = m.group(1).strip()
-        if not v:
-            f = FENCE_AFTER_RE.match(text[m.end():])
-            v = f.group(1) if f else ""
-        elif len(v) > 2 and v.startswith("`") and v.endswith("`"):
-            v = v[1:-1]
-        v = v.strip()
-        if len(v) >= 12:
-            vals.append(v)
-    return vals
+def _fence_at(lines, i):
+    """Content of a fenced block whose opening fence is the first non-blank line at or after i."""
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    if i >= len(lines) or not lines[i].lstrip().startswith("```"):
+        return None, i
+    body = []
+    j = i + 1
+    while j < len(lines) and not lines[j].lstrip().startswith("```"):
+        body.append(lines[j].rstrip("\r"))
+        j += 1
+    return "\n".join(body), j + 1
+
+
+def _block_edits(lines):
+    new, old = [], []
+    i = 0
+    while i < len(lines):
+        m = LABEL_LINE_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        label, value = m.group(1).strip().lower(), m.group(2).strip()
+        kind = "old" if OLD_WORDS_RE.search(label) else ("new" if NEW_WORDS_RE.search(label) else None)
+        if kind is None:
+            i += 1
+            continue
+        bucket = old if kind == "old" else new
+        if value and label != "edit":
+            if len(value) > 2 and value.startswith("`") and value.endswith("`"):
+                value = value[1:-1]
+            bucket.append(value.strip())
+        fence, after = _fence_at(lines, i + 1)
+        if fence is not None:
+            bucket.append(fence.strip())
+            i = after
+            continue
+        if not value:
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and not LABEL_LINE_RE.match(lines[j]) and not HEADING_RE.match(lines[j]):
+                bucket.append(lines[j].strip())
+        i += 1
+    keep = lambda vals: list(dict.fromkeys(v for v in vals if len(v) >= 12))
+    return keep(new), keep(old)
 
 
 def parse_pending(text, name):
-    """Status, target, base hash and edit texts from a W5 pending file."""
-    info = {"status": None, "target": "", "base": "", "new": [], "old": []}
+    """File status, Status placement and one entry per edit block (W5 pending file)."""
+    out = {"status": None, "status_first": False, "blocks": []}
     if name.lower().endswith(".json"):
         try:
             obj = json.loads(text)
@@ -762,62 +791,106 @@ def parse_pending(text, name):
             obj = None
         if isinstance(obj, dict):
             st = obj.get("status") or obj.get("Status")
-            info["status"] = str(st).split()[0].upper() if st else None
-            info["target"] = str(obj.get("target") or obj.get("Target") or obj.get("path") or "")
-            info["base"] = str(obj.get("base") or obj.get("base_sha256") or "")
+            out["status"] = str(st).split()[0].upper() if st and str(st).split() else None
+            out["status_first"] = out["status"] is not None
+            block = {"status": out["status"], "target": str(obj.get("target") or obj.get("Target") or obj.get("path") or ""),
+                     "base": str(obj.get("base") or obj.get("base_sha256") or ""), "new": [], "old": []}
             for e in obj.get("edits") or []:
                 if isinstance(e, dict):
                     for key, bucket in (("new", "new"), ("new_line", "new"), ("new_text", "new"),
                                         ("old", "old"), ("insert_after", "old"), ("anchor", "old")):
                         v = e.get(key)
                         if isinstance(v, str) and len(v.strip()) >= 12:
-                            info[bucket].append(v.strip())
-        return info
-    info["status"] = first_status(text)
-    info["target"] = _pending_value(text, "Target")
-    info["base"] = _pending_value(text, "Base")
-    info["new"] = _edit_values(text, PENDING_NEW_RE)
-    info["old"] = _edit_values(text, PENDING_OLD_RE)
-    return info
+                            block[bucket].append(v.strip())
+            out["blocks"].append(block)
+        return out
+    lines = text.split("\n")
+    first = next((ln for ln in lines if ln.strip()), "")
+    out["status_first"] = _status_of(first) is not None
+    statuses = [s for s in (_status_of(ln) for ln in lines) if s]
+    if statuses:
+        out["status"] = statuses[0]
+    else:
+        word = first.strip().split(" ", 1)[0].strip("*:(").upper() if first.strip() else ""
+        out["status"] = word if word in STATUS_WORDS else None
+    targets = [i for i, ln in enumerate(lines) if TARGET_LINE_RE.match(ln)]
+    starts = []
+    for k, t in enumerate(targets):
+        if k == 0:
+            starts.append(0)
+            continue
+        s = t
+        while s - 1 > targets[k - 1] and (not lines[s - 1].strip() or HEADING_RE.match(lines[s - 1])
+                                          or _status_of(lines[s - 1])):
+            s -= 1
+        starts.append(s)
+    spans = list(zip(starts, starts[1:] + [len(lines)])) if targets else [(0, len(lines))]
+    for k, (a, b) in enumerate(spans):
+        chunk = lines[a:b]
+        target = TARGET_LINE_RE.match(lines[targets[k]]).group(1).strip() if targets else ""
+        st = next((s for s in (_status_of(ln) for ln in chunk) if s), out["status"])
+        base = ""
+        for ln in chunk:
+            if re.search(r"(?i)\bbase\b", ln):
+                h = HEX64_RE.search(ln)
+                if h:
+                    base = h.group(0)
+                    break
+        new, old = _block_edits([ln for ln in chunk if not TARGET_LINE_RE.match(ln)])
+        out["blocks"].append({"status": st, "target": target, "base": base, "new": new, "old": old})
+    return out
+
+
+def classify_block(block, root, source_id=""):
+    recorded = {"APPLIED": "Applied", "SUPERSEDED": "Superseded", "CONFLICTED": "Conflicted",
+                "UNVERIFIABLE": "Unverifiable"}
+    raw = block["target"].strip().strip("`'\"\\ ")
+    target = clean_local_reference(raw) if raw else ""
+    if block["status"] in recorded:
+        return recorded[block["status"]] + " (recorded)", target
+    if not target:
+        return "Unverifiable (no Target)", ""
+    full = os.path.join(root, *target.replace("\\", "/").lstrip("/").split("/"))
+    if not os.path.isfile(full):
+        return "Unverifiable (target not found)", target
+    current = read_small_text(full)
+    if current is None:
+        return "Unverifiable (target unreadable)", target
+    try:
+        digest = sha256(full)
+    except (OSError, PermissionError):
+        return "Unverifiable (target unreadable)", target
+    base = HEX64_RE.search(block["base"] or "")
+    present = [v in current for v in block["new"]]
+    if present and all(present):
+        return "Applied (not marked)", target
+    if any(present):
+        return "Conflicted (partly present)", target
+    if base and base.group(0).lower() == digest:
+        return "Pending (base matches)", target
+    if block["old"] and all(current.count(v) == 1 for v in block["old"]):
+        return "Pending (anchor matches)", target
+    if source_id and source_id in current.lower():
+        return "Superseded (likely: source session ID in target)", target
+    if base:
+        return "Conflicted (base differs, text absent)", target
+    if block["new"]:
+        return "Unverifiable (text absent; no base or anchor)", target
+    return "Unverifiable (no edit text)", target
 
 
 def classify_pending(path, root):
-    """Return (state, target label, malformed)."""
+    """[(state, target)] per edit block, plus the Status flag for the file."""
     text = read_small_text(path)
     if text is None:
-        return "Unverifiable (unreadable)", "", False
+        return [("Unverifiable (unreadable)", "")], ""
     info = parse_pending(text, os.path.basename(path))
-    malformed = info["status"] is None
-    recorded = {"APPLIED": "Applied", "SUPERSEDED": "Superseded", "CONFLICTED": "Conflicted",
-                "UNVERIFIABLE": "Unverifiable"}
-    target = clean_local_reference(info["target"].strip("`'\" ")) if info["target"] else ""
-    if info["status"] in recorded:
-        return recorded[info["status"]] + " (recorded)", target, False
-    if not target:
-        return "Unverifiable (no Target)", "", malformed
-    full = os.path.join(root, *target.replace("\\", "/").lstrip("/").split("/"))
-    if not os.path.isfile(full):
-        return "Unverifiable (target not found)", target, malformed
-    current = read_small_text(full)
-    if current is None:
-        return "Unverifiable (target unreadable)", target, malformed
-    try:
-        digest = sha256(full)
-    except (OSError, PermissionError, RuntimeError):
-        return "Unverifiable (target unreadable)", target, malformed
-    base = HEX64_RE.search(info["base"] or "")
-    present = [v in current for v in info["new"]]
-    if present and all(present):
-        return "Applied (not marked)", target, malformed
-    if any(present):
-        return "Conflicted (partly present)", target, malformed
-    if base and base.group(0).lower() == digest:
-        return "Pending (base matches)", target, malformed
-    if info["old"] and all(current.count(v) == 1 for v in info["old"]):
-        return "Pending (anchor matches)", target, malformed
-    if base:
-        return "Conflicted (base differs)", target, malformed
-    return "Unverifiable (no base or edit text)", target, malformed
+    flag = "" if info["status_first"] else (
+        "no Status: line" if not any(b["status"] for b in info["blocks"]) and info["status"] is None
+        else "Status: not first line")
+    m = UUID_RE.search(relslash(path, root))
+    source_id = m.group(0).lower() if m else ""
+    return [classify_block(b, root, source_id) for b in info["blocks"]], flag
 
 
 def pending_scan_dirs(project, scratch_rel="AI_CONTEXT/scratch"):
@@ -1521,13 +1594,23 @@ def report_orient(root, args, limited):
 def report_pending(root, args, limited):
     section("Pending files (report only)")
     found = find_pending(root, args.scratch_dir)
-    rows = [(relslash(p, root),) + classify_pending(p, root) for p in found]
-    malformed = sum(1 for r in rows if r[3])
-    print(f"  pending files: {len(rows)} (without a Status: first line: {malformed})")
-    for r, state, target, bad in limited(rows):
-        print(f"    {state:<34} {r} -> {target or '(no Target)'}" + ("  [no Status: line]" if bad else ""))
-    applicable = sum(1 for r in rows if r[1].startswith("Pending ("))
-    applied = sum(1 for r in rows if r[1] == "Applied (not marked)")
+    lines, states, missing, late = [], [], 0, 0
+    for p in found:
+        blocks, flag = classify_pending(p, root)
+        missing += flag == "no Status: line"
+        late += flag == "Status: not first line"
+        for k, (state, target) in enumerate(blocks):
+            states.append(state)
+            part = f" [{k + 1}/{len(blocks)}]" if len(blocks) > 1 else ""
+            lines.append(f"{state:<49} {relslash(p, root)}{part} -> {target or '(no Target)'}"
+                         + (f"  [{flag}]" if flag and k == 0 else ""))
+    print(f"  pending files: {len(found)}, edit blocks: {len(states)}"
+          f" (no Status: line: {missing}; Status: not first line: {late})")
+    for ln in limited(lines):
+        print(f"    {ln}")
+    applicable = sum(1 for s in states if s.startswith("Pending ("))
+    applied = sum(1 for s in states if s == "Applied (not marked)")
+    malformed = missing
     prov = []
     inc = os.path.join(root, "Incoming")
     try:
@@ -1552,7 +1635,8 @@ def report_pending(root, args, limited):
         print("  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5).")
     print("  Nothing was applied. Apply under Work mode W5, then set the first line to")
     print("  'Status: APPLIED <after-sha8> by <session>/<turn>'.")
-    return {"pending files": len(rows), "pending without Status line": malformed,
+    return {"pending files": len(found), "pending edit blocks": len(states),
+            "pending without Status line": malformed,
             "pending applicable now": applicable, "applied but still PENDING": applied,
             "provenance files with PENDING": len(prov)}
 

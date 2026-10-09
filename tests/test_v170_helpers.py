@@ -130,7 +130,7 @@ class HelperChecks(unittest.TestCase):
             "PENDING_PROJECT_INDEX.md": "Pending (base matches)",
             "PENDING_ANCHOR.md": "Pending (anchor matches)",
             "PENDING_V1_SHARED.json": "Pending (anchor matches)",
-            "PENDING_QC.md": "Conflicted (base differs)",
+            "PENDING_QC.md": "Conflicted (base differs, text absent)",
             "PENDING_DONE.md": "Applied (recorded)",
             "PENDING_GONE.md": "Unverifiable (target not found)",
             "pending-index.md": "Applied (not marked)",
@@ -139,11 +139,40 @@ class HelperChecks(unittest.TestCase):
             line = next(l for l in out.splitlines() if name in l)
             self.assertTrue(line.strip().startswith(state), line)
         self.assertNotIn("spending-notes.md", out)
-        self.assertIn("pending files: 7 (without a Status: first line: 1)", out)
+        self.assertIn("pending files: 7, edit blocks: 7 (no Status: line: 1; Status: not first line: 0)", out)
         self.assertIn("[no Status: line]", next(l for l in out.splitlines() if "pending-index.md" in l))
         self.assertIn("Incoming/2026-10-08_muse_x/_PROVENANCE.md (1 PENDING mentions)", out)
         self.assertIn("sequential-writer declaration found", out)
         self.assertEqual(before, self.snapshot(), "--pending must not write")
+
+    def test_pending_real_world_shapes(self):
+        """Shapes seen in the portfolio on 2026-10-08: sections, headings, prose labels."""
+        s2 = self.root / "AI_CONTEXT/scratch/22222222-2222-4222-8222-222222222222"
+        idx = (self.root / "PROJECT_INDEX.md").read_text(encoding="utf-8")
+        digest = hashlib.sha256(idx.encode("utf-8")).hexdigest().upper()
+        w(self.root / "AI_CONTEXT/SESSION_INDEX.md",
+          "| Started | ID |\n|---|---|\n| 2026-10-05 | 22222222-2222-4222-8222-222222222222 (reworded row) |\n")
+        w(s2 / "PENDING_SHARED_EDITS.md",
+          "# Pending Shared Edits\n\n## SESSION_INDEX.md\nStatus: PENDING\nTarget: \\AI_CONTEXT/SESSION_INDEX.md\\\n"
+          "Complete base SHA-256: " + "A" * 64 + "\nExact new Markdown row:\n| 2026-10-05 | original wording of the row |\n\n"
+          "## PROJECT_INDEX.md\nStatus: PENDING\nTarget: \\PROJECT_INDEX.md\\\nComplete base SHA-256: " + digest + "\n"
+          "Exact new Markdown row:\n| [Report](Audits/report.md) | Evidence |\n")
+        w(s2 / "PENDING_NAVIGATION_EDITS.md",
+          "# Pending navigation edits\n\nSession/turn: x / T001\n\n## Edit A\n\nStatus: PENDING\n"
+          "Target: `PROJECT_INDEX.md`\nBase: SHA-256 " + "b" * 64 + "\n"
+          "Edit: insert immediately after the row beginning `- docs/plan.md`:\n\n```\n- docs/plan.md\n```\n")
+        w(s2 / "PENDING_PROSE.md", "PENDING (staging): in AI_CONTEXT/SESSION_INDEX.md, set last activity.\n")
+        out = run_py(self.root, "--pending")
+        line = lambda part: next(l for l in out.splitlines() if part in l)
+        self.assertIn("Superseded (likely: source session ID in target)", line("PENDING_SHARED_EDITS.md [1/2]"))
+        self.assertIn("-> AI_CONTEXT/SESSION_INDEX.md", line("PENDING_SHARED_EDITS.md [1/2]"))
+        self.assertIn("[Status: not first line]", line("PENDING_SHARED_EDITS.md [1/2]"))
+        self.assertIn("Pending (base matches)", line("PENDING_SHARED_EDITS.md [2/2]"))
+        self.assertIn("Applied (not marked)", line("PENDING_NAVIGATION_EDITS.md"))
+        self.assertIn("Unverifiable (no Target)", line("PENDING_PROSE.md"))
+        self.assertIn("[Status: not first line]", line("PENDING_PROSE.md"))
+        if powershell():
+            self.assertEqual(norm(run_py(self.root, "--pending")), norm(run_ps(self.root, "-Pending")))
 
     def test_orient_new_checks(self):
         out = run_py(self.root, "--orient", "--since", "2020-01-01T00:00")
