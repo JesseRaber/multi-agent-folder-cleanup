@@ -268,6 +268,15 @@ function Test-SecretHintName([string]$name) {
     return $false
 }
 
+function Get-Sha256Hex([string]$path) {
+    # .NET directly, not Get-FileHash: Windows PowerShell 5.1 started from PowerShell 7 inherits a
+    # PSModulePath whose Utility module it cannot load, and Get-FileHash then fails. Throws on error.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        try { return (-join ($sha.ComputeHash($fs) | ForEach-Object { $_.ToString('x2') })) } finally { $fs.Dispose() }
+    } finally { $sha.Dispose() }
+}
 function Get-ContentReadBlockReason([string]$path) {
     $cur = [IO.Path]::GetFullPath($path)
     $inside = $false
@@ -857,7 +866,7 @@ function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target) }
     $current = Read-SmallText $full
     if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target) }
-    try { $digest = (Get-FileHash -LiteralPath $full -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower() }
+    try { $digest = Get-Sha256Hex $full }
     catch { return @('Unverifiable (target unreadable)', $target) }
     $base = [regex]::Match([string]$block.Base, $Hex64Rx)
     $present = @(@($block.New) | ForEach-Object { $current.Contains($_) })
@@ -1929,7 +1938,7 @@ if ($HashFiles) {
             [pscustomobject]@{
                 Path = $f.FullName
                 Name = $f.Name
-                Hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+                Hash = Get-Sha256Hex $f.FullName
             }
         }
         catch {
@@ -2252,7 +2261,7 @@ foreach ($manifestValue in $ExpectedUploadManifest) {
         if ($row.sha256) {
             try {
                 Assert-ContentRead $target
-                $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+                $actualHash = Get-Sha256Hex $target
             } catch { $hashBad++; Write-ManifestDetail ("  HASH UNCHECKED (READ BLOCKED or unreadable) " + $row.path); continue }
             if ($actualHash -ne ([string]$row.sha256).ToLower()) {
                 $hashBad++; Write-ManifestDetail ("  HASH MISMATCH  " + $row.path)
