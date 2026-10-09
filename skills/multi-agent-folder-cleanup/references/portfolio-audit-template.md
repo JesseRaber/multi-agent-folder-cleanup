@@ -31,6 +31,13 @@ Derive the expected set from owner instructions. Do not impose names that the pr
 
 Allowed values: opened; listed; path-validated search result; missing by direct listing; alternate name; unverified.
 
+## Rules matrix
+
+| Project | Rules version | Work routing | Core matches bundled template | Sequential-writer declaration |
+|---|---|---|---|---|
+
+Rules version: the first `Version:` line of the root `AGENTS.md`, or `<version> (by reference)` when the root adopts a rules file by link. Work routing: `yes` when the section 3 "Day-to-day saving and indexing" subsection or the skill name is present (needs rules 3.1.0 or later). Core match: sections 1–12 compared line by line with the bundled `references/project-rules/AGENTS.proposed.md` as `match`, `differs (N lines)` or `unknown` (no template bundled, as in the Gemini Apps and Opal packages; never report `differs` then).
+
 ## Same-name control review
 
 | Name | Paths | Classification | Canonical target | Evidence | Owner decision needed |

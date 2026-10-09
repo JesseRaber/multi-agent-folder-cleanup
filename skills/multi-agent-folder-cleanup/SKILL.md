@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.6.4"
+  version: "1.7.0"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.4 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.7.0 (SKILL.md at <path>; helpers <version>)**.
 
 ## Choose the operating mode
 
@@ -29,6 +29,8 @@ Execute has three mutation types: **move execution** (mounted filesystem, litera
 Read only the files for your mode. Also read [audit-tools.md](references/audit-tools.md) when a filesystem is mounted and you will run the helpers; [connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search or web listings; [portfolio-audit-template.md](references/portfolio-audit-template.md) when the root holds multiple projects; [navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files. Run helpers for routine work; inspect their source only for safety checks, debugging or review.
 
 An agent that can only add files (browser upload, a connector without edit or append) follows **Add-only agents** in [work-mode.md](references/work-mode.md): no new top-level folder, and a `_PROVENANCE.md` beside the upload. To answer who changed a folder, follow **B5 Attribute activity** in [audit-mode.md](references/audit-mode.md).
+
+When the project's rules carry the sequential-writer declaration (one owner, agents one after another), the active agent edits shared records directly with read-back verification and applies leftover `PENDING_*` files whose base still matches (W5). Work with cloud connectors and sync folders by file id, state which view each listing came from, and never leave two live same-name files (W5 **Cloud connectors and sync folders**).
 
 ## Keep authorization narrow
 

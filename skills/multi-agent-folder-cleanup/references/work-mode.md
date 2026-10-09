@@ -7,7 +7,7 @@ The project's adopted instructions win. Where they name other paths or formats, 
 ## W1. Arrive (suggested read budget ~40 KB)
 
 1. Read the root instruction file (`AGENTS.md`, `CLAUDE.md` or the host's equivalent).
-2. Read `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md`, then `PROJECT_INDEX.md` only as far as your task needs.
+2. Read `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md`, then `PROJECT_INDEX.md` only as far as your task needs. Read a large tracker by section or item ID and a journal by its tail; do not read either whole at arrival.
 3. When resuming related work, read the relevant session log's last entries and inspect the sessions folder for newer records if the index is stale. Follow required authority and evidence even when that exceeds the suggested budget.
 4. If scripts can run, check for other writers and recent changes:
 
@@ -20,6 +20,12 @@ On Windows, `python` or `py -3` may replace `python3`; use `powershell.exe -NoPr
 
 It lists recently active session logs and scratch folders, files changed since the latest session started, and changed files the index never names. Times are local modified times: leads, not proof. Without scripts, use available listings and read the relevant recent logs. With connector-only or partial access, state the coverage limit; do not claim a writer is absent from missing activity signals. Use the helper path in the installed skill, not a presumed project-relative scripts directory.
 
+Also check, with the helper or by listing:
+
+- **Sync conflict copies.** `name (1).ext`, `name-<COMPUTER>.ext`, case-only name collisions and, through a connector, same-name siblings with different file ids; also a copy whose original is missing. Reconcile them before editing shared records, and check again before your final answer. Never merge, rename or delete them without the applicable approval.
+- **Undelivered handoffs.** New items in `Incoming/`, and handoffs in sibling projects' `Handoffs/` whose `To:` names this project.
+- **Cloud folders.** For a connector or a synced folder that also exists under another provider, follow [Cloud connectors and sync folders](#cloud-connectors-and-sync-folders) before trusting any listing.
+
 Before expensive or portfolio-wide work, compare the request with the topic, latest outcome and open work in recent session logs. If the same task is active, coordinate rather than duplicate it. If it is complete, reuse its evidence and inspect only changes or gaps. Record the current request promptly in your own session log; that log is the in-progress signal, so do not create a separate shared claim file.
 
 Treat summaries as leads. Verify anything your task depends on against the actual file.
@@ -27,9 +33,10 @@ Treat summaries as leads. Verify anything your task depends on against the actua
 ## W2. Claim your own space
 
 - For a new chat or uncertain writer handoff, create your own log with a generated UUID: `AI_CONTEXT/SESSIONS/YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`. Preserve source-session links separately. Within the same established session and writer, append to that log; do not create one per request. Resume after a restart only with established writer continuity, or follow an evidenced transfer under the project policy. If identity is uncertain, start a linked continuation.
+- Create your session-index row when you create the log, with status `in progress` (W6); refresh it at significant outcomes and close.
 - Use a lowercase tool slug in that filename and the `Tool/runtime` header: `claude`, `claude-code`, `codex`, `antigravity`, `gemini`, `copilot`, `manus`, `opal`, `grok`, or `muse`. An unlisted tool uses its own short lowercase name. Never skip the session log because your tool is unlisted. Use a canonical UUID for the ID segment.
 - Use the project's established format. Include session ID, start time with timezone when known, writer instance, source-chat identity or unavailable, and coverage start. Record each request/outcome with a stable turn ID; verify previous content is preserved and the entry appears once.
-- Keep drafts and temporary work in `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder.
+- Keep drafts and temporary work in `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder. The one exception: after applying another session's pending file under W5, rewrite only that file's `Status:` line.
 - If another writer looks active, do your independent work anyway and be extra careful with shared files (W5).
 
 ## W3. Save new files where the next agent will look
@@ -38,12 +45,14 @@ Write only in your own session log. If another agent's work needs correction, re
 
 | What you made | Where it goes |
 |---|---|
-| Finished deliverable | The project area the index names for that kind of work. No obvious area: the closest existing folder, and say so in the index row. |
+| Finished deliverable | The project area the index names for that kind of work. No obvious area: the closest existing folder, and say so in the index row. Never `AI_CONTEXT/`, which holds continuity records only. |
 | Draft, test output, intermediate data | `AI_CONTEXT/scratch/<your-session-id>/` |
 | Material from another model, chat or person, not yet reviewed | `Incoming/` (or the project's inbox), as a dated folder with a short provenance note. Do not create a new top-level folder for it. |
 | A newer version of an existing file | Edit the file in place when you are authorized to change it. Otherwise save beside it as a proposal and say what it would replace. Never create `final_v2_REAL` siblings. |
+| Your review of another agent's work | A dated file where that agent and the owner will look: beside the reviewed deliverable or in `Incoming/`. Read the other agent's log, scratch and deliverable from the folder, and log the review as a turn in your own log, so the owner can point rather than paste. |
+| A handoff addressed to another project | This project's handoff area with a `To: <project>` line. Also place it, or a pointer, in that project's `Incoming/` when you are authorized to write there; otherwise tell the owner it is undelivered. |
 | A proposed rule or instruction file | A non-loading name such as `AGENTS.proposed.md`, never a live instruction filename |
-| Candidate or release package | Keep candidates in a clearly named candidate/staging area, released artifacts in the release area, and superseded packages in History or `_superseded/`. Never place a same-version candidate beside a released package without an unmistakable status label and canonical pointer. |
+| Candidate or release package | Keep candidates in a clearly named candidate/staging area, released artifacts in the release area, and superseded packages in History or `_superseded/`. Never place a same-version candidate beside a released package without an unmistakable status label and canonical pointer. Keep staged and backup packages as ZIP plus `SHA256SUMS`, not extracted trees; if you must extract one, rename its `SKILL.md`, `AGENTS.md` and similar files to non-loading names. |
 | Credentials and tokens | Do not copy into task outputs or continuity records |
 | Customer-sensitive material needed for the task | Use only the authorized project location and access scope; omit unnecessary private content from logs and indexes |
 
@@ -94,6 +103,10 @@ Shared records are the index, quick context, session index and any file other ag
 
 Before editing, establish a supported conditional update, a cooperating lock covering the relevant writers/devices, or a designated single writer. A local lock does not exclude remote cloud writers. Rereading and hash checks verify integrity; they do not establish exclusive ownership. If coordination is unavailable, save the exact intended edit in your session scratch folder, mark it PENDING in your log, and continue independent work.
 
+**Sequential-writer declaration.** When the adopted rules or quick context carry the owner's declaration that one owner runs agents one after another (Project Rules 3.3.0 section 5 ships it by default), that declaration is the designated-writer coordination: the active agent edits shared records directly under steps 1–4 below and stages PENDING only when the project is declared multi-operator. Only the declaration establishes this; a quiet `--orient` result, an absent lock or an old timestamp never does. If read-back shows a change you did not make, treat it as a conflict and stage your edit (step 4).
+
+Edit shared files in place. Never write a replacement as a second file with the same name in the same folder, and never leave a sync conflict copy (`name (1).ext`) as the result of your save.
+
 Unless the target may contain credentials, first save a byte-for-byte pre-edit copy in your project session scratch area; a tool-private temporary folder is not a durable recovery location. Use a non-loading filename for an instruction-file copy, such as `AGENTS.md.before-<sha8>` or `AGENTS.before.md`, never a literal `AGENTS.md` under scratch. Never copy a credential-bearing file for this purpose. Record the complete before SHA-256, then preserve the target's encoding, line endings and structure while editing. For Markdown tables, keep each row inside the table, with no blank lines, and retain the table's established sort order.
 
 1. Re-read the file immediately before writing.
@@ -103,7 +116,7 @@ Unless the target may contain credentials, first save a byte-for-byte pre-edit c
 
 Do not claim a shared edit is **verified**, **zero loss** or **aligned** unless the applicable hash, diff and structure checks above passed. When `scripts/verify_records.py` is available, run it on every shared record you changed and cite its output line for each file; an ACTIVATED or "verified" record entry without that output, or an equivalent stated check, must say "not verified". When a pre-edit copy is prohibited because the file contains credentials, report that recovery and diff coverage limit instead.
 
-A pending edit must be concrete enough for a later writer to apply without guessing:
+A pending edit must be concrete enough for a later writer to apply without guessing. Save it in your scratch folder as `PENDING_<TARGET>.md`, where `<TARGET>` is the target filename in capitals without its extension (`PENDING_SESSION_INDEX.md`; add `_2`, `_3` for further edits to the same target), with `Status:` as its first line:
 
 ```text
 Status: PENDING
@@ -117,7 +130,19 @@ Reconcile: <condition required before applying>
 
 When coordination becomes available, read the current target, preserve intervening contributions, rebase the proposed edit and verify the save. Record the Applied/superseded/conflicted outcome in your own session log, citing the source session and turn; only the source session's writer appends to that session's log (W3). Leave the staged file in place after applying another session's edit. Removing it is cleanup requiring per-target approval; a blanket "do any cleanup you need" does not approve that deletion. A staged edit is not an applied update, and an old hash never authorizes overwriting newer work.
 
+**Apply leftover pending files.** A qualifying writer (the sequential-writer declaration is present, or other coordination is established) that finds `AI_CONTEXT/scratch/*/PENDING_*` files with `Status: PENDING` applies each one whose `Base` hash still equals the current target, or whose exact old text or anchor still appears exactly once. Verify by read-back as in step 3, rewrite that file's first line to `Status: APPLIED <after-sha8> by <session>/<turn>`, and record the outcome in your own log. Anything else is **Conflicted**: leave it, report it, and do not guess. `--pending` (`-Pending`) lists these files and their state when scripts can run; it reports and never applies.
+
 Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superseded**, **Conflicted** or **Unverifiable**. Compare the current target with the exact proposed change; filename age and the old base hash are not enough. Retain the source-session link and outcome even after the staged payload is no longer actionable.
+
+### Cloud connectors and sync folders
+
+Use this with OneDrive, SharePoint, Google Drive or Graph connectors, and with local sync mirrors of those providers.
+
+- **Say which view you used.** Every listing or folder finding states its view (connector API, local sync mirror, sync client status, download) and the time. When two views disagree, such as local `(1)` names against same-name Drive files, reconcile before proposing moves. When only one view is reachable, say so and act only within what it shows.
+- **Work by file id.** Read, re-download and verify a provider file by its id, never by name. If a name resolves to more than one id, stop and report the ids instead of picking one.
+- **Replace without twins.** When a tool may truncate or cannot edit in place, write the replacement in your own scratch folder, upload it under a unique name, verify its full content or hash by the new id, and give it a `Replaces: <old file id>` header line where the format allows. Retire the old file (History or the provider's trash) only after that verification and within the task's authorization. Never leave two live files with the same name.
+- **One file type per shared record.** If a host can only write a Google Doc, quick context says so and no Markdown twin is written. Record the provider folder id in the record header. A Doc and a Markdown file with the same record name are a finding.
+- **Replicas.** A project may also exist under another provider or parent (for example a Drive snapshot of a OneDrive project). Quick context, or the portfolio root, declares the primary provider and path and lists known replicas with status: mirror, stale snapshot or provider-only. An undeclared copy is a "replica of unknown status": never treat the copy you can reach as canonical because it is the one you can reach.
 
 ## W6. Index what matters, not everything
 
@@ -130,8 +155,8 @@ Reconcile pending edits into exactly one of: **Pending**, **Applied**, **Superse
 - Give important deliverables and authority/instruction files individual discoverable links, even inside a covered folder. Use the established index or its linked topic index. One line: path, purpose, classification (Authority, Current, Deliverable, Evidence, Reference, Backlog, Incoming, History, Scratch), coverage and existence.
 - Folder coverage is enough for routine supporting files and scratch descendants. Add a folder row only when existing navigation does not cover it. Do not add a row for every generated file.
 - Update the row when you supersede a file: mark the old one History/superseded and point it at the new one.
-- Update quick context only when direction, verified state, decisions or next steps changed. Maintain one clearly labeled current-state section: replace stale lines there instead of prepending dated paragraphs. Move useful chronology to session/history records. Aim for about 12 KB (`--orient` flags size and repeated/out-of-order header updates), while retaining active decisions, boundaries and evidence links. Size flags are advisory, not permission to discard context.
-- Keep one session-index row per session. If scripts can run, `--session-index` (`-SessionIndex`) lists missing rows and links to logs that no longer exist, and prints proposed rows. Paste only the rows you checked, using W5.
+- Update quick context only when direction, verified state, decisions or next steps changed. Maintain one clearly labeled current-state section: replace stale lines there instead of prepending dated paragraphs. Move useful chronology to session/history records. Aim for about 12 KB (`--orient` flags size and repeated/out-of-order header updates), while retaining active decisions, boundaries and evidence links. Size flags are advisory, not permission to discard context. While a build or release candidate is in flight, quick context lists the item IDs it already contains, so reviewers do not propose finished work.
+- Keep one session-index row per session, created with the session log (status `in progress`), not at close. If scripts can run, `--session-index` (`-SessionIndex`) lists missing rows and links to logs that no longer exist, and prints proposed rows. Paste only the rows you checked, using W5.
 
 ## W7. Hand off at the end of every request
 
@@ -145,6 +170,7 @@ Before each final answer, so the work survives if the chat stops here:
 - [ ] Quick context updated if the state changed
 - [ ] Every newly proposed, deferred or discovered future task is added to the one canonical tracker (or one exact pending insertion is recorded); no competing task list was created
 - [ ] Session-index row created at session creation or refreshed for a significant outcome/close; routine turns need only their log entry
+- [ ] No new sync conflict copy or same-name twin left by your saves (W1, W5)
 - [ ] Next step written where the next agent will see it
 
 Mark deferred navigation explicitly and link its exact pending edit. If you cannot save to the project, give the owed session entry as a copyable checkpoint, including session/turn, request, outcome, changed files and reason. A local sandbox copy does not prove delivery to the project destination.

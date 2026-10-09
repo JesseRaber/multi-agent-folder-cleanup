@@ -4,7 +4,7 @@ Use this when the target is reachable only through OneDrive, SharePoint, Graph, 
 
 ## Access and limits
 
-Record the provider, root URL, access route, and whether a mounted path exists. Mark hashes, hydration, OS path length, reparse points, and byte comparison unverified when the route cannot measure them.
+Record the provider, root URL, access route, and whether a mounted path exists. Label every listing with its view (connector API, local sync mirror, sync client, download) and time; when two views disagree, reconcile them before proposing moves, and when only one is reachable, say so. Mark hashes, hydration, OS path length, reparse points, and byte comparison unverified when the route cannot measure them.
 
 Connector access supports Audit and may support approved record-only or additive-intake execution. It never supports verified move execution because hydration, Windows path length, source hashes, and staging are unavailable.
 
@@ -49,6 +49,12 @@ Classify each as opened, directly listed, path-validated search result, missing 
 A handoff, roadmap, journal, or report establishes documentary state. Operational state requires current repository, provider, deployment, database, runtime, device, or test evidence. Use **documented as** when operational verification is unavailable.
 
 For material conclusions, keep a compact claim table with columns `Claim`, `State` (`Documented`, `Observed`, `Inferred` or `Unknown`), `Evidence`, `Scope/date`, and `What would verify it`. Do not collapse an inference into an observation because several documents repeat it.
+
+## Same-name files and replicas
+
+- Identify files by provider file id. Read, re-download and verify by id; when one name resolves to several ids in one folder, report every id as a same-name sibling finding and stop the affected inspection or mutation.
+- Report a Doc and a Markdown file with the same record name as a connector-profile finding: one canonical file type per shared record.
+- When a project name also exists under another provider or parent and no declaration names the primary copy, report it as a "replica of unknown status". Never treat the reachable copy as canonical.
 
 ## Same-name controls
 
