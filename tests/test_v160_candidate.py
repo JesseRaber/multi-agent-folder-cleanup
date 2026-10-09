@@ -55,7 +55,7 @@ class CandidateGuidanceTests(unittest.TestCase):
         self.assertIn("names every known unresolved item", work)
         self.assertIn("Private links, local or cloud paths", principles)
         self.assertIn("ask the owner before", principles)
-        self.assertIn("ordinary business details", proposed)
+        self.assertIn("names and business details are not", proposed)
 
     def test_crlf_markdown_table_insert_is_idempotent_and_byte_preserving(self) -> None:
         original = (

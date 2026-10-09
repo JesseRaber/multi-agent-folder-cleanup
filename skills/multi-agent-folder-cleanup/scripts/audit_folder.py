@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "1.7.0"  # must equal SKILL.md metadata.version
+VERSION = "1.7.1"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -664,6 +664,7 @@ CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
 # "Sequential writers:". Prose that merely describes the rule does not count.
 DECLARATION_RE = re.compile(r"(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:")
 RULES_VERSION_RE = re.compile(r"(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)")
+PLACEHOLDER_RE = re.compile(r"<(?![A-Za-z][A-Za-z0-9+.-]*:)[A-Za-z][^<>\n]{0,80}>")
 STATUS_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)")
 HEX64_RE = re.compile(r"\b[0-9a-fA-F]{64}\b")
 TO_LINE_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$")
@@ -933,11 +934,28 @@ def declaration_sources(project, quick_rel="AI_CONTEXT/PROJECT_QUICK_CONTEXT.md"
 
 def rules_core(text):
     lines = text.splitlines()
-    start = next((i for i, ln in enumerate(lines) if re.match(r"^## 1\.", ln)), None)
+    # Rules 4.0.0 adds section 0 to the shared core; 3.x cores start at section 1.
+    start = next((i for i, ln in enumerate(lines) if re.match(r"^## 0\.", ln)), None)
+    if start is None:
+        start = next((i for i, ln in enumerate(lines) if re.match(r"^## 1\.", ln)), None)
     if start is None:
         return None
     end = next((i for i in range(start + 1, len(lines)) if re.match(r"^## 13\.", lines[i])), len(lines))
     return [ln.strip() for ln in lines[start:end] if ln.strip()]
+
+
+def section13_complete(text):
+    """'yes' when a section 13 exists with no <placeholder> left; 'n/a' without one."""
+    lines = text.splitlines()
+    start = next((i for i, ln in enumerate(lines) if re.match(r"^## 13\.", ln)), None)
+    if start is None:
+        return "n/a"
+    end = next((i for i in range(start + 1, len(lines)) if re.match(r"^## ", lines[i])), len(lines))
+    body = "\n".join(lines[start + 1:end])
+    holes = PLACEHOLDER_RE.findall(body)
+    if not re.search(r"(?im)^\s*Adopted\s*:", body):
+        return "no (no Adopted: line)"
+    return "yes" if not holes else f"no ({len(holes)} placeholders)"
 
 
 def core_difference(a, b):
@@ -964,12 +982,12 @@ def template_core():
 
 
 def rules_info(project, tcore):
-    """(rules version, work routing, core match, sequential writer) for one project."""
+    """(rules version, work routing, core match, sequential writer, section 13) for one project."""
     agents = os.path.join(project, "AGENTS.md")
     text = read_small_text(agents) if os.path.isfile(agents) else None
     seq = "yes" if declaration_sources(project) else "no"
     if text is None:
-        return "n/a", "n/a", "n/a", seq
+        return "n/a", "n/a", "n/a", seq, "n/a"
     source, by_ref = text, ""
     m = RULES_VERSION_RE.search(text)
     if not m:
@@ -993,7 +1011,7 @@ def rules_info(project, tcore):
     else:
         n = core_difference(core, tcore)
         match = "match" if n == 0 else f"differs ({n} lines)"
-    return version, routing, match, seq
+    return version, routing, match, seq, section13_complete(source)
 
 
 def journal_retired(path, root, rules_major, context_text):
@@ -1142,6 +1160,17 @@ SESSION_NAME_RE = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.md$")
 CANONICAL_TOOL_SLUGS = frozenset(("claude", "claude-code", "codex", "antigravity",
                                   "gemini", "copilot", "manus", "opal", "grok", "muse"))
+CLOSE_ENTRY_RE = re.compile(
+    r"^\s*(?:[-*#]+\s*)?\**\s*(?:Session\s+(?:closed|close)\b|Closed\s*:|Close\s*:|Status\s*:\s*\**\s*closed\b)",
+    re.MULTILINE | re.IGNORECASE)
+CLOSE_TITLE_RE = re.compile(r"(?i)(?:\bsession\s+clos(?:e|ed|ing)\b|\|\s*(?:session\s+)?clos(?:e|ed)\s*$)")
+FINISHED_STATUSES = frozenset(("completed", "complete", "closed", "done", "finished",
+                               "abandoned", "superseded", "stopped", "ended"))
+GENERIC_RUNTIME_WORDS = frozenset(("desktop", "app", "cli", "web", "ide", "device", "cloud", "session",
+                                   "powershell", "python", "windows", "mac", "linux", "agent",
+                                   "local", "user", "chat", "the"))
+SLUG_LINE_RE = re.compile(r"(?im)^\s*Tool slugs in use\s*:\s*(.+)$")
+WINDOW_LINE_RE = re.compile(r"(?im)^\s*Active-writer window\s*:\s*(\d+)\s*min")
 SESSION_FIELD_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
@@ -1210,7 +1239,13 @@ def read_small_text(path, limit=SESSION_READ_LIMIT):
     if not content_read_allowed(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        # Same byte-order-mark detection as the PowerShell StreamReader: a UTF-16 log
+        # (e.g. written by Windows PowerShell 5.1) must parse identically in both helpers.
+        with open(path, "rb") as fh:
+            head = fh.read(3)
+        encoding = ("utf-16" if head[:2] in (b"\xff\xfe", b"\xfe\xff")
+                    else "utf-8-sig" if head == b"\xef\xbb\xbf" else "utf-8")
+        with open(path, "r", encoding=encoding, errors="replace") as fh:
             text = fh.read(limit + 1)
             if len(text) > limit:
                 print(f"  read incomplete (over {limit} characters): {os.path.basename(path)}; not parsed")
@@ -1233,6 +1268,7 @@ def load_sessions(root, sessions_rel):
         names = sorted(os.listdir(sdir))
     except OSError:
         return sdir, None, nonstandard, ["UNAVAILABLE (listing failed)"]
+    declared_slugs = set(scope_info(root)["slugs"])
     for name in names:
         full = os.path.join(sdir, name)
         if not name.lower().endswith(".md") or not os.path.isfile(full):
@@ -1249,7 +1285,8 @@ def load_sessions(root, sessions_rel):
             nonstandard.append(name + " (no session UUID; not treated as a session log)")
             continue
         sid = uid.group(0).lower()
-        tool = fields.get("tool/runtime") or (m.group(3) if m else "unknown")
+        header = re.sub(r"\s+", " ", fields.get("tool/runtime") or "").strip()
+        tool = header or (m.group(3) if m else "unknown")
         tool = tool.split("(")[0].strip() or "unknown"
         topic = m.group(4).replace("-", " ") if m else os.path.splitext(name)[0]
         start_value = next((fields[k] for k in ("started", "start", "start time")
@@ -1279,10 +1316,12 @@ def load_sessions(root, sessions_rel):
             continue
         if not m:
             nonstandard.append(name + " (nonstandard filename)")
-        elif m.group(3) not in CANONICAL_TOOL_SLUGS:
+        elif m.group(3) not in CANONICAL_TOOL_SLUGS and m.group(3) not in declared_slugs:
             nonstandard.append(name + " (nonstandard tool slug)")
         sessions.append({
             "name": name, "id": sid, "tool": tool, "topic": topic,
+            "slug": (m.group(3).lower() if m else ""), "header": header,
+            "closed": is_closed_log(text),
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
             "last_time": last_time, "mtime": mtime, "start_source": start_source,
             "filename_start": filename_start,
@@ -1293,6 +1332,123 @@ def load_sessions(root, sessions_rel):
     sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"],
                                  s["name"].lower(), s["name"]))
     return sdir, sessions, nonstandard, blocked
+
+
+def is_closed_log(text):
+    """Closed only when the LAST turn closes the session or a close entry follows the last
+    turn heading; an earlier close followed by more turns means the session resumed."""
+    heads = list(TURN_HEAD_RE.finditer(text))
+    if not heads:
+        return bool(CLOSE_ENTRY_RE.search(text))
+    last = heads[-1]
+    return bool(CLOSE_TITLE_RE.search(last.group(2)) or CLOSE_ENTRY_RE.search(text, last.start()))
+
+
+def scope_info(root):
+    """Section 13 values the helpers use: declared tool slugs and the active-writer window."""
+    text = read_small_text(os.path.join(root, "AGENTS.md")) if os.path.isfile(
+        os.path.join(root, "AGENTS.md")) else None
+    slugs, window = [], None
+    if text:
+        m = SLUG_LINE_RE.search(text)
+        if m:
+            for item in re.split(r"[;,]", m.group(1)):
+                key = item.split("=")[0].split("\u2192")[0].split("->")[0].strip().strip("`").lower()
+                if re.fullmatch(r"[a-z0-9][a-z0-9-]*", key or ""):
+                    slugs.append(key)
+        w = WINDOW_LINE_RE.search(text)
+        if w:
+            window = int(w.group(1))
+    return {"slugs": slugs, "window": window}
+
+
+def runtime_name(header):
+    """The runtime part of a Tool/runtime header. Model, machine, connector and surface detail
+    (parentheses, text after , ; / ` | or ' on '/' via '/' - ', and generic surface words) is dropped,
+    so 'codex desktop, gpt-x' and 'codex' agree while 'grok' and 'grok bot' do not."""
+    text = re.sub(r"\([^)]*\)", " ", (header or "").lower())
+    text = re.split(r"[,;/`|\u2013\u2014]| on | via | - ", text)[0]
+    words = [w for w in re.findall(r"[a-z0-9][a-z0-9.-]*", text) if w not in GENERIC_RUNTIME_WORDS]
+    return " ".join(words)
+
+
+def slug_header_variants(sessions):
+    """{slug: sorted distinct Tool/runtime headers} where one slug carries several (R228)."""
+    seen = {}
+    for s in sessions:
+        runtime = runtime_name(s["header"])
+        if s["slug"] and runtime:
+            seen.setdefault(s["slug"], set()).add(runtime)
+    return {k: sorted(v) for k, v in seen.items() if len(v) > 1}
+
+
+def print_slug_variants(sessions, limited):
+    variants = slug_header_variants(sessions)
+    print(f"  tool slugs used with more than one Tool/runtime header: {len(variants)}"
+          " (leads: one slug per runtime; a different runtime never shares one; consider <runtime>-<agent>)")
+    for slug in limited(sorted(variants)):
+        print(f"    {slug}: " + " | ".join(h[:60] for h in variants[slug][:4]))
+    return len(variants)
+
+
+def index_statuses(index_text):
+    """{session id: True for an 'in progress' row, False for a row whose status cell is a
+    finished state}. Rows with no recognizable status cell are left out (unknown)."""
+    out = {}
+    for line in (index_text or "").splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        cells = [c.strip().strip("*").strip().lower() for c in line.strip().strip("|").split("|")]
+        if "in progress" in cells:
+            state = True
+        elif any(c in FINISHED_STATUSES for c in cells):
+            state = False
+        else:
+            continue
+        for uid in UUID_RE.findall(line):
+            out[uid.lower()] = state
+    return out
+
+
+def newest_file_time(folder, limit=2000):
+    """Newest modified time of a file under folder (files, not folder times; bounded)."""
+    newest, seen = None, 0
+    for base, dirs, files in os.walk(folder):
+        dirs[:] = [d for d in dirs if not os.path.islink(os.path.join(base, d))]
+        for f in files:
+            seen += 1
+            if seen > limit:
+                return newest
+            try:
+                t = os.stat(os.path.join(base, f)).st_mtime
+            except OSError:
+                continue
+            newest = t if newest is None or t > newest else newest
+    return newest
+
+
+def provenance_pending(root):
+    """[(rel path, PENDING lines not marked APPLIED)] for Incoming/*/_PROVENANCE.md (R232)."""
+    out = []
+    inc = os.path.join(root, "Incoming")
+    try:
+        children = sorted((e for e in os.scandir(inc) if e.is_dir(follow_symlinks=False)),
+                          key=lambda e: (e.name.lower(), e.name))
+    except OSError:
+        children = []
+    for child in children:
+        try:
+            names = sorted(n for n in os.listdir(child.path) if n.lower() == "_provenance.md")
+        except OSError:
+            continue
+        for n in names:
+            t = read_small_text(os.path.join(child.path, n)) or ""
+            rows = [ln.strip() for ln in t.splitlines()
+                    if not ln.lstrip().startswith("#")  # a heading names a section, not a row
+                    and re.search(r"\bPENDING\b", ln) and not re.search(r"\bAPPLIED\b", ln)]
+            if rows:
+                out.append((f"Incoming/{child.name}/{n}", rows))
+    return out
 
 
 def _md_cell(value):
@@ -1356,12 +1512,14 @@ def report_session_index(root, args, limited):
     print(f"  nonstandard session filenames: {len(nonstandard)}")
     for item in limited(nonstandard):
         print(f"    {item}")
+    slug_variants = print_slug_variants(sessions, limited)
     if blocked:
         print(f"  session logs not parsed (blocked, unreadable or incomplete): {len(blocked)}")
         for item in limited(blocked):
             print(f"    {item}")
     return {"sessions missing from index": len(missing),
-            "index links to missing logs": len(set(stale))}
+            "index links to missing logs": len(set(stale)),
+            "slugs with several headers": slug_variants}
 
 
 def report_orient(root, args, limited):
@@ -1403,7 +1561,34 @@ def report_orient(root, args, limited):
         print(f"  quick context {args.quick_context}: NOT FOUND")
 
     sdir, sessions, _nonstandard, _blocked = load_sessions(root, args.sessions_dir)
-    active = []
+    scope = scope_info(root)
+    if args.active_minutes is not None:
+        minutes, window_src = args.active_minutes, "--active-minutes"
+    elif scope["window"] is not None:
+        minutes, window_src = scope["window"], "AGENTS.md 'Active-writer window:' line"
+    else:
+        minutes, window_src = 30, "default; no 'Active-writer window:' line"
+    window = minutes * 60
+    idx_full = os.path.join(root, *args.session_index_file.replace("\\", "/").split("/"))
+    statuses = index_statuses(read_small_text(idx_full) if os.path.isfile(idx_full) else "")
+    scratch_rel = args.scratch_dir.replace("\\", "/")
+    scratch_full = os.path.join(root, *scratch_rel.split("/"))
+    scratch_times = {}
+    if os.path.isdir(scratch_full):
+        for name in sorted(os.listdir(scratch_full)):
+            p = os.path.join(scratch_full, name)
+            if os.path.isdir(p) and not os.path.islink(p):
+                scratch_times[name] = newest_file_time(p)
+    mine = args.session_id.lower() if args.session_id else None
+
+    def is_closed(sess):
+        return sess["closed"] or statuses.get(sess["id"]) is False
+
+    def recent_scratch(sid):
+        return any(n.lower().startswith(sid) and t is not None and now - t <= window
+                   for n, t in scratch_times.items())
+
+    active, closed_recent, idle_open = [], [], []
     sessions_available = sessions is not None
     if sessions is None:
         print(f"  sessions folder {args.sessions_dir}: {_blocked[0]} (coverage unavailable)")
@@ -1414,40 +1599,46 @@ def report_orient(root, args, limited):
         print(f"  recent sessions (of {len(sessions)}):")
         for s in limited(recent[:5]):
             print(f"    {work_activity(s)}  {s['tool']}  {s['id'][:8]}  "
-                  f"{s['topic']}  [{s['turns']} turns] {s['last_title'][:70]}")
-        window = args.active_minutes * 60
-        active = [s for s in sessions if now - s["mtime"] <= window]
+                  f"{s['topic']}  [{s['turns']} turns]"
+                  + ("  closed" if is_closed(s) else "") + f" {s['last_title'][:70]}")
+        for s in sessions:
+            if mine and s["id"].startswith(mine):
+                continue
+            fresh = now - s["mtime"] <= window or recent_scratch(s["id"])
+            if fresh and is_closed(s):
+                closed_recent.append(s)
+            elif fresh:
+                active.append(s)
+            elif statuses.get(s["id"]) is True and not s["closed"]:
+                idle_open.append(s)
     if _blocked and sessions_available:
         print(f"  session logs not parsed (blocked, unreadable or incomplete): {len(_blocked)}")
     duplicates = duplicate_session_ids(sessions)
     if duplicates:
         print(f"  duplicate session IDs: {len(duplicates)}; excluded from baseline selection")
-    scratch_rel = args.scratch_dir.replace("\\", "/")
-    scratch_full = os.path.join(root, *scratch_rel.split("/"))
-    active_scratch = []
-    if os.path.isdir(scratch_full):
-        for name in sorted(os.listdir(scratch_full)):
-            p = os.path.join(scratch_full, name)
-            if os.path.isdir(p) and not os.path.islink(p):
-                try:
-                    if now - os.stat(p).st_mtime <= args.active_minutes * 60:
-                        active_scratch.append(name)
-                except OSError:
-                    pass
-    if args.session_id:
-        mine = args.session_id.lower()
-        active = [s for s in active if not s["id"].startswith(mine)]
-        active_scratch = [n for n in active_scratch if not n.lower().startswith(mine)]
+    known = {s["id"] for s in sessions}
+    closed_ids = {s["id"] for s in sessions if is_closed(s)}
+    unpaired_scratch = [n for n, t in scratch_times.items()
+                        if t is not None and now - t <= window
+                        and not (mine and n.lower().startswith(mine))
+                        and not any(n.lower().startswith(sid) for sid in known)]
     active_ids = {s["id"] for s in active}
-    paired_scratch = [n for n in active_scratch
-                      if any(n.lower().startswith(sid) for sid in active_ids)]
-    unpaired_scratch = [n for n in active_scratch if n not in paired_scratch]
-    print(f"  possibly active writers (changed in last {args.active_minutes} min): "
+    print(f"  active-writer window: {minutes} min ({window_src}); activity = session log or"
+          " scratch file modified times, not folder times")
+    print(f"  possibly active writers (changed in last {minutes} min): "
           f"{len(active_ids)} distinct sessions, {len(unpaired_scratch)} unpaired scratch folders")
     for s in limited(active):
         print(f"    session {s['id'][:8]} {s['tool']} {s['topic']}")
     for name in limited(unpaired_scratch):
         print(f"    unpaired scratch/{name}")
+    if closed_recent:
+        print(f"  closed sessions with recent file activity (not active writers): {len(closed_recent)}")
+        for s in limited(closed_recent):
+            print(f"    session {s['id'][:8]} {s['tool']} {s['topic']}")
+    if idle_open:
+        print(f"  'in progress' index rows with no file activity in the window (not active writers): {len(idle_open)}")
+    print("  closed = close entry in the log or session-index status other than 'in progress'.")
+    print("  An owner handoff message also closes a session; this helper cannot see chat.")
     declared = declaration_sources(root, args.quick_context.replace("\\", "/"))
     if declared:
         print(f"  coordination: sequential-writer declaration found ({', '.join(declared)})")
@@ -1458,6 +1649,15 @@ def report_orient(root, args, limited):
         print("       stage exact pending edits in your scratch if coordination is unavailable.")
         if declared:
             print("       The declaration covers agents working one after another, not overlap: stage shared-record edits this session.")
+    slug_variants = print_slug_variants(sessions, limited)
+    prov = provenance_pending(root)
+    print(f"  _PROVENANCE.md files with PENDING rows: {len(prov)}"
+          + (" (list and apply state: --pending)" if prov else ""))
+    for r, rows in limited(prov):
+        print(f"    {r} ({len(rows)} PENDING lines)")
+    if os.name == "nt":
+        print("  Windows: writing shared records from Windows PowerShell 5.1? Never use '>>' or")
+        print("    Set-Content/Out-File without -Encoding utf8, and replace only your own session-ID line (W5).")
 
     # Declared startup read order (README_FIRST links, in order).
     read_order_kb = "none found"
@@ -1586,6 +1786,8 @@ def report_orient(root, args, limited):
     else:
         print(f"  index {', '.join(index_paths)}: NOT FOUND or unreadable; unindexed check skipped")
     return {"possibly active writers": len(active_ids) + len(unpaired_scratch),
+            "slugs with several headers": slug_variants,
+            "provenance PENDING files": len(prov),
             "changed since baseline": len(changed),
             "changed but unnamed in index": len(unindexed) if index_text else "n/a",
             "quick context over size": "yes" if qc_flag else "no",
@@ -1616,26 +1818,14 @@ def report_pending(root, args, limited):
     applicable = sum(1 for s in states if s.startswith("Pending ("))
     applied = sum(1 for s in states if s == "Applied (not marked)")
     malformed = missing
-    prov = []
-    inc = os.path.join(root, "Incoming")
-    try:
-        children = sorted((e for e in os.scandir(inc) if e.is_dir(follow_symlinks=False)),
-                          key=lambda e: (e.name.lower(), e.name))
-    except OSError:
-        children = []
-    for child in children:
-        try:
-            names = [n for n in os.listdir(child.path) if n.lower() == "_provenance.md"]
-        except OSError:
-            continue
-        for n in names:
-            t = read_small_text(os.path.join(child.path, n)) or ""
-            k = len(re.findall(r"PENDING", t))
-            if k:
-                prov.append(f"Incoming/{child.name}/{n} ({k} PENDING mentions)")
-    print(f"  _PROVENANCE.md files with PENDING rows: {len(prov)}")
-    for r in limited(prov):
-        print(f"    {r}")
+    prov = provenance_pending(root)
+    print(f"  _PROVENANCE.md files with PENDING rows: {len(prov)}"
+          " (lines marked PENDING and not APPLIED; apply under W5, then mark"
+          " 'APPLIED <hash8> by <session>/<turn>')")
+    for r, rows in limited(prov):
+        print(f"    {r} ({len(rows)} PENDING lines)")
+        for row in limited(rows):
+            print(f"      {row[:160]}")
     if declaration_sources(root, args.quick_context.replace("\\", "/")):
         print("  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5).")
     print("  Conflicted means compare by hand: the edit may already be in the target in other words,")
@@ -1727,8 +1917,9 @@ def main():
     work.add_argument("--quick-context", default="AI_CONTEXT/PROJECT_QUICK_CONTEXT.md")
     work.add_argument("--quick-context-kb", type=int, default=12,
                       help="Flag quick context above this size (replace stale lines, don't append).")
-    work.add_argument("--active-minutes", type=int, default=30,
-                      help="Session logs or scratch folders changed this recently suggest an active writer.")
+    work.add_argument("--active-minutes", type=int, default=None,
+                      help="Active-writer window in minutes (default: the AGENTS.md 'Active-writer window:' "
+                           "line, else 30). Closed sessions are never listed as possibly active.")
     work.add_argument("--session-id",
                       help="Your own session ID (or prefix), left out of the possibly-active list.")
     work.add_argument("--since", help="ISO time baseline for --orient (default: start of latest session).")
@@ -2369,16 +2560,17 @@ def run_report(args, root, coverage_pairs):
         rows = portfolio_rows(root, args.entrypoint)
         _tc, tver = template_core()
         print("  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates"
-              " | Rules version | Work routing | Core match | Sequential writer | Entrypoints present")
+              " | Rules version | Work routing | Core match | Sequential writer | Section 13 complete"
+              " | Entrypoints present")
         if rows:
-            for name, count, present, state, sessions, missing, pending, ver, routing, core, seq in rows:
+            for name, count, present, state, sessions, missing, pending, ver, routing, core, seq, s13 in rows:
                 value = ", ".join(present) if present else "(none detected)"
                 print(f"  {name} | root-level | {state} | {count} | {sessions} | {missing} | {pending}"
-                      f" | {ver} | {routing} | {core} | {seq} | {value}")
+                      f" | {ver} | {routing} | {core} | {seq} | {s13} | {value}")
         else:
             print("  no immediate child directories")
         print("  Presence does not determine authority or operational state.")
-        print("  Core match compares sections 1-12 with the bundled template"
+        print("  Core match compares sections 0-12 (1-12 before Rules 4.0.0) with the bundled template"
               + (f" {tver}" if tver else " (not bundled in this package: unknown)") + ".")
         names = [n for n, *_ in rows]
         def base_name(n):

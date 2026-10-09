@@ -138,6 +138,8 @@ class V153CandidateTests(unittest.TestCase):
                            "Outcome: verified outcome\n", encoding="utf-8")
             (root / "AI_CONTEXT/scratch" / sid).mkdir(parents=True)
             (root / "AI_CONTEXT/scratch/unpaired").mkdir()
+            # v1.7.1 (R229): activity is file times, not folder times; an empty folder is not activity.
+            (root / "AI_CONTEXT/scratch/unpaired/note.txt").write_text("x\n", encoding="utf-8")
             for name, result in run_audits(root, "--orient", "--session-index", "--active-minutes", "100000"):
                 with self.subTest(helper=name):
                     self.assertEqual(result.returncode, 0, result.stderr)

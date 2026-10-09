@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.7.0"
+  version: "1.7.1"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.7.0 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.7.1 (SKILL.md at <path>; helpers <version>)**.
 
 ## Choose the operating mode
 
@@ -48,12 +48,12 @@ Discover root/scoped instruction files, owner directives, startup READMEs and ac
 
 Verify every required entrypoint exists. A missing entrypoint outranks ordinary duplicates because the next agent starts blind.
 
-Adopted project logging requirements govern in Audit and Plan as well as Execute. Do not reduce an every-request policy to substantive-only journaling. Two conditions prevent a write:
+Adopted project logging requirements govern in Audit and Plan as well as Execute. Do not reduce an every-request policy to substantive-only journaling. Read-only limits task files, not your session log. Two conditions prevent a write:
 
-- the user explicitly requested a read-only audit; or
+- the owner expressly prohibited all project writes, including logs; or
 - recording is unavailable or cannot be saved safely with the project's required coordination and immediate content verification.
 
-For an explicit read-only request, make no project writes, including logs. If only continuity or a shared record cannot be saved safely, defer that write and continue independent authorized work. Provide the owed checkpoint and explain the limitation. Never replace a shared journal merely to simulate append.
+Then make no project writes, give the owed `NOT SAVED TO PROJECT` checkpoint line and explain the limitation. If only a shared record cannot be saved safely, defer that write and continue independent authorized work. Never replace a shared journal merely to simulate append.
 
 Measure journal size. Above the configured threshold (default 100 KB), flag it and propose rotation into dated history plus a short current-tail file. Rotation requires approval and must preserve every entry.
 

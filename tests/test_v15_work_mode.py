@@ -257,9 +257,10 @@ class WorkModeTests(unittest.TestCase):
 
     def test_optional_rules_carry_single_tracker_requirement(self):
         text = (REPO / "skills/multi-agent-folder-cleanup/references/project-rules/AGENTS.proposed.md").read_text(encoding="utf-8")
-        for phrase in ("exactly one authoritative project-wide tracker",
-                       "Do not create a competing roadmap", "one exact pending tracker insertion",
-                       "Delegated helpers return proposed rows"):
+        # Rules 4.0.0 wording (sections 7 and 10).
+        for phrase in ("**Tracker:** exactly one per project",
+                       "Competing lists are never created", "Nothing of that kind lives only in a log",
+                       "Delegated helpers return evidence to the coordinating session"):
             self.assertIn(phrase, text)
 
     def test_v151_decision_invariants_are_routed_to_relevant_modes(self):

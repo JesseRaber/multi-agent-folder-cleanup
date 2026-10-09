@@ -117,7 +117,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.7.0'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.7.1'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -268,6 +268,15 @@ function Test-SecretHintName([string]$name) {
     return $false
 }
 
+function Get-Sha256Hex([string]$path) {
+    # .NET directly, not Get-FileHash: Windows PowerShell 5.1 started from PowerShell 7 inherits a
+    # PSModulePath whose Utility module it cannot load, and Get-FileHash then fails. Throws on error.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $fs = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+        try { return (-join ($sha.ComputeHash($fs) | ForEach-Object { $_.ToString('x2') })) } finally { $fs.Dispose() }
+    } finally { $sha.Dispose() }
+}
 function Get-ContentReadBlockReason([string]$path) {
     $cur = [IO.Path]::GetFullPath($path)
     $inside = $false
@@ -634,6 +643,7 @@ $ConflictHostRx = '^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$'
 # "Sequential writers:". Prose that merely describes the rule does not count.
 $DeclarationRx = '(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:'
 $RulesVersionRx = '(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)'
+$PlaceholderRx = '<(?![A-Za-z][A-Za-z0-9+.-]*:)[A-Za-z][^<>\n]{0,80}>'
 $StatusLineRx = '^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)'
 $Hex64Rx = '\b[0-9a-fA-F]{64}\b'
 $ToLineRx = '(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$'
@@ -856,7 +866,7 @@ function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target) }
     $current = Read-SmallText $full
     if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target) }
-    try { $digest = (Get-FileHash -LiteralPath $full -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower() }
+    try { $digest = Get-Sha256Hex $full }
     catch { return @('Unverifiable (target unreadable)', $target) }
     $base = [regex]::Match([string]$block.Base, $Hex64Rx)
     $present = @(@($block.New) | ForEach-Object { $current.Contains($_) })
@@ -926,13 +936,28 @@ function Get-DeclarationSources([string]$project, [string]$quickRel = 'AI_CONTEX
 function Get-RulesCore([string]$text) {
     $lines = $text -split "`n"
     $start = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 1\.') { $start = $i; break } }
+    # Rules 4.0.0 adds section 0 to the shared core; 3.x cores start at section 1.
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 0\.') { $start = $i; break } }
+    if ($start -lt 0) { for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 1\.') { $start = $i; break } } }
     if ($start -lt 0) { return $null }
     $end = $lines.Count
     for ($i = $start + 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 13\.') { $end = $i; break } }
     $core = [Collections.Generic.List[string]]::new()
     for ($i = $start; $i -lt $end; $i++) { $t = $lines[$i].Trim(); if ($t) { $core.Add($t) } }
     return , $core.ToArray()
+}
+function Get-Section13Complete([string]$text) {
+    $lines = $text -split "\r?\n"
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 13\.') { $start = $i; break } }
+    if ($start -lt 0) { return 'n/a' }
+    $end = $lines.Count
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## ') { $end = $i; break } }
+    $body = if ($end -gt $start + 1) { ($lines[($start + 1)..($end - 1)]) -join "`n" } else { '' }
+    $holes = [regex]::Matches($body, $PlaceholderRx).Count
+    if (-not [regex]::IsMatch($body, '(?im)^\s*Adopted\s*:')) { return 'no (no Adopted: line)' }
+    if ($holes -eq 0) { return 'yes' }
+    return "no ($holes placeholders)"
 }
 function Get-CoreDifference([string[]]$a, [string[]]$b) {
     $c = @{}
@@ -955,7 +980,7 @@ function Get-RulesInfo([string]$project, $tcore) {
     $agents = [IO.Path]::Combine($project, 'AGENTS.md')
     $text = if (Test-Path -LiteralPath $agents -PathType Leaf) { Read-SmallText $agents } else { $null }
     $seq = if (@(Get-DeclarationSources $project).Count) { 'yes' } else { 'no' }
-    if ($null -eq $text) { return @('n/a', 'n/a', 'n/a', $seq) }
+    if ($null -eq $text) { return @('n/a', 'n/a', 'n/a', $seq, 'n/a') }
     $source = $text; $byRef = ''
     $m = [regex]::Match($text, $RulesVersionRx)
     if (-not $m.Success) {
@@ -979,7 +1004,89 @@ function Get-RulesInfo([string]$project, $tcore) {
         $n = Get-CoreDifference $core $tcore
         $match = if ($n -eq 0) { 'match' } else { "differs ($n lines)" }
     }
-    return @($version, $routing, $match, $seq)
+    return @($version, $routing, $match, $seq, (Get-Section13Complete $source))
+}
+$CloseEntryRx = '(?im)^\s*(?:[-*#]+\s*)?\**\s*(?:Session\s+(?:closed|close)\b|Closed\s*:|Close\s*:|Status\s*:\s*\**\s*closed\b)'
+$CloseTitleRx = '(?i)(?:\bsession\s+clos(?:e|ed|ing)\b|\|\s*(?:session\s+)?clos(?:e|ed)\s*$)'
+$FinishedStatuses = @('completed', 'complete', 'closed', 'done', 'finished', 'abandoned', 'superseded', 'stopped', 'ended')
+function Get-ScopeInfo([string]$project) {
+    # Section 13 values the helpers use: declared tool slugs and the active-writer window.
+    $agents = [IO.Path]::Combine($project, 'AGENTS.md')
+    $text = if (Test-Path -LiteralPath $agents -PathType Leaf) { Read-SmallText $agents } else { $null }
+    $slugs = [Collections.Generic.List[string]]::new(); $window = $null
+    if ($text) {
+        $m = [regex]::Match($text, '(?im)^\s*Tool slugs in use\s*:\s*(.+)$')
+        if ($m.Success) {
+            foreach ($item in ($m.Groups[1].Value -split '[;,]')) {
+                $key = $item.Split('=')[0].Split([char]0x2192)[0]
+                $ix = $key.IndexOf('->'); if ($ix -ge 0) { $key = $key.Substring(0, $ix) }
+                $key = $key.Trim().Trim('`').ToLowerInvariant()
+                if ($key -cmatch '^[a-z0-9][a-z0-9-]*$') { $slugs.Add($key) }
+            }
+        }
+        $w = [regex]::Match($text, '(?im)^\s*Active-writer window\s*:\s*(\d+)\s*min')
+        if ($w.Success) { $window = [int]$w.Groups[1].Value }
+    }
+    return [pscustomobject]@{ Slugs = @($slugs); Window = $window }
+}
+$GenericRuntimeWords = @('desktop', 'app', 'cli', 'web', 'ide', 'device', 'cloud', 'session', 'powershell', 'python', 'windows', 'mac', 'linux', 'agent', 'local', 'user', 'chat', 'the')
+function Get-RuntimeName([string]$header) {
+    # The runtime part of a Tool/runtime header (same rules as runtime_name in audit_folder.py).
+    $text = [regex]::Replace(([string]$header).ToLowerInvariant(), '\([^)]*\)', ' ')
+    $text = [regex]::Split($text, '[,;/`|\u2013\u2014]| on | via | - ')[0]
+    $words = @([regex]::Matches($text, '[a-z0-9][a-z0-9.-]*') | ForEach-Object { $_.Value } | Where-Object { $GenericRuntimeWords -notcontains $_ })
+    return ($words -join ' ')
+}
+function Get-SlugVariants($sessions) {
+    # Slugs that appear with more than one Tool/runtime header (R228).
+    $seen = @{}
+    foreach ($s in @($sessions)) {
+        $runtime = Get-RuntimeName $s.Header
+        if ($s.Slug -and $runtime) {
+            if (-not $seen.ContainsKey($s.Slug)) { $seen[$s.Slug] = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal) }
+            [void]$seen[$s.Slug].Add($runtime)
+        }
+    }
+    $out = [ordered]@{}
+    foreach ($k in @($seen.Keys | Sort-Ordinal -Key { $_ })) { if ($seen[$k].Count -gt 1) { $out[$k] = @($seen[$k] | Sort-Ordinal -Key { $_ }) } }
+    return $out
+}
+function Get-IndexStatuses([string]$indexText) {
+    # True for an 'in progress' row, False for a finished status cell; rows without a status are unknown.
+    $out = @{}
+    foreach ($line in (([string]$indexText) -split "\r?\n")) {
+        if (-not $line.TrimStart().StartsWith('|')) { continue }
+        $cells = @($line.Trim().Trim('|').Split('|') | ForEach-Object { $_.Trim().Trim('*').Trim().ToLowerInvariant() })
+        if ($cells -contains 'in progress') { $state = $true }
+        elseif (@($cells | Where-Object { $FinishedStatuses -contains $_ }).Count) { $state = $false }
+        else { continue }
+        foreach ($u in [regex]::Matches($line, $UuidPattern)) { $out[$u.Value.ToLowerInvariant()] = $state }
+    }
+    return $out
+}
+function Get-NewestFileTime([string]$folder, [int]$limit = 2000) {
+    # Newest file modified time under a folder (file times, not folder times; bounded).
+    $newest = $null; $n = 0
+    foreach ($f in @(Get-ChildItem -LiteralPath $folder -File -Recurse -Force -ErrorAction SilentlyContinue)) {
+        $n++; if ($n -gt $limit) { break }
+        $t = [DateTimeOffset]$f.LastWriteTime
+        if ($null -eq $newest -or $t -gt $newest) { $newest = $t }
+    }
+    return $newest
+}
+function Get-ProvenancePending([string]$project) {
+    # Incoming/*/_PROVENANCE.md lines marked PENDING and not APPLIED (R232).
+    $out = [Collections.Generic.List[object]]::new()
+    $inc = [IO.Path]::Combine($project, 'Incoming')
+    if (-not (Test-Path -LiteralPath $inc -PathType Container)) { return @() }
+    foreach ($child in @(Get-ChildItem -LiteralPath $inc -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.LinkType } | Sort-Ordinal -Key { Get-OrdinalKey $_.Name })) {
+        foreach ($pf in @(Get-ChildItem -LiteralPath $child.FullName -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower() -eq '_provenance.md' } | Sort-Ordinal -Key { $_.Name })) {
+            $t = Read-SmallText $pf.FullName; if ($null -eq $t) { $t = '' }
+            $rows = @(($t -split "\r?\n") | Where-Object { $_ -notmatch '^\s*#' -and $_ -cmatch '\bPENDING\b' -and $_ -cnotmatch '\bAPPLIED\b' } | ForEach-Object { $_.Trim() })
+            if ($rows.Count) { $out.Add([pscustomobject]@{ Rel = ("Incoming/{0}/{1}" -f $child.Name, $pf.Name); Rows = $rows }) }
+        }
+    }
+    return @($out)
 }
 function Get-JournalRetired($file, [int]$rulesMajor, [string]$contextText) {
     $r = Get-RelSlash $file.FullName
@@ -1095,6 +1202,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
         $non = [Collections.Generic.List[string]]::new(); $blk = [Collections.Generic.List[string]]::new()
         try { $names = @(Get-ChildItem -LiteralPath $sdir -File -Force -ErrorAction Stop | Where-Object { $_.Name.ToLower().EndsWith('.md') } | Sort-Ordinal -Key { $_.Name }) }
         catch { $res.State = 'UNAVAILABLE (listing failed)'; return $res }
+        $declaredSlugs = @((Get-ScopeInfo $RootFull).Slugs)
         foreach ($f in $names) {
             $text = Read-SmallText $f.FullName
             if ($null -eq $text) { $blk.Add($f.Name); continue }
@@ -1105,7 +1213,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
             $sid = if ($fields['session id']) { $fields['session id'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
             $uid = [regex]::Match($(if ($sid) { $sid } else { $f.Name }), $UuidPattern)
             if (-not $uid.Success) { $non.Add($f.Name + ' (no session UUID; not treated as a session log)'); continue }
-            $tool = if ($fields['tool/runtime']) { $fields['tool/runtime'] } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
+            $header = if ($fields['tool/runtime']) { ([regex]::Replace($fields['tool/runtime'], '\s+', ' ')).Trim() } else { '' }
+            $tool = if ($header) { $header } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
             $tool = $tool.Split('(')[0].Trim(); if (-not $tool) { $tool = 'unknown' }
             $topic = if ($nm.Success) { $nm.Groups[4].Value.Replace('-', ' ') } else { [IO.Path]::GetFileNameWithoutExtension($f.Name) }
             $startValue = @('started', 'start', 'start time') | ForEach-Object { if ($fields[$_]) { $fields[$_] } } | Select-Object -First 1
@@ -1129,8 +1238,15 @@ if ($Orient -or $SessionIndex -or $Pending) {
             $outcomes = [regex]::Matches($text, '(?im)^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$')
             if ($outcomes.Count) { $lastTitle = $outcomes[$outcomes.Count - 1].Groups[1].Value.Trim() }
             if (-not $nm.Success) { $non.Add($f.Name + ' (nonstandard filename)') }
-            elseif ($CanonicalToolSlugs -cnotcontains $nm.Groups[3].Value) { $non.Add($f.Name + ' (nonstandard tool slug)') }
+            elseif (($CanonicalToolSlugs -cnotcontains $nm.Groups[3].Value) -and ($declaredSlugs -cnotcontains $nm.Groups[3].Value)) { $non.Add($f.Name + ' (nonstandard tool slug)') }
+            # Closed only when the LAST turn closes the session or a close entry follows the last
+            # turn heading; an earlier close followed by more turns means the session resumed.
+            if ($turns.Count) {
+                $lastTurn = $turns[$turns.Count - 1]
+                $closed = [regex]::IsMatch($lastTurn.Groups[2].Value, $CloseTitleRx) -or [regex]::new($CloseEntryRx).IsMatch($text, $lastTurn.Index)
+            } else { $closed = [regex]::IsMatch($text, $CloseEntryRx) }
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
+                Slug = $(if ($nm.Success) { $nm.Groups[3].Value.ToLowerInvariant() } else { '' }); Header = $header; Closed = $closed
                 Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource; FilenameStart = $filenameStart })
         }
         $res.Sessions = @($list | Sort-Ordinal -Key { Get-SessionLoadKey $_ })
@@ -1138,6 +1254,14 @@ if ($Orient -or $SessionIndex -or $Pending) {
         return $res
     }
     function Get-Activity($s) { if ($s.LastTime) { $s.LastTime } else { $s.MTime } }
+    function Write-SlugVariants($sessions) {
+        $v = Get-SlugVariants $sessions
+        Write-Line ("  tool slugs used with more than one Tool/runtime header: {0} (leads: one slug per runtime; a different runtime never shares one; consider <runtime>-<agent>)" -f $v.Count)
+        Write-Capped @($v.Keys | ForEach-Object {
+            $k = $_
+            "{0}: {1}" -f $k, ((@($v[$k] | Select-Object -First 4 | ForEach-Object { if ($_.Length -gt 60) { $_.Substring(0, 60) } else { $_ } })) -join ' | ') })
+        return $v.Count
+    }
     function Test-Mine($id) { return ($SessionId -and $id.ToLower().StartsWith($SessionId.ToLower())) }
 
     Write-Line "Read-only work-mode check of $RootFull"
@@ -1176,7 +1300,24 @@ if ($Orient -or $SessionIndex -or $Pending) {
         } else { Write-Line "  quick context ${QuickContext}: NOT FOUND" }
 
         $S = Get-Sessions
-        $sessions = @(); $active = @()
+        $scope = Get-ScopeInfo $RootFull
+        if ($PSBoundParameters.ContainsKey('ActiveMinutes')) { $minutes = $ActiveMinutes; $windowSrc = '--active-minutes' }
+        elseif ($null -ne $scope.Window) { $minutes = $scope.Window; $windowSrc = "AGENTS.md 'Active-writer window:' line" }
+        else { $minutes = 30; $windowSrc = "default; no 'Active-writer window:' line" }
+        $windowSec = $minutes * 60
+        $idxFull = Join-RootRel $SessionIndexFile
+        $statuses = Get-IndexStatuses $(if (Test-Path -LiteralPath $idxFull -PathType Leaf) { Read-SmallText $idxFull } else { '' })
+        $scratchFull = Join-RootRel $ScratchDir
+        $scratchTimes = [ordered]@{}
+        if (Test-Path -LiteralPath $scratchFull -PathType Container) {
+            foreach ($d in @(Get-ChildItem -LiteralPath $scratchFull -Directory -Force | Where-Object { -not $_.LinkType } | Sort-Ordinal -Key { $_.Name })) { $scratchTimes[$d.Name] = Get-NewestFileTime $d.FullName }
+        }
+        function Test-Closed($s) { return ($s.Closed -or ($statuses.ContainsKey($s.Id) -and $statuses[$s.Id] -eq $false)) }
+        function Test-RecentScratch([string]$sid) {
+            foreach ($k in $scratchTimes.Keys) { $t = $scratchTimes[$k]; if ($k.ToLower().StartsWith($sid) -and $null -ne $t -and ($Now - $t).TotalSeconds -le $windowSec) { return $true } }
+            return $false
+        }
+        $sessions = @(); $active = [Collections.Generic.List[object]]::new(); $closedRecent = [Collections.Generic.List[object]]::new(); $idleOpen = 0
         if ($null -eq $S.Sessions) { Write-Line ("  sessions folder {0}: {1} (coverage unavailable)" -f $SessionsDir, $S.State) }
         else {
             $sessions = @($S.Sessions)
@@ -1184,27 +1325,34 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Line ("  recent sessions (of {0}):" -f $sessions.Count)
             Write-Capped @($recent | ForEach-Object {
                 $t = $_.LastTitle; if ($t.Length -gt 70) { $t = $t.Substring(0, 70) }
-                "{0}  {1}  {2}  {3}  [{4} turns] {5}" -f (Format-Activity $_), $_.Tool, $_.Id.Substring(0, [Math]::Min(8, $_.Id.Length)), $_.Topic, $_.Turns, $t })
-            $active = @($sessions | Where-Object { ($Now - $_.MTime).TotalSeconds -le $ActiveMinutes * 60 })
+                "{0}  {1}  {2}  {3}  [{4} turns]{6} {5}" -f (Format-Activity $_), $_.Tool, $_.Id.Substring(0, [Math]::Min(8, $_.Id.Length)), $_.Topic, $_.Turns, $t, $(if (Test-Closed $_) { '  closed' } else { '' }) })
+            foreach ($ss in $sessions) {
+                if (Test-Mine $ss.Id) { continue }
+                $fresh = (($Now - $ss.MTime).TotalSeconds -le $windowSec) -or (Test-RecentScratch $ss.Id)
+                if ($fresh -and (Test-Closed $ss)) { $closedRecent.Add($ss) }
+                elseif ($fresh) { $active.Add($ss) }
+                elseif ($statuses.ContainsKey($ss.Id) -and $statuses[$ss.Id] -eq $true -and -not $ss.Closed) { $idleOpen++ }
+            }
         }
         if ($S.Blocked.Count -and $null -ne $S.Sessions) { Write-Line ("  session logs not parsed (blocked, unreadable or incomplete): {0}" -f $S.Blocked.Count) }
         $duplicates = @(Get-DuplicateIds $sessions)
         if ($duplicates.Count) { Write-Line ("  duplicate session IDs: {0}; excluded from baseline selection" -f $duplicates.Count) }
-        $scratchFull = Join-RootRel $ScratchDir
-        $activeScratch = @()
-        if (Test-Path -LiteralPath $scratchFull -PathType Container) {
-            $activeScratch = @(Get-ChildItem -LiteralPath $scratchFull -Directory -Force | Where-Object { -not $_.LinkType -and ($Now - [DateTimeOffset]$_.LastWriteTime).TotalSeconds -le $ActiveMinutes * 60 } | Sort-Ordinal -Key { $_.Name } | ForEach-Object { $_.Name })
-        }
-        if ($SessionId) {
-            $active = @($active | Where-Object { -not (Test-Mine $_.Id) })
-            $activeScratch = @($activeScratch | Where-Object { -not (Test-Mine $_) })
-        }
+        $knownIds = @($sessions | ForEach-Object { $_.Id })
+        $unpairedScratch = @($scratchTimes.Keys | Where-Object {
+            $n = $_; $t = $scratchTimes[$n]
+            $null -ne $t -and ($Now - $t).TotalSeconds -le $windowSec -and -not (Test-Mine $n) -and -not @($knownIds | Where-Object { $n.ToLower().StartsWith($_) }).Count })
         $activeIds = @($active | ForEach-Object { $_.Id } | Select-Object -Unique)
-        $pairedScratch = @($activeScratch | Where-Object { $n = $_; @($activeIds | Where-Object { $n.ToLower().StartsWith($_) }).Count })
-        $unpairedScratch = @($activeScratch | Where-Object { $_ -notin $pairedScratch })
-        Write-Line ("  possibly active writers (changed in last {0} min): {1} distinct sessions, {2} unpaired scratch folders" -f $ActiveMinutes, $activeIds.Count, $unpairedScratch.Count)
+        Write-Line ("  active-writer window: {0} min ({1}); activity = session log or scratch file modified times, not folder times" -f $minutes, $windowSrc)
+        Write-Line ("  possibly active writers (changed in last {0} min): {1} distinct sessions, {2} unpaired scratch folders" -f $minutes, $activeIds.Count, $unpairedScratch.Count)
         Write-Capped @($active | ForEach-Object { "session {0} {1} {2}" -f $_.Id.Substring(0, 8), $_.Tool, $_.Topic })
         Write-Capped @($unpairedScratch | ForEach-Object { "unpaired scratch/$_" })
+        if ($closedRecent.Count) {
+            Write-Line ("  closed sessions with recent file activity (not active writers): {0}" -f $closedRecent.Count)
+            Write-Capped @($closedRecent | ForEach-Object { "session {0} {1} {2}" -f $_.Id.Substring(0, 8), $_.Tool, $_.Topic })
+        }
+        if ($idleOpen) { Write-Line ("  'in progress' index rows with no file activity in the window (not active writers): {0}" -f $idleOpen) }
+        Write-Line "  closed = close entry in the log or session-index status other than 'in progress'."
+        Write-Line '  An owner handoff message also closes a session; this helper cannot see chat.'
         $declared = @(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/'))
         if ($declared.Count) { Write-Line ("  coordination: sequential-writer declaration found ({0})" -f ($declared -join ', ')) }
         else { Write-Line '  coordination: no sequential-writer declaration; stage PENDING edits unless other coordination is established' }
@@ -1212,6 +1360,20 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Line '    -> another agent may be working: coordinate shared edits before writing;'
             Write-Line '       stage exact pending edits in your scratch if coordination is unavailable.'
             if ($declared.Count) { Write-Line '       The declaration covers agents working one after another, not overlap: stage shared-record edits this session.' }
+        }
+        $slugVariantCount = Write-SlugVariants $sessions
+        $provO = @(Get-ProvenancePending $RootFull)
+        Write-Line (("  _PROVENANCE.md files with PENDING rows: {0}" -f $provO.Count) + $(if ($provO.Count) { ' (list and apply state: --pending)' } else { '' }))
+        Write-Capped @($provO | ForEach-Object { "{0} ({1} PENDING lines)" -f $_.Rel, $_.Rows.Count })
+        $onWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
+        if ($onWindows) {
+            Write-Line "  Windows: writing shared records from Windows PowerShell 5.1? Never use '>>' or"
+            Write-Line "    Set-Content/Out-File without -Encoding utf8, and replace only your own session-ID line (W5)."
+        }
+        if ($PSVersionTable.PSVersion.Major -lt 6) {
+            # stderr, not the warning stream: PowerShell 5.1 -File copies warnings to stdout,
+            # which would break the Python/PowerShell report parity.
+            [Console]::Error.WriteLine("WARNING: this shell is Windows PowerShell $($PSVersionTable.PSVersion). Its '>>' and default Set-Content/Out-File write UTF-16LE or ANSI into UTF-8 records; use UTF-8 explicitly (W5).")
         }
 
         # Declared startup read order (README_FIRST links, in order).
@@ -1345,6 +1507,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Capped $unindexed
         } else { Write-Line ("  index {0}: NOT FOUND or unreadable; unindexed check skipped" -f ($idxList -join ', ')) }
         $glance['possibly active writers'] = $activeIds.Count + $unpairedScratch.Count
+        $glance['slugs with several headers'] = $slugVariantCount
+        $glance['provenance PENDING files'] = $provO.Count
         $glance['changed since baseline'] = $changedS.Count
         $glance['changed but unnamed in index'] = $(if ($idxText) { $unindexed.Count } else { 'n/a' })
         $glance['quick context over size'] = $(if ($qcFlag) { 'yes' } else { 'no' })
@@ -1411,9 +1575,11 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Capped @($stale)
             Write-Line ("  nonstandard session filenames: {0}" -f $S.Nonstandard.Count)
             Write-Capped $S.Nonstandard
+            $slugVariantCountI = Write-SlugVariants $S.Sessions
             if ($S.Blocked.Count) { Write-Line ("  session logs not parsed (blocked, unreadable or incomplete): {0}" -f $S.Blocked.Count); Write-Capped $S.Blocked }
             $glance['sessions missing from index'] = $missing.Count
             $glance['index links to missing logs'] = $stale.Count
+            $glance['slugs with several headers'] = $slugVariantCountI
             }
         }
     }
@@ -1441,19 +1607,14 @@ if ($Orient -or $SessionIndex -or $Pending) {
         $applicableN = @($pstates | Where-Object { $_.StartsWith('Pending (') }).Count
         $appliedN = @($pstates | Where-Object { $_ -eq 'Applied (not marked)' }).Count
         $malformedN = $missingN
-        $prov = [Collections.Generic.List[string]]::new()
-        $inc = Join-RootRel 'Incoming'
-        if (Test-Path -LiteralPath $inc -PathType Container) {
-            foreach ($child in @(Get-ChildItem -LiteralPath $inc -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.LinkType } | Sort-Ordinal -Key { Get-OrdinalKey $_.Name })) {
-                foreach ($pf in @(Get-ChildItem -LiteralPath $child.FullName -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower() -eq '_provenance.md' })) {
-                    $t = Read-SmallText $pf.FullName; if ($null -eq $t) { $t = '' }
-                    $k = [regex]::Matches($t, 'PENDING').Count
-                    if ($k) { $prov.Add(("Incoming/{0}/{1} ({2} PENDING mentions)" -f $child.Name, $pf.Name, $k)) }
-                }
-            }
+        $prov = @(Get-ProvenancePending $RootFull)
+        Write-Line ("  _PROVENANCE.md files with PENDING rows: {0} (lines marked PENDING and not APPLIED; apply under W5, then mark 'APPLIED <hash8> by <session>/<turn>')" -f $prov.Count)
+        $provTake = [Math]::Min($prov.Count, $WorkCap)
+        for ($i = 0; $i -lt $provTake; $i++) {
+            Write-Line ("    {0} ({1} PENDING lines)" -f $prov[$i].Rel, $prov[$i].Rows.Count)
+            Write-Capped @($prov[$i].Rows | ForEach-Object { if ($_.Length -gt 160) { $_.Substring(0, 160) } else { $_ } }) '      '
         }
-        Write-Line ("  _PROVENANCE.md files with PENDING rows: {0}" -f $prov.Count)
-        Write-Capped @($prov)
+        if ($prov.Count -gt $provTake) { Write-Line ("      ... and {0} more" -f ($prov.Count - $provTake)) }
         if (@(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/')).Count) { Write-Line "  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5)." }
         Write-Line '  Conflicted means compare by hand: the edit may already be in the target in other words,'
         Write-Line '  or may still be needed. Never discard or apply on the label alone.'
@@ -1777,7 +1938,7 @@ if ($HashFiles) {
             [pscustomobject]@{
                 Path = $f.FullName
                 Name = $f.Name
-                Hash = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+                Hash = Get-Sha256Hex $f.FullName
             }
         }
         catch {
@@ -1993,7 +2154,7 @@ if ($Portfolio) {
     $checks = @($defaults + $EntryPoint | Select-Object -Unique)
     $tpl = Get-TemplateCore
     $tcore = $tpl[0]; $tver = $tpl[1]
-    Write-Line "  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Rules version | Work routing | Core match | Sequential writer | Entrypoints present"
+    Write-Line "  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Rules version | Work routing | Core match | Sequential writer | Section 13 complete | Entrypoints present"
     $children = @(Get-ChildItem -LiteralPath $RootFull -Directory -Force -ErrorAction SilentlyContinue | Sort-Ordinal -Key { $_.Name.ToLower() })
     if ($children.Count) {
         foreach ($child in $children) {
@@ -2016,12 +2177,12 @@ if ($Portfolio) {
             $pend = @(Find-PendingFiles $child.FullName)
             $noStatus = @($pend | Where-Object { $t = Read-SmallText $_; ($null -eq $t) -or ($null -eq (Get-PendingInfo $t ([IO.Path]::GetFileName($_))).Status) }).Count
             $ri = Get-RulesInfo $child.FullName $tcore
-            Write-Line ("  {0} | root-level | {1} | {2} | {3} | {4} | {5} ({6} no Status) | {7} | {8} | {9} | {10} | {11}" -f $child.Name, $state, $count, $sessionCount, $missingRows, $pend.Count, $noStatus, $ri[0], $ri[1], $ri[2], $ri[3], $value)
+            Write-Line ("  {0} | root-level | {1} | {2} | {3} | {4} | {5} ({6} no Status) | {7} | {8} | {9} | {10} | {11} | {12}" -f $child.Name, $state, $count, $sessionCount, $missingRows, $pend.Count, $noStatus, $ri[0], $ri[1], $ri[2], $ri[3], $ri[4], $value)
         }
     }
     else { Write-Line "  no immediate child directories" }
     Write-Line "  Presence does not determine authority or operational state."
-    Write-Line ("  Core match compares sections 1-12 with the bundled template" + $(if ($tver) { " $tver" } else { ' (not bundled in this package: unknown)' }) + ".")
+    Write-Line ("  Core match compares sections 0-12 (1-12 before Rules 4.0.0) with the bundled template" + $(if ($tver) { " $tver" } else { ' (not bundled in this package: unknown)' }) + ".")
     $names = @($children | ForEach-Object { $_.Name })
     $groups = @{}
     foreach ($n in $names) {
@@ -2100,7 +2261,7 @@ foreach ($manifestValue in $ExpectedUploadManifest) {
         if ($row.sha256) {
             try {
                 Assert-ContentRead $target
-                $actualHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower()
+                $actualHash = Get-Sha256Hex $target
             } catch { $hashBad++; Write-ManifestDetail ("  HASH UNCHECKED (READ BLOCKED or unreadable) " + $row.path); continue }
             if ($actualHash -ne ([string]$row.sha256).ToLower()) {
                 $hashBad++; Write-ManifestDetail ("  HASH MISMATCH  " + $row.path)

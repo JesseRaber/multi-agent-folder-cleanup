@@ -6,6 +6,10 @@ measured so an agent can cite the output instead of asserting "verified".
 
 Checks per file (Markdown or plain text):
   - readable, valid UTF-8 (first bad byte offset reported)
+  - encoding damage UTF-8 validity misses (R235): NUL bytes, UTF-16LE/BE text
+    segments (e.g. a Windows PowerShell 5.1 '>>' append into a UTF-8 file), a
+    UTF-16 byte-order mark, and UTF-16 line breaks mis-decoded into U+0A0D /
+    U+0D0A / U+0D00 / U+0A00 characters
   - byte-order mark (finding unless --allow-bom)
   - line endings: CRLF / LF / lone CR counts; mixed or lone CR is a finding;
     --newline lf|crlf also enforces one style
@@ -36,7 +40,7 @@ import re
 import sys
 from urllib.parse import unquote
 
-VERSION = "1.7.0"  # must equal SKILL.md metadata.version
+VERSION = "1.7.1"  # must equal SKILL.md metadata.version
 
 BOM = b"\xef\xbb\xbf"
 # Common UTF-8-read-as-cp1252/latin-1 sequences, plus the replacement character.
@@ -49,6 +53,9 @@ MOJIBAKE = re.compile("|".join([
     chr(0xEF) + chr(0xBB) + chr(0xBF),           # BOM decoded as cp1252
     chr(0xFFFD),                                 # replacement character
 ]))
+UTF16LE_RUN = re.compile(rb"(?:[\x09\x0a\x0d\x20-\x7e]\x00){4,}")
+UTF16BE_RUN = re.compile(rb"(?:\x00[\x09\x0a\x0d\x20-\x7e]){4,}")
+MISDECODED_BREAK = re.compile("[\u0a0d\u0d0a\u0d00\u0a00]")
 FENCE = re.compile(r"^\s*(```|~~~)")
 INLINE_CODE = re.compile(r"(`+)(.+?)\1")
 LINK = re.compile(r"!?\[[^\]]*\]\(\s*(<[^>]*>|[^)\s]+)(?:\s+\"[^\"]*\")?\s*\)")
@@ -67,6 +74,31 @@ def table_cells(line):
     if s.endswith("|") and not s.endswith("\\|"):
         s = s[:-1]
     return re.split(r"(?<!\\)\|", s)
+
+
+def check_encoding_damage(data):
+    """Findings for mixed-encoding damage that still decodes as UTF-8 (R235)."""
+    found = []
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        found.append("UTF-16 byte-order mark at byte 0 (file is UTF-16, not UTF-8)")
+    nul = data.count(b"\x00")
+    if nul:
+        first = data.index(b"\x00")
+        found.append(f"{nul} NUL bytes (first at byte {first})")
+    for label, rx in (("UTF-16LE", UTF16LE_RUN), ("UTF-16BE", UTF16BE_RUN)):
+        runs = list(rx.finditer(data))
+        if runs and label == "UTF-16BE" and UTF16LE_RUN.search(data):
+            continue  # an LE run read one byte late looks like BE; report it once
+        if runs:
+            found.append(f"{len(runs)} {label} text segment(s), first at byte {runs[0].start()}"
+                         " (mixed encodings; e.g. a PowerShell 5.1 '>>' append)")
+    text = data.decode("utf-8", errors="replace")
+    bad = list(MISDECODED_BREAK.finditer(text))
+    if bad:
+        line = text.count("\n", 0, bad[0].start()) + 1
+        found.append(f"{len(bad)} mis-decoded UTF-16 line-break character(s) (U+0A0D/U+0D0A/U+0D00/U+0A00),"
+                     f" first on line {line}")
+    return found
 
 
 def check_newlines(data, mode):
@@ -169,6 +201,7 @@ def check_file(path, args):
         result["utf8"] = True
     if text.startswith(chr(0xFEFF)):
         text = text[1:]
+    f.extend(check_encoding_damage(data))
     result["newlines"], nl = check_newlines(data, args.newline)
     f.extend(nl)
     is_md = path.lower().endswith((".md", ".markdown"))
@@ -278,7 +311,7 @@ def main(argv=None):
             print(f"{'FAIL' if h['finding'] else 'PASS'} sha256 {h['path']}: "
                   f"expected {h['expected']}, actual {h['actual'] or 'unreadable'}")
         print(f"verify_records.py {VERSION}: {len(results)} file(s), {findings} finding(s), {errors} error(s). "
-              "Checks: UTF-8, BOM, line endings, mojibake, relative links, table shape"
+              "Checks: UTF-8, BOM, NUL/UTF-16 segments, line endings, mojibake, relative links, table shape"
               + (", comparisons" if comparisons else "") + (", hashes" if hashes else "") + ".")
     if errors:
         return 2
