@@ -137,7 +137,7 @@ Status: PENDING
 Target: AI_CONTEXT/SESSION_INDEX.md
 Base: 3f0ac80650cf8f20e44c4f61790a554d085d4f7b9dd9c00eb7df15e87710e891
 Edit: append after the last table row
-New: | 2026-10-09T00:23-04:00 | 2026-10-09T00:35-04:00 | <session-uuid> | Antigravity | <topic> | <outcome> | Completed | [Session](SESSIONS/<log file>.md) |
+New: | 2026-10-09T00:23-04:00 | 2026-10-09T00:35-04:00 | <session-uuid> | Antigravity | <topic> | <outcome> | Completed | <link to SESSIONS/your-log.md> |
 Reason: no sequential-writer declaration in this project
 Session/turn: <session-uuid> / T002
 Reconcile: apply if Base still matches or the last row is unchanged; verify by read-back
