@@ -49,10 +49,10 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python3 scripts/audit_folder.py --version    # audit_folder.py 1.6.4
-python3 scripts/verify_move.py --version     # verify_move.py 1.6.4
-python3 scripts/verify_records.py --version  # verify_records.py 1.6.4
-pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.6.4
+python3 scripts/audit_folder.py --version    # audit_folder.py 1.7.0
+python3 scripts/verify_move.py --version     # verify_move.py 1.7.0
+python3 scripts/verify_records.py --version  # verify_records.py 1.7.0
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.7.0
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
@@ -63,20 +63,23 @@ Move preflight rejects linked source/target components and probes Windows source
 
 ## Work-mode checks (v1.5)
 
-Two read-only checks for agents working in a shared folder ([work-mode.md](work-mode.md)). Both skip the full audit, write nothing to the root, and honor `--brief`, `--out`, `--exclude` and `--max-seconds`.
+Three read-only checks for agents working in a shared folder ([work-mode.md](work-mode.md)). All skip the full audit, write nothing to the root, and honor `--brief`, `--out`, `--exclude` and `--max-seconds`.
 
 ```bash
 python scripts/audit_folder.py --root <root> --orient --session-id <your-id>
 python scripts/audit_folder.py --root <root> --session-index
-pwsh -File scripts/audit_folder.ps1 -Root <root> -Orient -SessionIndex -SessionId <your-id>
+python scripts/audit_folder.py --root <root> --pending
+pwsh -File scripts/audit_folder.ps1 -Root <root> -Orient -SessionIndex -Pending -SessionId <your-id>
 ```
 
-- `--orient` / `-Orient`: startup read-set size against `--read-budget-kb`; quick-context size against `--quick-context-kb` (default 12); the five most recent sessions; session logs and scratch folders changed within `--active-minutes` (default 30) as possibly active writers, leaving out your own `--session-id`; files changed since `--since` or, by default, the start of the latest other session (session logs and scratch excluded, generated state not walked); and which of those changed files the index (`--index-path`, default `PROJECT_INDEX.md`) never names.
+- `--orient` / `-Orient`: startup read-set size against `--read-budget-kb`; quick-context size against `--quick-context-kb` (default 12); the five most recent sessions; session logs and scratch folders changed within `--active-minutes` (default 30) as possibly active writers, leaving out your own `--session-id`; files changed since `--since` or, by default, the start of the latest other session (session logs and scratch excluded, generated state not walked); and which of those changed files the index (`--index-path`, default `PROJECT_INDEX.md`) never names. From v1.7 it also reports: whether a sequential-writer declaration is present in `AGENTS.md`, `CLAUDE.md` or quick context (only the declaration establishes it); the declared read order (`README_FIRST.md` at the root or in `AI_CONTEXT/` plus the `.md` files it links, in order, with files over 32 KiB marked LARGE); changed files no session log or `_PROVENANCE.md` names; clusters of 10 or more files sharing one modified second (typical of archive extraction, not activity evidence); and sync conflict copies (`name (1).ext`, `name-HOST.ext` beside its original) and case-only name collisions. Sibling projects are outside the root and are never read; run `--portfolio` on the parent to see handoffs addressed to this project.
 - `--session-index` / `-SessionIndex`: compares session logs in `--sessions-dir` (default `AI_CONTEXT/SESSIONS`) with `--session-index-file` (default `AI_CONTEXT/SESSION_INDEX.md`); prints proposed rows for missing sessions, index links to logs that no longer exist, and session files without a standard name or UUID. Review the proposed rows' outcome and status before saving them with a guarded append.
+- `--pending` / `-Pending` (v1.7): lists W5 pending files (names starting `PENDING_`, `pending-` or `pending.` in any case, or containing `.pending.`/`.pending-`; `.md` or `.json`) directly in the root, `AI_CONTEXT/` and each `--scratch-dir` session folder, and classifies each edit block (a file with several `Target:` lines is split into blocks): **Pending (base matches)** or **Pending (anchor matches)** (a qualifying writer may apply it), **Applied (not marked)** (every new text is already in the target), **Conflicted** (text absent and the base changed or the source session's UUID already appears in the target, or the text is partly present: compare by hand, because the edit may already be in the target in other words or may still be needed), **Unverifiable** (no Target, target missing, or no base, anchor or edit text), or the status the file itself records. Files whose first line is not `Status:` are flagged. It also counts `PENDING` mentions in `Incoming/*/_PROVENANCE.md`. It never applies or edits anything, and every state is a lead for the applying writer to confirm. New texts come from labels such as `New:`, `Insert:`, `Add:`, `Exact new row:` or `Edit:` followed by a value, the next line or a fenced block; old texts from `Old:`, `Anchor:` or `Insert after:`; the base from a hash on a line naming `base`; and from JSON `edits[]` with `new`/`new_line` and `old`/`insert_after`. Values under 12 characters are ignored as too generic to prove anything.
 - Session logs are parsed for the header fields `Session ID`, `Started` and `Tool/runtime`, and turn headings such as `## T001 — <time> — <title>` or `T001 | <time> | <title>`; the filename pattern is the fallback.
 - Activity and change lists come from local modified times. They are leads: sync replicas, hydration and clock skew change them. They never prove that another agent is or is not working.
 - A full audit also inventories handoff/next-prompt ambiguity, pending-update artifacts and their evidenced lifecycle state, and candidate/released/superseded ZIPs that share a folder. It reports review candidates; it does not choose a current handoff, apply a pending edit, move a package or authorize deletion.
-- `--portfolio` / `-Portfolio` reports immediate-child state (`managed`, `unmanaged` or `empty`), root-item scope, detected entrypoints, sessions, missing session-index rows when the index is readable, and pending-update artifacts. Empty and unmanaged are distinct observations, not quality verdicts.
+- `--portfolio` / `-Portfolio` reports immediate-child state (`managed`, `unmanaged` or `empty`), root-item scope, detected entrypoints, sessions, missing session-index rows when the index is readable, and pending files with how many lack a `Status:` line. From v1.7 it adds the rules version (first `Version:` line of `AGENTS.md`, or `(by reference)` through a linked `*rules*.md` in its first 20 lines), Work routing, core match against the bundled `references/project-rules/AGENTS.proposed.md` (`match`, `differs (N lines)`, or `unknown` when the package has no template), and the sequential-writer declaration; then children whose names differ only by a copy suffix, handoffs whose `To:` line names another child, and whether a `PORTFOLIO.md` replica declaration exists. Empty and unmanaged are distinct observations, not quality verdicts.
+- The full audit (v1.7) adds a **Sync copies, unpacked packages and continuity folders** section: conflict copies and case-only collisions, `SKILL.md` trees under scratch/backup/history/incoming paths, folders with `.gitignore`/`.gitattributes`/`.github` but no `.git`, and `AI_CONTEXT/` files that are not continuity records (non-text files outside `SESSIONS/` and `scratch/`, and unknown loose files). Large journals already retired (History/archive path, declared retired, or a sibling `SESSIONS/` folder under rules 3.x) are reported once without a rotation proposal, and `AGENTS.md` over 16 KB is a warning beside the 32 KiB high flag.
 
 ## Keep the report small (v1.4)
 

@@ -105,6 +105,7 @@ param(
     [int]$ReadBudgetKB = 40,
     [switch]$Orient,
     [switch]$SessionIndex,
+    [switch]$Pending,
     [string]$SessionsDir = 'AI_CONTEXT/SESSIONS',
     [string]$SessionIndexFile = 'AI_CONTEXT/SESSION_INDEX.md',
     [string]$ScratchDir = 'AI_CONTEXT/scratch',
@@ -116,7 +117,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.6.4'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.7.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -598,7 +599,7 @@ if ($Out) {
     if (Test-Path -LiteralPath $OutFull) { throw "-Out already exists; choose a new file: $OutFull" }
 }
 
-if (-not ($Orient -or $SessionIndex)) {
+if (-not ($Orient -or $SessionIndex -or $Pending)) {
     Write-Line "Read-only audit of $RootFull"
     Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 }
@@ -623,13 +624,430 @@ function Test-LinkDirectory($item) {
 }
 
 # ---------------------------------------------------------------------------
+# v1.7 checks: sync conflict copies, pending files, rules matrix, continuity
+# folders. Report only; same output as audit_folder.py.
+# ---------------------------------------------------------------------------
+$PendingNameRx = '(?i)^pending[._ -]|\.pending[.-]'
+$ConflictParenRx = '^(.+?) \((\d{1,3})\)(\.[^.]+)?$'
+$ConflictHostRx = '^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$'
+# The owner's opt-in line (Project Rules 3.3.0 section 5): a line that begins
+# "Sequential writers:". Prose that merely describes the rule does not count.
+$DeclarationRx = '(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:'
+$RulesVersionRx = '(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)'
+$StatusLineRx = '^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)'
+$Hex64Rx = '\b[0-9a-fA-F]{64}\b'
+$ToLineRx = '(?im)^\s*(?:[-*]\s*)?\**To\**\s*:\s*(.+)$'
+$KnownContinuity = @('project_quick_context.md', 'session_index.md', 'policy_installation.md',
+    'readme_first.md', 'chat_index.md', 'project_activity_journal.md')
+$ContinuityTextExts = @('.md', '.txt', '.json', '.csv', '.yml', '.yaml', '.log')
+$TemplatePath = [IO.Path]::Combine($PSScriptRoot, '..', 'references', 'project-rules', 'AGENTS.proposed.md')
+$AgentsWarnBytes = 16384
+$script:InWork = $false
+
+function Join-RootRel([string]$relPath) {
+    $acc = $RootFull
+    foreach ($seg in $relPath.Replace('\', '/').Split('/')) { if ($seg) { $acc = [IO.Path]::Combine($acc, $seg) } }
+    return $acc
+}
+function Read-SmallText([string]$path) {
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+    if (-not (Test-ContentReadAllowed $path)) { return $null }
+    try {
+        $sr = [IO.StreamReader]::new($path, [Text.UTF8Encoding]::new($false), $true)
+        try {
+            $buf = New-Object char[] 1048577
+            $n = $sr.ReadBlock($buf, 0, $buf.Length)
+            if ($n -gt 1048576) {
+                Write-Line ("  read incomplete (over 1048576 characters): {0}; not parsed" -f [IO.Path]::GetFileName($path))
+                return $null
+            }
+            return [string]::new($buf, 0, $n)
+        } finally { $sr.Dispose() }
+    } catch { return $null }
+}
+# Python's `limited`: work mode caps at 15 (10 with -Brief), the full audit
+# only with -Brief; the overflow line differs in indentation.
+function Write-Limited($items, [string]$indent) {
+    $items = @($items)
+    if ($script:InWork) {
+        $take = [Math]::Min($items.Count, $(if ($Brief) { 10 } else { 15 }))
+        $more = '      ... and {0} more'
+    } else {
+        $take = Get-Cap $items.Count
+        $more = '  ... and {0} more'
+    }
+    for ($i = 0; $i -lt $take; $i++) { Write-Line ($indent + $items[$i]) }
+    if ($items.Count -gt $take) { Write-Line ($more -f ($items.Count - $take)) }
+}
+function Test-PendingName([string]$name) {
+    $low = $name.ToLower()
+    if (-not ($low.EndsWith('.md') -or $low.EndsWith('.json'))) { return $false }
+    return [regex]::IsMatch($name, $PendingNameRx)
+}
+function Get-OrdinalKey([string]$s) { return $s.ToLowerInvariant() + [char]0 + $s }
+function Get-ConflictCopies([string[]]$rels) {
+    $present = [Collections.Generic.HashSet[string]]::new()
+    foreach ($r in $rels) { [void]$present.Add($r.ToLowerInvariant()) }
+    $out = foreach ($r in $rels) {
+        $cut = $r.LastIndexOf('/')
+        $prefix = if ($cut -ge 0) { $r.Substring(0, $cut + 1) } else { '' }
+        $name = $r.Substring($cut + 1)
+        $m = [regex]::Match($name, $ConflictParenRx)
+        if ($m.Success) {
+            $original = $prefix + $m.Groups[1].Value + $m.Groups[3].Value
+            $state = if ($present.Contains($original.ToLowerInvariant())) { 'original present' } else { 'ORIGINAL MISSING' }
+            [pscustomobject]@{ Kind = '(n) copy'; State = $state; Rel = $r }
+            continue
+        }
+        $m = [regex]::Match($name, $ConflictHostRx)
+        if ($m.Success -and [regex]::IsMatch($m.Groups[2].Value, '[A-Z]')) {
+            $original = $prefix + $m.Groups[1].Value + $m.Groups[3].Value
+            if ($present.Contains($original.ToLowerInvariant())) { [pscustomobject]@{ Kind = '-HOST copy'; State = 'original present'; Rel = $r } }
+        }
+    }
+    return @($out | Sort-Ordinal -Key { Get-OrdinalKey $_.Rel })
+}
+function Get-CaseCollisions([string[]]$rels) {
+    $groups = @{}
+    foreach ($r in $rels) {
+        $k = $r.ToLowerInvariant()
+        if (-not $groups.ContainsKey($k)) { $groups[$k] = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal) }
+        [void]$groups[$k].Add($r)
+    }
+    $out = foreach ($k in $groups.Keys) {
+        if ($groups[$k].Count -gt 1) {
+            [string[]]$arr = @($groups[$k])
+            [Array]::Sort($arr, [StringComparer]::Ordinal)
+            [pscustomobject]@{ First = $arr[0]; Items = $arr }
+        }
+    }
+    return @($out | Sort-Ordinal -Key { $_.First.ToLowerInvariant() })
+}
+function Write-ConflictBlock([string[]]$rels) {
+    $copies = @(Get-ConflictCopies $rels)
+    $collisions = @(Get-CaseCollisions $rels)
+    $missing = @($copies | Where-Object { $_.State -eq 'ORIGINAL MISSING' }).Count
+    Write-Line ("  sync conflict copies: {0} (original missing: {1})" -f $copies.Count, $missing)
+    Write-Limited @($copies | ForEach-Object { "{0,-10} {1,-16} {2}" -f $_.Kind, $_.State, $_.Rel }) '    '
+    Write-Line ("  case-only name collisions: {0}" -f $collisions.Count)
+    Write-Limited @($collisions | ForEach-Object { $_.Items -join ' | ' }) '    '
+    if ($copies.Count -or $collisions.Count) { Write-Line '    Reconcile before shared-record edits; never merge, rename or delete without approval.' }
+    return @($copies.Count, $collisions.Count)
+}
+$StatusWords = @('PENDING', 'APPLIED', 'SUPERSEDED', 'CONFLICTED', 'UNVERIFIABLE')
+$TargetLineRx = '(?i)^\s*(?:[-*]\s*)?\**Target\**\s*:\s*(.*)$'
+$LabelLineRx = '^\s*(?:[-*]\s*)?\**([A-Za-z][A-Za-z /-]{0,40}?)\**\s*:[ \t]*(.*)$'
+$HeadingRx = '^\s*#'
+$OldWordsRx = '(?i)\b(old|anchor|after|before|replace|remove)\b'
+$NewWordsRx = '(?i)\b(new|insert|add|row|append|edit|text|line)\b'
+function Get-StatusOf([string]$line) {
+    $m = [regex]::Match($line, $StatusLineRx)
+    if ($m.Success) { return $m.Groups[1].Value.ToUpper() }
+    return $null
+}
+function Get-FenceAt([string[]]$lines, [int]$i) {
+    while ($i -lt $lines.Count -and -not $lines[$i].Trim()) { $i++ }
+    if ($i -ge $lines.Count -or -not $lines[$i].TrimStart().StartsWith('```')) { return @($null, $i) }
+    $body = [Collections.Generic.List[string]]::new()
+    $j = $i + 1
+    while ($j -lt $lines.Count -and -not $lines[$j].TrimStart().StartsWith('```')) { $body.Add($lines[$j].TrimEnd("`r")); $j++ }
+    return @(($body -join "`n"), ($j + 1))
+}
+function Get-BlockEdits([string[]]$lines) {
+    $new = [Collections.Generic.List[string]]::new(); $old = [Collections.Generic.List[string]]::new()
+    $i = 0
+    while ($i -lt $lines.Count) {
+        $m = [regex]::Match($lines[$i], $LabelLineRx)
+        if (-not $m.Success) { $i++; continue }
+        $label = $m.Groups[1].Value.Trim().ToLower(); $value = $m.Groups[2].Value.Trim()
+        $kind = if ([regex]::IsMatch($label, $OldWordsRx)) { 'old' } elseif ([regex]::IsMatch($label, $NewWordsRx)) { 'new' } else { $null }
+        if (-not $kind) { $i++; continue }
+        if ($kind -eq 'old') { $bucket = $old } else { $bucket = $new }
+        if ($value -and $label -ne 'edit') {
+            if ($value.Length -gt 2 -and $value.StartsWith('`') -and $value.EndsWith('`')) { $value = $value.Substring(1, $value.Length - 2) }
+            $bucket.Add($value.Trim())
+        }
+        $fence = Get-FenceAt $lines ($i + 1)
+        if ($null -ne $fence[0]) { $bucket.Add($fence[0].Trim()); $i = $fence[1]; continue }
+        if (-not $value) {
+            $j = $i + 1
+            while ($j -lt $lines.Count -and -not $lines[$j].Trim()) { $j++ }
+            if ($j -lt $lines.Count -and -not [regex]::IsMatch($lines[$j], $LabelLineRx) -and -not [regex]::IsMatch($lines[$j], $HeadingRx)) { $bucket.Add($lines[$j].Trim()) }
+        }
+        $i++
+    }
+    $keep = {
+        param($vals)
+        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+        , @($vals | Where-Object { $_.Length -ge 12 -and $seen.Add($_) })
+    }
+    return @((& $keep $new), (& $keep $old))
+}
+function Get-PendingInfo([string]$text, [string]$name) {
+    $out = @{ Status = $null; StatusFirst = $false; Blocks = [Collections.Generic.List[object]]::new() }
+    if ($name.ToLower().EndsWith('.json')) {
+        try { $obj = $text | ConvertFrom-Json -ErrorAction Stop } catch { $obj = $null }
+        if ($obj -is [pscustomobject]) {
+            $st = $obj.status
+            if ($st -and ([string]$st).Trim()) { $out.Status = ([string]$st).Trim().Split([string[]]@(' ', "`t", "`r", "`n"), [StringSplitOptions]::RemoveEmptyEntries)[0].ToUpper() }
+            $out.StatusFirst = $null -ne $out.Status
+            $tgt = ''; foreach ($k in @('target', 'path')) { if (-not $tgt -and $obj.$k) { $tgt = [string]$obj.$k } }
+            $bas = ''; foreach ($k in @('base', 'base_sha256')) { if (-not $bas -and $obj.$k) { $bas = [string]$obj.$k } }
+            $new = [Collections.Generic.List[string]]::new(); $old = [Collections.Generic.List[string]]::new()
+            foreach ($e in @($obj.edits)) {
+                if ($e -isnot [pscustomobject]) { continue }
+                foreach ($pair in @(@('new', $new), @('new_line', $new), @('new_text', $new), @('old', $old), @('insert_after', $old), @('anchor', $old))) {
+                    $v = $e.($pair[0])
+                    if ($v -is [string] -and $v.Trim().Length -ge 12) { $pair[1].Add($v.Trim()) }
+                }
+            }
+            $out.Blocks.Add([pscustomobject]@{ Status = $out.Status; Target = $tgt; Base = $bas; New = $new.ToArray(); Old = $old.ToArray() })
+        }
+        return $out
+    }
+    [string[]]$lines = $text -split "`n"
+    $first = ''; foreach ($ln in $lines) { if ($ln.Trim()) { $first = $ln; break } }
+    $out.StatusFirst = $null -ne (Get-StatusOf $first)
+    foreach ($ln in $lines) { $s = Get-StatusOf $ln; if ($s) { $out.Status = $s; break } }
+    if (-not $out.Status -and $first.Trim()) {
+        $word = $first.Trim().Split(' ')[0].Trim([char[]]@('*', ':', '(')).ToUpper()
+        if ($StatusWords -contains $word) { $out.Status = $word }
+    }
+    $targets = @(for ($i = 0; $i -lt $lines.Count; $i++) { if ([regex]::IsMatch($lines[$i], $TargetLineRx)) { $i } })
+    $starts = [Collections.Generic.List[int]]::new()
+    for ($k = 0; $k -lt $targets.Count; $k++) {
+        if ($k -eq 0) { $starts.Add(0); continue }
+        $s = $targets[$k]
+        while (($s - 1) -gt $targets[$k - 1] -and ((-not $lines[$s - 1].Trim()) -or [regex]::IsMatch($lines[$s - 1], $HeadingRx) -or (Get-StatusOf $lines[$s - 1]))) { $s-- }
+        $starts.Add($s)
+    }
+    $spans = [Collections.Generic.List[object]]::new()
+    if ($targets.Count) {
+        for ($k = 0; $k -lt $starts.Count; $k++) { $spans.Add([int[]]@($starts[$k], $(if ($k + 1 -lt $starts.Count) { $starts[$k + 1] } else { $lines.Count }))) }
+    } else { $spans.Add([int[]]@(0, $lines.Count)) }
+    for ($k = 0; $k -lt $spans.Count; $k++) {
+        $a = $spans[$k][0]; $b = $spans[$k][1]
+        [string[]]$chunk = if ($b -gt $a) { $lines[$a..($b - 1)] } else { @() }
+        $target = if ($targets.Count) { [regex]::Match($lines[$targets[$k]], $TargetLineRx).Groups[1].Value.Trim() } else { '' }
+        $st = $out.Status
+        foreach ($ln in $chunk) { $s = Get-StatusOf $ln; if ($s) { $st = $s; break } }
+        $base = ''
+        foreach ($ln in $chunk) {
+            if ($ln -match '(?i)\bbase\b') { $h = [regex]::Match($ln, $Hex64Rx); if ($h.Success) { $base = $h.Value; break } }
+        }
+        $edits = Get-BlockEdits @($chunk | Where-Object { -not [regex]::IsMatch($_, $TargetLineRx) })
+        $out.Blocks.Add([pscustomobject]@{ Status = $st; Target = $target; Base = $base; New = @($edits[0]); Old = @($edits[1]) })
+    }
+    return $out
+}
+function Get-SubstringCount([string]$hay, [string]$needle) {
+    $n = 0; $i = 0
+    while (($i = $hay.IndexOf($needle, $i, [StringComparison]::Ordinal)) -ge 0) { $n++; $i += $needle.Length }
+    return $n
+}
+function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
+    $recorded = @{ 'APPLIED' = 'Applied'; 'SUPERSEDED' = 'Superseded'; 'CONFLICTED' = 'Conflicted'; 'UNVERIFIABLE' = 'Unverifiable' }
+    $raw = $block.Target.Trim().Trim([char[]]@('`', "'", '"', '\', ' '))
+    $target = if ($raw) { Get-CleanReference $raw } else { '' }
+    if ($block.Status -and $recorded.ContainsKey($block.Status)) { return @(($recorded[$block.Status] + ' (recorded)'), $target) }
+    if (-not $target) { return @('Unverifiable (no Target)', '') }
+    $full = $projectRoot
+    foreach ($seg in $target.Replace('\', '/').TrimStart('/').Split('/')) { if ($seg) { $full = [IO.Path]::Combine($full, $seg) } }
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target) }
+    $current = Read-SmallText $full
+    if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target) }
+    try { $digest = (Get-FileHash -LiteralPath $full -Algorithm SHA256 -ErrorAction Stop).Hash.ToLower() }
+    catch { return @('Unverifiable (target unreadable)', $target) }
+    $base = [regex]::Match([string]$block.Base, $Hex64Rx)
+    $present = @(@($block.New) | ForEach-Object { $current.Contains($_) })
+    if ($present.Count -and -not ($present -contains $false)) { return @('Applied (not marked)', $target) }
+    if ($present -contains $true) { return @('Conflicted (partly present)', $target) }
+    if ($base.Success -and $base.Value.ToLower() -eq $digest) { return @('Pending (base matches)', $target) }
+    if (@($block.Old).Count -and -not (@(@($block.Old) | ForEach-Object { (Get-SubstringCount $current $_) -eq 1 }) -contains $false)) {
+        return @('Pending (anchor matches)', $target)
+    }
+    if ($base.Success -or ($sourceId -and $current.ToLower().Contains($sourceId))) {
+        $why = if ($sourceId -and $current.ToLower().Contains($sourceId)) { '; source session ID in target' } else { '' }
+        return @(('Conflicted (text absent' + $(if ($base.Success) { ', base differs' } else { '' }) + $why + ')'), $target)
+    }
+    if (@($block.New).Count) { return @('Unverifiable (text absent; no base or anchor)', $target) }
+    return @('Unverifiable (no edit text)', $target)
+}
+function Get-PendingState([string]$path, [string]$projectRoot) {
+    $text = Read-SmallText $path
+    if ($null -eq $text) { return [pscustomobject]@{ Blocks = @(, @('Unverifiable (unreadable)', '')); Flag = '' } }
+    $info = Get-PendingInfo $text ([IO.Path]::GetFileName($path))
+    $flag = ''
+    if (-not $info.StatusFirst) {
+        $anyBlock = @($info.Blocks | Where-Object { $_.Status }).Count
+        $flag = if (-not $anyBlock -and $null -eq $info.Status) { 'no Status: line' } else { 'Status: not first line' }
+    }
+    $m = [regex]::Match((Get-RelUnder $path $projectRoot), $UuidPattern)
+    $sid = if ($m.Success) { $m.Value.ToLower() } else { '' }
+    $blocks = @(foreach ($b in $info.Blocks) { , (Get-BlockState $b $projectRoot $sid) })
+    return [pscustomobject]@{ Blocks = $blocks; Flag = $flag }
+}
+function Get-RelUnder([string]$full, [string]$base) {
+    $b = $base.TrimEnd('\', '/')
+    if ($full.StartsWith($b, [StringComparison]::OrdinalIgnoreCase)) { return $full.Substring($b.Length).TrimStart('\', '/').Replace('\', '/') }
+    return $full.Replace('\', '/')
+}
+function Find-PendingFiles([string]$project, [string]$scratchRel = 'AI_CONTEXT/scratch') {
+    $dirs = [Collections.Generic.List[string]]::new()
+    $dirs.Add($project); $dirs.Add([IO.Path]::Combine($project, 'AI_CONTEXT'))
+    $scratch = $project
+    foreach ($seg in $scratchRel.Replace('\', '/').Split('/')) { if ($seg) { $scratch = [IO.Path]::Combine($scratch, $seg) } }
+    if (Test-Path -LiteralPath $scratch -PathType Container) {
+        $si = Get-Item -LiteralPath $scratch -Force
+        if (-not $si.LinkType) {
+            $dirs.Add($scratch)
+            @(Get-ChildItem -LiteralPath $scratch -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.LinkType } |
+                Sort-Ordinal -Key { $_.FullName }) | ForEach-Object { $dirs.Add($_.FullName) }
+        }
+    }
+    $found = [Collections.Generic.HashSet[string]]::new()
+    foreach ($d in $dirs) {
+        if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
+        foreach ($f in @(Get-ChildItem -LiteralPath $d -File -Force -ErrorAction SilentlyContinue)) {
+            if (Test-PendingName $f.Name) { [void]$found.Add($f.FullName) }
+        }
+    }
+    return @($found | Sort-Ordinal -Key { Get-OrdinalKey (Get-RelUnder $_ $project) })
+}
+function Get-DeclarationSources([string]$project, [string]$quickRel = 'AI_CONTEXT/PROJECT_QUICK_CONTEXT.md') {
+    $out = foreach ($relName in @('AGENTS.md', 'CLAUDE.md', $quickRel)) {
+        $p = $project
+        foreach ($seg in $relName.Split('/')) { if ($seg) { $p = [IO.Path]::Combine($p, $seg) } }
+        $t = Read-SmallText $p
+        if ($t -and [regex]::IsMatch($t, $DeclarationRx)) { $relName }
+    }
+    return @($out)
+}
+function Get-RulesCore([string]$text) {
+    $lines = $text -split "`n"
+    $start = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 1\.') { $start = $i; break } }
+    if ($start -lt 0) { return $null }
+    $end = $lines.Count
+    for ($i = $start + 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^## 13\.') { $end = $i; break } }
+    $core = [Collections.Generic.List[string]]::new()
+    for ($i = $start; $i -lt $end; $i++) { $t = $lines[$i].Trim(); if ($t) { $core.Add($t) } }
+    return , $core.ToArray()
+}
+function Get-CoreDifference([string[]]$a, [string[]]$b) {
+    $c = @{}
+    foreach ($x in $a) { $c[$x] = [int]$c[$x] + 1 }
+    foreach ($x in $b) { $c[$x] = [int]$c[$x] - 1 }
+    $n = 0
+    foreach ($k in $c.Keys) { $n += [Math]::Abs($c[$k]) }
+    return $n
+}
+function Get-TemplateCore {
+    # The skill's own bundled template: outside the audited root by design, so
+    # it is read directly rather than through the root-confined reader.
+    try { $text = [IO.File]::ReadAllText($TemplatePath, [Text.UTF8Encoding]::new($false)) } catch { return @($null, $null) }
+    if (-not $text) { return @($null, $null) }
+    $m = [regex]::Match($text, $RulesVersionRx)
+    $ver = if ($m.Success) { $m.Groups[1].Value } else { '?' }
+    return @((Get-RulesCore $text), $ver)
+}
+function Get-RulesInfo([string]$project, $tcore) {
+    $agents = [IO.Path]::Combine($project, 'AGENTS.md')
+    $text = if (Test-Path -LiteralPath $agents -PathType Leaf) { Read-SmallText $agents } else { $null }
+    $seq = if (@(Get-DeclarationSources $project).Count) { 'yes' } else { 'no' }
+    if ($null -eq $text) { return @('n/a', 'n/a', 'n/a', $seq) }
+    $source = $text; $byRef = ''
+    $m = [regex]::Match($text, $RulesVersionRx)
+    if (-not $m.Success) {
+        $head = (($text -split "`n") | Select-Object -First 20) -join "`n"
+        foreach ($target in @(Get-MarkdownTargets $head)) {
+            $clean = Get-CleanReference $target
+            if ($clean -match '(?i)rules[^/]*\.md$') {
+                $full = $project
+                foreach ($seg in $clean.Replace('\', '/').TrimStart('/').Split('/')) { if ($seg) { $full = [IO.Path]::Combine($full, $seg) } }
+                $ref = if (Test-Path -LiteralPath $full -PathType Leaf) { Read-SmallText $full } else { $null }
+                if ($ref -and [regex]::IsMatch($ref, $RulesVersionRx)) { $source = $ref; $byRef = ' (by reference)'; $m = [regex]::Match($ref, $RulesVersionRx); break }
+            }
+        }
+    }
+    $version = if ($m.Success) { $m.Groups[1].Value + $byRef } else { 'unversioned' }
+    $routing = if ($source.Contains('Day-to-day saving and indexing') -or $source.Contains('multi-agent-folder-cleanup')) { 'yes' } else { 'no' }
+    $core = Get-RulesCore $source
+    if ($null -eq $tcore) { $match = 'unknown (no template bundled)' }
+    elseif ($null -eq $core) { $match = 'unknown (no sections 1-12)' }
+    else {
+        $n = Get-CoreDifference $core $tcore
+        $match = if ($n -eq 0) { 'match' } else { "differs ($n lines)" }
+    }
+    return @($version, $routing, $match, $seq)
+}
+function Get-JournalRetired($file, [int]$rulesMajor, [string]$contextText) {
+    $r = Get-RelSlash $file.FullName
+    $segs = $r.ToLower().Split('/')
+    for ($i = 0; $i -lt $segs.Count - 1; $i++) {
+        if ($segs[$i].Contains('history') -or $segs[$i].Contains('_superseded') -or $segs[$i].Contains('archive')) { return 'under a History/archive path' }
+    }
+    foreach ($line in ($contextText -split "`n")) {
+        if ($line.Contains($file.Name) -and $line -match '(?i)retired|legacy|history') { return 'declared retired in AGENTS.md or quick context' }
+    }
+    $sessions = [IO.Path]::Combine($file.DirectoryName, 'SESSIONS')
+    if ($rulesMajor -ge 3 -and (Test-Path -LiteralPath $sessions -PathType Container)) {
+        if (@(Get-ChildItem -LiteralPath $sessions -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower().EndsWith('.md') }).Count) { return 'superseded by SESSIONS/ logs (rules 3.x)' }
+    }
+    return $null
+}
+function Get-CommonFolder([string[]]$rels) {
+    $parts = @($rels | ForEach-Object { $s = $_.Split('/'); , @($s[0..($s.Count - 1)] | Select-Object -First ($s.Count - 1)) })
+    $out = [Collections.Generic.List[string]]::new()
+    $min = ($parts | ForEach-Object { @($_).Count } | Measure-Object -Minimum).Minimum
+    for ($i = 0; $i -lt $min; $i++) {
+        $seg = @($parts[0])[$i]
+        if (@($parts | Where-Object { @($_)[$i] -cne $seg }).Count) { break }
+        $out.Add($seg)
+    }
+    if ($out.Count) { return ($out -join '/') }
+    return '.'
+}
+function Get-AiContextMisuse($items) {
+    $out = foreach ($it in $items) {
+        $segs = $it.Rel.Split('/')
+        if ($segs.Count -lt 2 -or $segs[0].ToLower() -ne 'ai_context') { continue }
+        if ($segs.Count -gt 2 -and @('scratch', 'sessions') -contains $segs[1].ToLower()) { continue }
+        $ext = [IO.Path]::GetExtension($segs[-1]).ToLower()
+        if ($ContinuityTextExts -notcontains $ext) { [pscustomobject]@{ Rel = $it.Rel; Size = $it.Size; Why = 'non-text file' } }
+        elseif ($segs.Count -eq 2 -and $KnownContinuity -notcontains $segs[1].ToLower()) { [pscustomobject]@{ Rel = $it.Rel; Size = $it.Size; Why = 'loose file' } }
+    }
+    return @($out | Sort-Ordinal -Key { Get-OrdinalKey $_.Rel })
+}
+function Get-RepoFoldersWithoutGit([string[]]$rels) {
+    $dirs = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($r in $rels) {
+        $segs = $r.Split('/')
+        $noise = $false
+        for ($i = 0; $i -lt $segs.Count - 1; $i++) { if (Test-NoiseSegment $segs[$i]) { $noise = $true } }
+        if ($noise) { continue }
+        $leaf = $segs[-1].ToLower()
+        if ($leaf -eq '.gitignore' -or $leaf -eq '.gitattributes') { [void]$dirs.Add((@($segs | Select-Object -First ($segs.Count - 1)) -join '/')) }
+        for ($i = 0; $i -lt $segs.Count - 1; $i++) {
+            if ($segs[$i].ToLower() -eq '.github') { [void]$dirs.Add((@($segs | Select-Object -First $i) -join '/')); break }
+        }
+    }
+    $out = foreach ($d in $dirs) {
+        $gitPath = if ($d) { Join-RootRel ($d + '/.git') } else { [IO.Path]::Combine($RootFull, '.git') }
+        if (-not (Test-Path -LiteralPath $gitPath)) { if ($d) { $d } else { '.' } }
+    }
+    return @($out | Sort-Ordinal -Key { Get-OrdinalKey $_ })
+}
+
+# ---------------------------------------------------------------------------
 # Work-mode helpers (v1.5): -Orient and -SessionIndex. Same output as
 # audit_folder.py --orient / --session-index. Read-only; modified-time evidence
 # is labeled local and replica-unsafe.
 # ---------------------------------------------------------------------------
-if ($Orient -or $SessionIndex) {
+if ($Orient -or $SessionIndex -or $Pending) {
+    $script:InWork = $true
     $SessionNameRx = '^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_(' + $UuidPattern + ')\.md$'
-    $CanonicalToolSlugs = @('claude', 'claude-code', 'codex', 'antigravity', 'gemini', 'copilot', 'manus', 'opal', 'grok')
+    $CanonicalToolSlugs = @('claude', 'claude-code', 'codex', 'antigravity', 'gemini', 'copilot', 'manus', 'opal', 'grok', 'muse')
     $IsoRx = '\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?'
     $TurnRx = '(?m)^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$'
     $WorkCap = if ($Brief) { 10 } else { 15 }
@@ -661,27 +1079,6 @@ if ($Orient -or $SessionIndex) {
         $counts = @{}
         foreach ($s in $items) { if ($counts.ContainsKey($s.Id)) { $counts[$s.Id]++ } else { $counts[$s.Id] = 1 } }
         return @($counts.Keys | Where-Object { $counts[$_] -gt 1 } | Sort-Object)
-    }
-    function Join-RootRel([string]$relPath) {
-        $acc = $RootFull
-        foreach ($seg in $relPath.Replace('\', '/').Split('/')) { if ($seg) { $acc = [IO.Path]::Combine($acc, $seg) } }
-        return $acc
-    }
-    function Read-SmallText([string]$path) {
-        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
-        if (-not (Test-ContentReadAllowed $path)) { return $null }
-        try {
-            $sr = [IO.StreamReader]::new($path, [Text.UTF8Encoding]::new($false), $true)
-            try {
-                $buf = New-Object char[] 1048577
-                $n = $sr.ReadBlock($buf, 0, $buf.Length)
-                if ($n -gt 1048576) {
-                    Write-Line ("  read incomplete (over 1048576 characters): {0}; not parsed" -f [IO.Path]::GetFileName($path))
-                    return $null
-                }
-                return [string]::new($buf, 0, $n)
-            } finally { $sr.Dispose() }
-        } catch { return $null }
     }
     function Write-Capped($items, [string]$indent = '    ') {
         $items = @($items)
@@ -808,10 +1205,52 @@ if ($Orient -or $SessionIndex) {
         Write-Line ("  possibly active writers (changed in last {0} min): {1} distinct sessions, {2} unpaired scratch folders" -f $ActiveMinutes, $activeIds.Count, $unpairedScratch.Count)
         Write-Capped @($active | ForEach-Object { "session {0} {1} {2}" -f $_.Id.Substring(0, 8), $_.Tool, $_.Topic })
         Write-Capped @($unpairedScratch | ForEach-Object { "unpaired scratch/$_" })
+        $declared = @(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/'))
+        if ($declared.Count) { Write-Line ("  coordination: sequential-writer declaration found ({0})" -f ($declared -join ', ')) }
+        else { Write-Line '  coordination: no sequential-writer declaration; stage PENDING edits unless other coordination is established' }
         if ($active.Count -or $unpairedScratch.Count) {
             Write-Line '    -> another agent may be working: coordinate shared edits before writing;'
             Write-Line '       stage exact pending edits in your scratch if coordination is unavailable.'
+            if ($declared.Count) { Write-Line '       The declaration covers agents working one after another, not overlap: stage shared-record edits this session.' }
         }
+
+        # Declared startup read order (README_FIRST links, in order).
+        $readOrderKB = 'none found'
+        $rfRel = $null
+        foreach ($c in @('README_FIRST.md', 'AI_CONTEXT/README_FIRST.md')) { if (Test-Path -LiteralPath (Join-RootRel $c) -PathType Leaf) { $rfRel = $c; break } }
+        if ($rfRel) {
+            $rfFull = Join-RootRel $rfRel
+            $rfText = Read-SmallText $rfFull; if ($null -eq $rfText) { $rfText = '' }
+            $order = [Collections.Generic.List[string]]::new(); $order.Add($rfRel)
+            $seen = [Collections.Generic.HashSet[string]]::new(); [void]$seen.Add($rfRel.ToLower())
+            $refs = @(Get-MarkdownTargets $rfText) + @([regex]::Matches($rfText, '`([^`\r\n]+\.[A-Za-z0-9]{1,8})`') | ForEach-Object { $_.Groups[1].Value })
+            foreach ($ref in $refs) {
+                $clean = Get-CleanReference $ref
+                if ((Test-ExternalOrNonPath $clean) -or -not $clean.ToLower().EndsWith('.md')) { continue }
+                $hits = @(Get-ResolvedReferencePaths $clean ([IO.Path]::GetDirectoryName($rfFull)))
+                if (-not $hits.Count -or -not (Test-Path -LiteralPath $hits[0] -PathType Leaf)) { continue }
+                # .NET Framework's GetFullPath may expand 8.3 short names, so test
+                # containment against both spellings of the root (see $RootWalk).
+                $hit = [IO.Path]::GetFullPath($hits[0])
+                $insideRoot = $false
+                foreach ($rp in @($RootFull, $RootWalk)) {
+                    if ($rp -and $hit.StartsWith($rp.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { $insideRoot = $true }
+                }
+                if (-not $insideRoot) { continue }
+                $key = Get-RelSlash $hit
+                if (-not $seen.Add($key.ToLower())) { continue }
+                $order.Add($key)
+            }
+            $orderTotal = 0
+            $orderLines = foreach ($key in $order) {
+                $sz = (Get-Item -LiteralPath (Join-RootRel $key) -Force).Length; $orderTotal += $sz
+                ("{0}  {1} KB" -f $key, [Math]::Floor($sz / 1024)) + $(if ($sz -gt $CodexDocLimit) { '  LARGE: read by section/ID or tail' } else { '' })
+            }
+            Write-Line ("  declared read order ({0} and the .md files it links, in order; may include optional reads): {1} files" -f $rfRel, $order.Count)
+            Write-Capped @($orderLines)
+            Write-Line (("    total {0} KB (budget {1} KB)" -f [Math]::Floor($orderTotal / 1024), $ReadBudgetKB) + $(if ($orderTotal -gt $ReadBudgetKB * 1024) { '  OVER BUDGET' } else { '' }))
+            $readOrderKB = "{0} KB" -f [Math]::Floor($orderTotal / 1024)
+        } else { Write-Line '  declared read order: no README_FIRST.md at the root or in AI_CONTEXT/' }
 
         if ($Since) {
             $sinceT = ConvertFrom-Iso $Since
@@ -826,6 +1265,7 @@ if ($Orient -or $SessionIndex) {
         }
         $skip = @(($SessionsDir.Replace('\', '/').Trim('/') + '/').ToLower(), ($ScratchDir.Replace('\', '/').Trim('/') + '/').ToLower())
         $changed = [Collections.Generic.List[object]]::new()
+        $allW = [Collections.Generic.List[object]]::new()
         $prunedCount = 0; $unvisitedW = 0
         $clockW = [Diagnostics.Stopwatch]::StartNew()
         $stackW = [Collections.Generic.Stack[IO.DirectoryInfo]]::new(); $stackW.Push($RootDirInfo)
@@ -846,6 +1286,7 @@ if ($Orient -or $SessionIndex) {
                 } else {
                     $r = Get-RelSlash $e.FullName
                     $mt = [DateTimeOffset]$e.LastWriteTime
+                    $allW.Add([pscustomobject]@{ Rel = $r; MTime = $mt; Full = $e.FullName; Name = $e.Name })
                     if ($mt -lt $sinceT) { continue }
                     $rl = $r.ToLower(); if ($rl.StartsWith($skip[0]) -or $rl.StartsWith($skip[1])) { continue }
                     $ex = $false; foreach ($pat in $Exclude) { if (Test-MatchPattern $r $pat) { $ex = $true } }
@@ -855,12 +1296,43 @@ if ($Orient -or $SessionIndex) {
             }
             if ($envP) { $prunedCount++ }
         }
-        $changedS = @($changed | Sort-Object -Property @{ Expression = { $_.MTime.UtcTicks }; Descending = $true }, @{ Expression = { $_.Rel }; Descending = $false })
+        # Newest first, then ordinal path order, exactly like audit_folder.py.
+        $changedS = @($changed | Sort-Ordinal -Key { ([DateTimeOffset]::MaxValue.UtcTicks - $_.MTime.UtcTicks).ToString('D19') + [char]0 + $_.Rel })
         $sinceLabel = if (-not $Since -and $dated.Count -and $latest.FilenameStart) { $latest.FilenameStart + ' (filename; offset unknown)' } else { Format-WorkTime $sinceT }
         Write-Line ("  files changed since {0} ({1}), excluding session logs and scratch: {2}" -f $sinceLabel, $basis, $changedS.Count)
         Write-Capped @($changedS | ForEach-Object { "{0}  {1}" -f (Format-WorkTime $_.MTime), $_.Rel })
         if ($unvisitedW) { Write-Line "  WALK INCOMPLETE: $unvisitedW folders not visited (--max-seconds)" }
         if ($prunedCount) { Write-Line "  generated-state folders not walked: $prunedCount" }
+
+        # Activity no record accounts for (R189/R209).
+        $recordTexts = [Collections.Generic.List[string]]::new()
+        if ($null -ne $S.Sessions) {
+            foreach ($sf in @(Get-ChildItem -LiteralPath $S.Dir -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower().EndsWith('.md') } | Sort-Ordinal -Key { $_.Name })) {
+                $t = Read-SmallText $sf.FullName; if ($t) { $recordTexts.Add($t) }
+            }
+        }
+        foreach ($w in $allW) { if ($w.Name.ToLower() -eq '_provenance.md') { $t = Read-SmallText $w.Full; if ($t) { $recordTexts.Add($t) } } }
+        $unattributed = @($changedS | Where-Object {
+            $r = $_.Rel; $leaf = $r.Split('/')[-1]
+            -not @($recordTexts | Where-Object { $_.Contains($r) -or $_.Contains($leaf) }).Count } | ForEach-Object { $_.Rel })
+        Write-Line ("  changed files no session log or _PROVENANCE.md names: {0} (leads; a log may cover them by folder)" -f $unattributed.Count)
+        Write-Capped $unattributed
+        $byTime = @{}
+        foreach ($w in $allW) {
+            $sec = [int64][Math]::Floor($w.MTime.ToUnixTimeMilliseconds() / 1000)
+            if (-not $byTime.ContainsKey($sec)) { $byTime[$sec] = [Collections.Generic.List[string]]::new() }
+            $byTime[$sec].Add($w.Rel)
+        }
+        $clusters = @($byTime.Keys | Where-Object { $byTime[$_].Count -ge 10 } | ForEach-Object {
+            [pscustomobject]@{ Count = $byTime[$_].Count; Sec = $_; Folder = (Get-CommonFolder @($byTime[$_])) } } |
+            Sort-Ordinal -Key { (Get-DescKey $_.Count) + [char]0 + ($_.Sec + 100000000000).ToString('D16') } | Select-Object -First 3)
+        foreach ($c in $clusters) {
+            $where = if ($c.Folder -eq '.') { 'the root' } else { $c.Folder + '/' }
+            Write-Line ("  identical modified times: {0} files at {1} under {2} (typical of archive extraction; not activity evidence)" -f $c.Count, (Format-WorkTime ([DateTimeOffset]::FromUnixTimeSeconds($c.Sec))), $where)
+        }
+        $conf = Write-ConflictBlock @($allW | ForEach-Object { $_.Rel })
+        # Sibling projects are outside this root, so their contents are never read here.
+        Write-Line '  handoffs from sibling projects: not read (outside this root); run --portfolio on the parent folder to list handoffs addressed to this project'
         $idxText = ''
         foreach ($ip in $idxList) { $t = Read-SmallText (Join-RootRel $ip); if ($t) { $idxText += $t } }
         $unindexed = @()
@@ -876,6 +1348,11 @@ if ($Orient -or $SessionIndex) {
         $glance['changed since baseline'] = $changedS.Count
         $glance['changed but unnamed in index'] = $(if ($idxText) { $unindexed.Count } else { 'n/a' })
         $glance['quick context over size'] = $(if ($qcFlag) { 'yes' } else { 'no' })
+        $glance['sequential-writer declaration'] = $(if ($declared.Count) { 'yes' } else { 'no' })
+        $glance['declared read order'] = $readOrderKB
+        $glance['changed but unattributed'] = $unattributed.Count
+        $glance['sync conflict copies'] = $conf[0]
+        $glance['case-only name collisions'] = $conf[1]
     }
 
     if ($SessionIndex) {
@@ -939,6 +1416,55 @@ if ($Orient -or $SessionIndex) {
             $glance['index links to missing logs'] = $stale.Count
             }
         }
+    }
+
+    if ($Pending) {
+        Write-Section 'Pending files (report only)'
+        $pfound = @(Find-PendingFiles $RootFull $ScratchDir)
+        $plines = [Collections.Generic.List[string]]::new(); $pstates = [Collections.Generic.List[string]]::new()
+        $missingN = 0; $lateN = 0
+        foreach ($pf in $pfound) {
+            $res = Get-PendingState $pf $RootFull
+            if ($res.Flag -eq 'no Status: line') { $missingN++ }
+            if ($res.Flag -eq 'Status: not first line') { $lateN++ }
+            $nb = @($res.Blocks).Count
+            for ($k = 0; $k -lt $nb; $k++) {
+                $bst = @($res.Blocks)[$k]
+                $pstates.Add($bst[0])
+                $part = if ($nb -gt 1) { " [{0}/{1}]" -f ($k + 1), $nb } else { '' }
+                $tg = if ($bst[1]) { $bst[1] } else { '(no Target)' }
+                $plines.Add((("{0,-49} {1}{2} -> {3}" -f $bst[0], (Get-RelSlash $pf), $part, $tg) + $(if ($res.Flag -and $k -eq 0) { "  [$($res.Flag)]" } else { '' })))
+            }
+        }
+        Write-Line ("  pending files: {0}, edit blocks: {1} (no Status: line: {2}; Status: not first line: {3})" -f $pfound.Count, $pstates.Count, $missingN, $lateN)
+        Write-Capped @($plines)
+        $applicableN = @($pstates | Where-Object { $_.StartsWith('Pending (') }).Count
+        $appliedN = @($pstates | Where-Object { $_ -eq 'Applied (not marked)' }).Count
+        $malformedN = $missingN
+        $prov = [Collections.Generic.List[string]]::new()
+        $inc = Join-RootRel 'Incoming'
+        if (Test-Path -LiteralPath $inc -PathType Container) {
+            foreach ($child in @(Get-ChildItem -LiteralPath $inc -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.LinkType } | Sort-Ordinal -Key { Get-OrdinalKey $_.Name })) {
+                foreach ($pf in @(Get-ChildItem -LiteralPath $child.FullName -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower() -eq '_provenance.md' })) {
+                    $t = Read-SmallText $pf.FullName; if ($null -eq $t) { $t = '' }
+                    $k = [regex]::Matches($t, 'PENDING').Count
+                    if ($k) { $prov.Add(("Incoming/{0}/{1} ({2} PENDING mentions)" -f $child.Name, $pf.Name, $k)) }
+                }
+            }
+        }
+        Write-Line ("  _PROVENANCE.md files with PENDING rows: {0}" -f $prov.Count)
+        Write-Capped @($prov)
+        if (@(Get-DeclarationSources $RootFull $QuickContext.Replace('\', '/')).Count) { Write-Line "  sequential-writer declaration found: the active writer may apply 'Pending (base/anchor matches)' entries (W5)." }
+        Write-Line '  Conflicted means compare by hand: the edit may already be in the target in other words,'
+        Write-Line '  or may still be needed. Never discard or apply on the label alone.'
+        Write-Line '  Nothing was applied. Apply under Work mode W5, then set the first line to'
+        Write-Line "  'Status: APPLIED <after-sha8> by <session>/<turn>'."
+        $glance['pending files'] = $pfound.Count
+        $glance['pending edit blocks'] = $pstates.Count
+        $glance['pending without Status line'] = $malformedN
+        $glance['pending applicable now'] = $applicableN
+        $glance['applied but still PENDING'] = $appliedN
+        $glance['provenance files with PENDING'] = $prov.Count
     }
 
     Write-Section 'Findings at a glance'
@@ -1365,14 +1891,19 @@ else { Write-Line "  none detected by name" }
 
 Write-Section "Handoff and pending-update lifecycle warnings"
 $handoffs = @($files | Where-Object { $r = Get-Short $_.FullName; -not (Test-NonGoverning $r) -and ($_.Name -match '(?i)handoff|next[ _-].*prompt') })
-$pendingUpdates = @($files | Where-Object { $_.Name -match '(?i)pending.*(navigation|shared|index)|(navigation|shared).*pending' })
+$pendingUpdates = @($files | Where-Object { Test-PendingName $_.Name } | ForEach-Object {
+        $t = Read-SmallText $_.FullName
+        $st = if ($null -ne $t) { (Get-PendingInfo $t $_.Name).Status } else { $null }
+        $mark = if ($st) { $st.Substring(0, 1).ToUpper() + $st.Substring(1).ToLower() } else { 'no Status:' }
+        [pscustomobject]@{ Rel = (Get-RelSlash $_.FullName); Mark = $mark } } | Sort-Ordinal -Key { $_.Rel + [char]0 + $_.Mark })
 $packageChannels = @($files | Where-Object { $_.Extension.ToLower() -eq '.zip' -and (Get-Short $_.FullName) -match '(?i)(candidate|superseded|release)' })
 Write-Line ("  handoff/next-prompt files outside non-governing areas: " + $handoffs.Count)
-$handoffs | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
-Write-Line ("  pending shared-update artifacts: " + $pendingUpdates.Count)
-$pendingUpdates | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    Unverifiable " + (Get-Short $_.FullName)) }
+Write-Limited @($handoffs | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
+Write-Line ("  pending shared-update artifacts: {0} (without a Status: first line: {1})" -f $pendingUpdates.Count, @($pendingUpdates | Where-Object { $_.Mark -eq 'no Status:' }).Count)
+Write-Limited @($pendingUpdates | ForEach-Object { "{0,-12} {1}" -f $_.Mark, $_.Rel }) '    '
+if ($pendingUpdates.Count) { Write-Line '  Run --pending for target and base checks; a status here is only what the file records.' }
 Write-Line ("  candidate/release/superseded ZIPs requiring channel review: " + $packageChannels.Count)
-$packageChannels | Select-Object -First (Get-Cap 25) | ForEach-Object { Write-Line ("    " + (Get-Short $_.FullName)) }
+Write-Limited @($packageChannels | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
 $glance['handoffs'] = $handoffs.Count; $glance['pending_updates'] = $pendingUpdates.Count; $glance['package_channels'] = $packageChannels.Count
 
 Write-Section "Possible orphaned temporary files"
@@ -1392,15 +1923,28 @@ else { Write-Line "  none" }
 
 Write-Section "Large journals (threshold $JournalThresholdKB KB)"
 $journalLimit = [int64]$JournalThresholdKB * 1024
-$journals = @($allFiles | Where-Object { $_.Name.ToLower().Contains('journal') -and $_.Length -ge $journalLimit })
+$bigJournals = @($allFiles | Where-Object { $_.Name.ToLower().Contains('journal') -and $_.Length -ge $journalLimit })
+$rootAgentsPath = [IO.Path]::Combine($RootFull, 'AGENTS.md')
+$rootAgents = if (Test-Path -LiteralPath $rootAgentsPath -PathType Leaf) { Read-SmallText $rootAgentsPath } else { $null }
+$vm = [regex]::Match([string]$rootAgents, $RulesVersionRx)
+$rulesMajor = if ($vm.Success) { [int]$vm.Groups[1].Value.Split('.')[0] } else { 0 }
+$qcPathMain = [IO.Path]::Combine($RootFull, 'AI_CONTEXT', 'PROJECT_QUICK_CONTEXT.md')
+$qcTextMain = if (Test-Path -LiteralPath $qcPathMain -PathType Leaf) { Read-SmallText $qcPathMain } else { $null }
+$contextText = [string]$rootAgents + "`n" + [string]$qcTextMain
+$journals = [Collections.Generic.List[object]]::new(); $retiredJournals = [Collections.Generic.List[object]]::new()
+foreach ($j in $bigJournals) {
+    $why = Get-JournalRetired $j $rulesMajor $contextText
+    if ($why) { $retiredJournals.Add([pscustomobject]@{ File = $j; Why = $why }) } else { $journals.Add([pscustomobject]@{ File = $j; Why = $null }) }
+}
 $glance['journals'] = $journals.Count
+$glance['retired_journals'] = $retiredJournals.Count
+$jKey = { (Get-DescKey $_.File.Length) + [char]0 + (Get-Short $_.File.FullName).ToLower() }
 if ($journals.Count) {
-    $journals | Sort-Ordinal -Key { (Get-DescKey $_.Length) + [char]0 + (Get-Short $_.FullName).ToLower() } | Select-BriefItems | ForEach-Object {
-        Write-Line ("  {0,9}  {1}" -f $_.Length, (Get-Short $_.FullName))
-    }
+    Write-Limited @($journals | Sort-Ordinal -Key $jKey | ForEach-Object { "{0,9}  {1}" -f $_.File.Length, (Get-Short $_.File.FullName) }) '  '
     Write-Line "  Rotation is a proposal only; preserve every entry and require approval."
 }
 else { Write-Line "  none" }
+Write-Limited @($retiredJournals | Sort-Ordinal -Key $jKey | ForEach-Object { "retired legacy journal, {0} KB: {1} ({2}); no rotation proposed" -f [Math]::Floor($_.File.Length / 1024), (Get-Short $_.File.FullName), $_.Why }) '  '
 
 if ($EntryPoint.Count) {
     Write-Section "Expected entrypoints"
@@ -1447,7 +1991,9 @@ if ($Portfolio) {
         'AI_CONTEXT/PROJECT_QUICK_CONTEXT.md', 'AI_CONTEXT/PROJECT_ACTIVITY_JOURNAL.md',
         'AI_CONTEXT/CHAT_INDEX.md')
     $checks = @($defaults + $EntryPoint | Select-Object -Unique)
-    Write-Line "  Project | State | Count scope | Root items | Entrypoints present | Sessions | Missing index rows | Pending updates"
+    $tpl = Get-TemplateCore
+    $tcore = $tpl[0]; $tver = $tpl[1]
+    Write-Line "  Project | Count scope | State | Root items | Sessions | Missing index rows | Pending updates | Rules version | Work routing | Core match | Sequential writer | Entrypoints present"
     $children = @(Get-ChildItem -LiteralPath $RootFull -Directory -Force -ErrorAction SilentlyContinue | Sort-Ordinal -Key { $_.Name.ToLower() })
     if ($children.Count) {
         foreach ($child in $children) {
@@ -1455,37 +2001,57 @@ if ($Portfolio) {
             $present = @($checks | Where-Object { Test-Path -LiteralPath (Join-Path $child.FullName $_) })
             $value = if ($present.Count) { $present -join ', ' } else { '(none detected)' }
             $state = if ($count -eq 0) { 'empty' } elseif ($present.Count) { 'managed' } else { 'unmanaged' }
-            $sessionDir = Join-Path $child.FullName 'AI_CONTEXT/SESSIONS'
-            $sessionFiles = if (Test-Path -LiteralPath $sessionDir -PathType Container) {
-                @(Get-ChildItem -LiteralPath $sessionDir -File -Filter '*.md' -ErrorAction SilentlyContinue)
-            } else { @() }
-            $sessionCount = $sessionFiles.Count
-            $indexFile = Join-Path $child.FullName 'AI_CONTEXT/SESSION_INDEX.md'
-            $missingRows = 'n/a'
-            if (Test-Path -LiteralPath $indexFile -PathType Leaf) {
-                try {
-                    $indexText = Get-Content -LiteralPath $indexFile -Raw -ErrorAction Stop
-                    $missingRows = @($sessionFiles | Where-Object { $indexText -notmatch [regex]::Escape($_.Name) }).Count
-                } catch { $missingRows = 'n/a' }
+            $sessionDir = [IO.Path]::Combine($child.FullName, 'AI_CONTEXT', 'SESSIONS')
+            $sessionCount = 0; $missingRows = 'n/a'
+            if (Test-Path -LiteralPath $sessionDir -PathType Container) {
+                $sessionNames = @(Get-ChildItem -LiteralPath $sessionDir -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower().EndsWith('.md') } | ForEach-Object { $_.Name })
+                $sessionCount = $sessionNames.Count
+                $indexText = Read-SmallText ([IO.Path]::Combine($child.FullName, 'AI_CONTEXT', 'SESSION_INDEX.md'))
+                if ($null -ne $indexText) {
+                    $missingRows = @($sessionNames | Where-Object {
+                        $n = $_
+                        -not $indexText.Contains($n) -and -not @([regex]::Matches($n, $UuidPattern) | Where-Object { $indexText.Contains($_.Value) }).Count }).Count
+                }
             }
-            # Keep portfolio mode bounded: inspect conventional record locations
-            # without recursively traversing the whole project or linked folders.
-            $pendingDirs = @($child.FullName, (Join-Path $child.FullName 'AI_CONTEXT'))
-            $scratchDir = Join-Path $child.FullName 'AI_CONTEXT/scratch'
-            if (Test-Path -LiteralPath $scratchDir -PathType Container) {
-                $pendingDirs += $scratchDir
-                $pendingDirs += @(Get-ChildItem -LiteralPath $scratchDir -Directory -Force -ErrorAction SilentlyContinue |
-                    Where-Object { -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) } |
-                    ForEach-Object { $_.FullName })
-            }
-            $pendingCount = @($pendingDirs | Select-Object -Unique | ForEach-Object {
-                Get-ChildItem -LiteralPath $_ -File -Force -ErrorAction SilentlyContinue
-            } | Where-Object { $_.Name -match '(?i)pending[-_ ]?(update|navigation|edit)|proposed[-_ ]?(update|patch)' }).Count
-            Write-Line ("  {0} | {1} | root-level | {2} | {3} | {4} | {5} | {6}" -f $child.Name, $state, $count, $value, $sessionCount, $missingRows, $pendingCount)
+            $pend = @(Find-PendingFiles $child.FullName)
+            $noStatus = @($pend | Where-Object { $t = Read-SmallText $_; ($null -eq $t) -or ($null -eq (Get-PendingInfo $t ([IO.Path]::GetFileName($_))).Status) }).Count
+            $ri = Get-RulesInfo $child.FullName $tcore
+            Write-Line ("  {0} | root-level | {1} | {2} | {3} | {4} | {5} ({6} no Status) | {7} | {8} | {9} | {10} | {11}" -f $child.Name, $state, $count, $sessionCount, $missingRows, $pend.Count, $noStatus, $ri[0], $ri[1], $ri[2], $ri[3], $value)
         }
     }
     else { Write-Line "  no immediate child directories" }
     Write-Line "  Presence does not determine authority or operational state."
+    Write-Line ("  Core match compares sections 1-12 with the bundled template" + $(if ($tver) { " $tver" } else { ' (not bundled in this package: unknown)' }) + ".")
+    $names = @($children | ForEach-Object { $_.Name })
+    $groups = @{}
+    foreach ($n in $names) {
+        $b = ([regex]::Replace($n, '(?i)( \(\d+\)| - copy| copy|-copy)$', '')).ToLower()
+        if (-not $groups.ContainsKey($b)) { $groups[$b] = [Collections.Generic.List[string]]::new() }
+        $groups[$b].Add($n)
+    }
+    $twins = @($groups.Keys | Where-Object { $groups[$_].Count -gt 1 } | ForEach-Object {
+            $sortedNames = @($groups[$_] | Sort-Ordinal -Key { Get-OrdinalKey $_ })
+            [pscustomobject]@{ First = $sortedNames[0]; Items = $sortedNames } } | Sort-Ordinal -Key { $_.First.ToLower() })
+    foreach ($v in $twins) { Write-Line ("  possible replicas under this root: " + ($v.Items -join ' ~ ')) }
+    $handoffsTo = [Collections.Generic.List[string]]::new()
+    $lowered = @{}; foreach ($n in $names) { $lowered[$n.ToLower()] = $n }
+    $lowKeys = @($lowered.Keys | Sort-Ordinal -Key { $_ })
+    foreach ($n in $names) {
+        $hdir = [IO.Path]::Combine($RootFull, $n, 'Handoffs')
+        if (-not (Test-Path -LiteralPath $hdir -PathType Container)) { continue }
+        foreach ($h in @(Get-ChildItem -LiteralPath $hdir -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower().EndsWith('.md') } | Sort-Ordinal -Key { $_.Name })) {
+            $t = Read-SmallText $h.FullName; if ($null -eq $t) { $t = '' }
+            if ($t.Length -gt 4096) { $t = $t.Substring(0, 4096) }
+            $m = [regex]::Match($t, $ToLineRx)
+            if (-not $m.Success) { continue }
+            $val = $m.Groups[1].Value.ToLower()
+            foreach ($low in $lowKeys) { if ($lowered[$low] -ne $n -and $val.Contains($low)) { $handoffsTo.Add(("{0}/Handoffs/{1} -> {2}" -f $n, $h.Name, $lowered[$low])) } }
+        }
+    }
+    Write-Line ("  handoffs addressed to another project here: {0} (check each target's Incoming/ for a copy or pointer)" -f $handoffsTo.Count)
+    Write-Limited @($handoffsTo) '    '
+    if (Test-Path -LiteralPath ([IO.Path]::Combine($RootFull, 'PORTFOLIO.md')) -PathType Leaf) { Write-Line '  replica declaration: PORTFOLIO.md present; read it before trusting any copy' }
+    else { Write-Line '  replica declaration: none (PORTFOLIO.md); copies under other providers cannot be seen from this root' }
 }
 
 if ($DetectPointers) {
@@ -1672,8 +2238,10 @@ $autoload = @($instr | Where-Object { $AutoloadNames -contains $_.Name.ToLower()
 $readmes = @($instr | Where-Object { $ReadmeNames -contains $_.Name.ToLower() })
 $misplaced = @($autoload | Where-Object { Test-NonGoverning (Get-RelSlash $_.FullName) })
 $oversized = @($autoload | Where-Object { $_.Name.ToLower() -eq 'agents.md' -and $_.Length -gt $CodexDocLimit })
+$agentsWarn = @($autoload | Where-Object { $_.Name.ToLower() -eq 'agents.md' -and $_.Length -gt $AgentsWarnBytes -and $_.Length -le $CodexDocLimit })
 $glance['misplaced'] = $misplaced.Count
 $glance['oversized'] = $oversized.Count
+$glance['agents_warn'] = $agentsWarn.Count
 if ($instr.Count) {
     Write-Line "  Auto-loaded names:"
     if ($autoload.Count) {
@@ -1694,11 +2262,34 @@ if ($instr.Count) {
     if ($misplaced.Count) { Write-Line "  A host that walks the tree may load these as rules. Propose a non-loading name such as AGENTS.proposed.md; never rename without approval." }
     foreach ($ov in @($oversized | Select-BriefItems)) { Write-Line ("  OVER 32 KiB ({0} bytes): {1}" -f $ov.Length, (Get-Short $ov.FullName)) -ForegroundColor Yellow }
     if ($oversized.Count) { Write-Line "  Codex reads at most 32 KiB of AGENTS.md by default and silently drops the rest. Propose a shorter file that links to on-demand detail." }
+    foreach ($aw in @($agentsWarn | Select-BriefItems)) { Write-Line ("  OVER 16 KB, warning ({0} bytes): {1}" -f $aw.Length, (Get-Short $aw.FullName)) }
+    if ($agentsWarn.Count) { Write-Line "  Little headroom before the 32 KiB Codex limit once project clauses are added." }
 }
 else {
     Write-Line "  NONE FOUND ANYWHERE." -ForegroundColor Yellow
     Write-Line "  No AGENTS.md / CLAUDE.md / README.md in the tree means every agent's instructions live outside the folder and cannot be read by the next one. Report this as a finding."
 }
+
+Write-Section "Sync copies, unpacked packages and continuity folders"
+$relsFiles = @($files | ForEach-Object { Get-RelSlash $_.FullName })
+$confMain = Write-ConflictBlock $relsFiles
+$glance['copies'] = $confMain[0]; $glance['collisions'] = $confMain[1]
+$unpacked = @($relsFiles | Where-Object { $_.Split('/')[-1].ToLower() -eq 'skill.md' -and (Test-NonGoverning $_) } | Sort-Ordinal -Key { Get-OrdinalKey $_ })
+$glance['unpacked'] = $unpacked.Count
+Write-Line ("  unpacked skill trees under scratch/backup/history/incoming: {0}" -f $unpacked.Count)
+Write-Limited $unpacked '    '
+if ($unpacked.Count) { Write-Line '    Keep staged or backup packages as ZIP + SHA256SUMS, or rename SKILL.md to a non-loading name.' }
+$repos = @(Get-RepoFoldersWithoutGit $relsFiles)
+$glance['repos'] = $repos.Count
+Write-Line ("  repository-shaped folders without .git: {0}" -f $repos.Count)
+Write-Limited $repos '    '
+if ($repos.Count) { Write-Line '    A working copy, not a clone: the index should name the remote and the commit or tag it mirrors.' }
+$misuse = @(Get-AiContextMisuse @($files | ForEach-Object { [pscustomobject]@{ Rel = (Get-RelSlash $_.FullName); Size = $_.Length } }))
+$glance['ai_context'] = $misuse.Count
+$misuseBytes = [int64](($misuse | Measure-Object Size -Sum).Sum)
+Write-Line ("  AI_CONTEXT/ files that are not continuity records: {0} ({1} KB)" -f $misuse.Count, [Math]::Floor($misuseBytes / 1024))
+Write-Limited @($misuse | ForEach-Object { "{0,-13} {1,9}  {2}" -f $_.Why, $_.Size, $_.Rel }) '    '
+if ($misuse.Count) { Write-Line '    Propose a content folder the index names (for example Research/ or Proposals/); move nothing in Audit mode.' }
 
 Write-Section "Findings at a glance"
 function Write-GlanceRow([string]$label, $value) { Write-Line ("  {0,-32} {1}" -f $label, $value) }
@@ -1708,6 +2299,7 @@ if ($glance.ContainsKey('missing_entry')) { Write-GlanceRow 'Missing entrypoints
 $readText = if ($readSet.Count) { ("{0:F1} KB" -f ($readTotal / 1024)) + $(if ($overBudget) { ' OVER BUDGET' } else { '' }) } else { 'not identified' }
 Write-GlanceRow 'Startup read set:' $readText
 Write-GlanceRow 'AGENTS.md over 32 KiB:' $glance['oversized']
+Write-GlanceRow 'AGENTS.md over 16 KB (warning):' $glance['agents_warn']
 Write-GlanceRow 'Misplaced live-loading names:' $glance['misplaced']
 Write-GlanceRow 'Embedded skill copies:' ("{0} ({1} name(s) with several copies)" -f $glance['skills'][0], $glance['skills'][1])
 Write-GlanceRow 'Possible orphaned temp files:' $glance['orphans']
@@ -1719,6 +2311,12 @@ Write-GlanceRow 'Handoff / next-prompt files:' $glance['handoffs']
 Write-GlanceRow 'Pending shared-update artifacts:' $glance['pending_updates']
 Write-GlanceRow 'Package-channel review items:' $glance['package_channels']
 Write-GlanceRow 'Large journals:' $glance['journals']
+Write-GlanceRow 'Retired journals (no rotation):' $glance['retired_journals']
+Write-GlanceRow 'Sync conflict copies:' $glance['copies']
+Write-GlanceRow 'Case-only name collisions:' $glance['collisions']
+Write-GlanceRow 'Unpacked skill trees:' $glance['unpacked']
+Write-GlanceRow 'Repo folders without .git:' $glance['repos']
+Write-GlanceRow 'AI_CONTEXT non-continuity files:' $glance['ai_context']
 Write-Line "  Counts only. Open the matching section before acting on any of them."
 
 Write-Line ""

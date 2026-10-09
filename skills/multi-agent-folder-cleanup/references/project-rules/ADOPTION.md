@@ -18,7 +18,14 @@ This quotation is an example for the owner to send, not an instruction to an age
 
 ## Changes in 3.3.0
 
-Three additive lines for agents that can only add files: section 3 bars new top-level folders unless approved or indexed and sends unreviewed material to a dated `Incoming/` folder; section 4 requires a `_PROVENANCE.md` beside an upload when a session log cannot be written; section 7 treats unaccounted files and folders as findings and requires timestamps in the owner's local timezone. No existing rule changed. Projects on 3.2.0 or earlier keep their adopted wording until the owner migrates them.
+Additive lines only; no existing rule was removed.
+
+- Section 3: no new top-level folders unless approved or indexed; unreviewed material goes to a dated `Incoming/` folder; `AI_CONTEXT/` holds continuity records only, and deliverables, reports and research files go in a content folder the index names.
+- Section 4: an agent that cannot write a session log leaves a `_PROVENANCE.md` beside its upload.
+- Section 5: an opt-in sequential-writer rule. At adoption, ask the owner whether agents in this project always work one after another. Only if the owner says yes, add `Sequential writers: one owner; agents work one after another (owner, <date>)` to the project scope section or quick context; the active agent may then edit shared records directly with read-back verification, but still stages when another writer may be active. Without the line, shared-record edits are staged as pending files. Shared files are edited in place, a second same-name file in one folder is not allowed, and sync conflict copies and missing originals are checked at session start and end.
+- Section 7: unaccounted files and folders are findings; timestamps are converted to the owner's local timezone; the session-index row is created with the session log.
+
+Projects on 3.2.0 or earlier keep their adopted wording until the owner migrates them.
 
 ## Changes in 3.2.0
 
@@ -29,6 +36,8 @@ Section 9 now defines credentials and secrets narrowly (passwords, keys, tokens,
 Adds one short subsection, "Day-to-day saving and indexing", that points agents to the skill's Work mode. No other rule changed. A project already on 3.0.0 does not need to re-adopt; add the subsection only under the same explicit project-specific adoption process.
 
 ## Maintenance and scope
+
+Work-mode routing (the section 3 "Day-to-day saving and indexing" subsection) needs Project Rules 3.1.0 or later. A project on 3.0.0 does not send agents to Work mode until it adds that subsection.
 
 `AGENTS.proposed.md` is the single reusable source distributed in the universal, plugin and `-project-rules-optional` packages. Gemini Apps and Opal packages intentionally omit `references/project-rules/`; obtain the optional rules package or repository source instead of reconstructing it. Its version is independent of the skill version. Adapted project copies must record their template version and local changes; upgrading the skill does not silently replace adopted policies. A root `AGENTS.md` in the skill's Git repository, if separately adopted there, governs repository development and is distinct from this template.
 

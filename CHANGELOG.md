@@ -1,13 +1,26 @@
 # Changelog
 
-### 1.6.4 (candidate) — add-only agents and activity attribution
+### 1.7.0 (released 2026-10-09) — stable release: add-only agents, sequential writers, sync-copy and pending-file checks
 
 - Add-only agent fallback in Work mode: an agent that can only add files uploads into a dated `Incoming/` folder (never a new top-level folder) with a `_PROVENANCE.md` listing tool, time with timezone, files, status and PENDING index/tracker/session-index rows; the next agent with edit access applies them. An upload with neither a log nor a provenance file is incomplete. End-of-request checklist item added.
 - `muse` added to tool slugs; an unlisted tool uses its own short lowercase name and never skips the session log.
 - Audit mode B5 "Attribute activity": name searches are not evidence of absence, unmatched changes are unattributed-activity findings, timestamps are converted to the owner's local timezone, and timing-only evidence is reported as "consistent with".
 - Optional Project Rules 3.3.0: three additive lines in sections 3, 4 and 7. Gemini Apps and Opal packages still omit `references/project-rules/`.
-- Helper check for unattributed changes during `--orient` deferred (needs Python/PowerShell parity work).
-- Source: owner handoff from a Muse browser-upload review, 2026-10-08; Claude session `0e9d1f7d`.
+- Sequential-writer declaration (R156 declaration part, R211): opt-in: the owner adds a `Sequential writers:` line at adoption (Project Rules 3.3.0 section 5; owner decision 2026-10-09 after independent review); Work mode W5 lets the active agent edit shared records directly with read-back verification when it is present, and keeps PENDING staging for multi-operator projects. Only the owner's line establishes this, never a quiet `--orient`; with the line, an agent still stages when another writer looks active.
+- Pending files (R201, R212): one name, `PENDING_<TARGET>.md` with a `Status:` first line; a qualifying writer applies leftovers whose base hash or anchor still matches, verifies by read-back and marks them `APPLIED`; anything else is Conflicted. R200 (exact direct-write test) stays on hold.
+- Sync conflict copies and same-name files (R030, R195, R197): edit shared files in place, never create a second same-name file in one folder, check for `(1)`/`-COMPUTER` copies and missing originals at arrival and before the final answer; audit reports them and never merges, renames or deletes.
+- Cloud connectors and sync folders (R168, R169, R197–R199): new Work-mode subsection — state the view and time of every listing, work by file id and stop when a name maps to several ids, stage replacements in scratch with `Replaces: <old file id>`, one file type per shared record, declare replicas.
+- Work mode also: read large trackers by section and journals by tail (R213); session-index row created with the log (R204); cross-agent reviews saved where the reviewed agent will look (R203); cross-project handoffs also delivered to the target's `Incoming/` when authorized (R206); scratch packages kept as ZIP + SHA256SUMS (R207); quick context lists what an in-flight candidate contains (R205); `AI_CONTEXT/` is for continuity records only (R215).
+- Audit guidance: AGENTS.md size warning above 16 KB, high above 32 KiB (R214); declared startup read order (R213); retired journals reported once (R161); unpacked packages and repo-shaped folders without `.git` (R207, R208); `AI_CONTEXT/` misuse (R215); B5 does not rely on modified time alone (R209); portfolio rules matrix with rules version, Work routing and core-match columns (R165, R166).
+- Project Rules 3.3.0 (unreleased until now) also gains: section 3 `AI_CONTEXT/` continuity-only line, section 5 declaration and same-name/conflict-copy lines, section 7 session-index row at creation.
+- Version renamed from the unreleased 1.6.4 candidate to 1.7.0 (owner decision 2026-10-08 23:27 ET) and Batch B folded in, except the mutating `apply_record_patch.py` helper (still deferred).
+- Helpers (Python and PowerShell, same output; all read-only):
+  - `--pending` / `-Pending` (R155, R201, R212): lists pending files in the root, `AI_CONTEXT/` and scratch session folders (any case, `pending-*` variants) and classifies each as Pending (base or anchor matches), Applied (not marked), Conflicted, Unverifiable or its recorded status; flags files without a `Status:` first line; counts PENDING rows in `Incoming/*/_PROVENANCE.md`.
+  - `--orient` (R189, R209, R211, R213, R195): sequential-writer declaration found/none; declared read order from `README_FIRST.md`; changed files no session log or `_PROVENANCE.md` names (the check deferred in the 1.6.4 candidate); identical-timestamp clusters; sync conflict copies and case-only collisions. Sibling projects are never read from `--orient`.
+  - Full audit (R030, R161, R207, R208, R214, R215): new "Sync copies, unpacked packages and continuity folders" section; retired journals reported once; `AGENTS.md` warning above 16 KB; pending lifecycle uses the new name detection and reads `Status:`.
+  - `--portfolio` (R165, R166, R168, R206): rules version, Work routing, core match against the bundled template (`unknown` where the package has no template), sequential-writer declaration, copy-suffix replicas, handoffs addressed to another child, `PORTFOLIO.md` presence. Python and PowerShell now print the same columns and pending counts (previously they differed).
+  - `muse` added to the helpers' canonical tool slugs (R188 follow-through).
+- Sources: owner handoffs from Muse, GaugeWorx, Windows PC Monitor, GitHub Release Skill and jesseraber.net reviews, 2026-10-08; Claude sessions `0e9d1f7d`, `6dbd138b`, `99022649`.
 
 ### 1.6.3 (released 2026-10-08) — portfolio audit corrections
 
