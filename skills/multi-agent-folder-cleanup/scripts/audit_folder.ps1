@@ -1220,14 +1220,19 @@ if ($Orient -or $SessionIndex -or $Pending) {
             $order = [Collections.Generic.List[string]]::new(); $order.Add($rfRel)
             $seen = [Collections.Generic.HashSet[string]]::new(); [void]$seen.Add($rfRel.ToLower())
             $refs = @(Get-MarkdownTargets $rfText) + @([regex]::Matches($rfText, '`([^`\r\n]+\.[A-Za-z0-9]{1,8})`') | ForEach-Object { $_.Groups[1].Value })
-            $rootPrefix = $RootFull.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
             foreach ($ref in $refs) {
                 $clean = Get-CleanReference $ref
                 if ((Test-ExternalOrNonPath $clean) -or -not $clean.ToLower().EndsWith('.md')) { continue }
                 $hits = @(Get-ResolvedReferencePaths $clean ([IO.Path]::GetDirectoryName($rfFull)))
                 if (-not $hits.Count -or -not (Test-Path -LiteralPath $hits[0] -PathType Leaf)) { continue }
+                # .NET Framework's GetFullPath may expand 8.3 short names, so test
+                # containment against both spellings of the root (see $RootWalk).
                 $hit = [IO.Path]::GetFullPath($hits[0])
-                if (-not $hit.ToLower().StartsWith($rootPrefix.ToLower())) { continue }
+                $insideRoot = $false
+                foreach ($rp in @($RootFull, $RootWalk)) {
+                    if ($rp -and $hit.StartsWith($rp.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { $insideRoot = $true }
+                }
+                if (-not $insideRoot) { continue }
                 $key = Get-RelSlash $hit
                 if (-not $seen.Add($key.ToLower())) { continue }
                 $order.Add($key)
