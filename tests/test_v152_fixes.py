@@ -192,7 +192,7 @@ class FoldAndLongPathTests(unittest.TestCase):
         self.assertEqual(mod.win_long_path(prefixed), prefixed)
 
     def test_version(self):
-        self.assertIn("1.6.3", run("--version").stdout)
+        self.assertIn("1.6.4", run("--version").stdout)
 
 
 if __name__ == "__main__":

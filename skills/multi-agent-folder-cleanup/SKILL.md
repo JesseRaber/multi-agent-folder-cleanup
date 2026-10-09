@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.6.3"
+  version: "1.6.4"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.6.3 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.6.4 (SKILL.md at <path>; helpers <version>)**.
 
 ## Choose the operating mode
 
@@ -20,13 +20,15 @@ State the mode in the first line. Use **Work** for ordinary project work in a sh
 | Mode | Typical request | Allowed work | Read |
 |---|---|---|---|
 | **Work** | Any task that creates, saves or updates files in a shared project folder | User-authorized task edits, session continuity and coordinated navigation updates. Use cleanup modes for folder reorganization. | [work-mode.md](references/work-mode.md) |
-| **Audit** | “What is here?” “Why are agents confused?” | Read-only inspection and an evidence report. | [preconditions.md](references/preconditions.md), [cleanup-principles.md](references/cleanup-principles.md), [audit-mode.md](references/audit-mode.md) |
+| **Audit** | “What is here?” “Why are agents confused?” “Who has been in this folder?” | Read-only inspection and an evidence report. | [preconditions.md](references/preconditions.md), [cleanup-principles.md](references/cleanup-principles.md), [audit-mode.md](references/audit-mode.md) |
 | **Plan** | “How should this be organized?” | Read-only inspection, an exact proposal, and literal mutation lists labeled **PROPOSED**. | preconditions, cleanup-principles, [plan-mode.md](references/plan-mode.md) |
 | **Execute** | Explicit approval of a specific mutation list | Only the approved moves, factual patches, or additive intake files. | preconditions, cleanup-principles, then [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md) |
 
 Execute has three mutation types: **move execution** (mounted filesystem, literal move map, hydration checks, staging, hashes, final verification), **record-only execution** (approved exact factual patches to navigation or current-state records), and **additive-intake execution** (a new non-governing incoming package that never replaces existing authority).
 
 Read only the files for your mode. Also read [audit-tools.md](references/audit-tools.md) when a filesystem is mounted and you will run the helpers; [connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search or web listings; [portfolio-audit-template.md](references/portfolio-audit-template.md) when the root holds multiple projects; [navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files. Run helpers for routine work; inspect their source only for safety checks, debugging or review.
+
+An agent that can only add files (browser upload, a connector without edit or append) follows **Add-only agents** in [work-mode.md](references/work-mode.md): no new top-level folder, and a `_PROVENANCE.md` beside the upload. To answer who changed a folder, follow **B5 Attribute activity** in [audit-mode.md](references/audit-mode.md).
 
 ## Keep authorization narrow
 

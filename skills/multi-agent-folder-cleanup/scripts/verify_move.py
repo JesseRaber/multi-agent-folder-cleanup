@@ -42,7 +42,7 @@ import stat
 import sys
 from collections import Counter, defaultdict
 
-VERSION = "1.6.3"  # must equal SKILL.md metadata.version
+VERSION = "1.6.4"  # must equal SKILL.md metadata.version
 
 CLOUD_ATTRS = {"OFFLINE": 0x1000, "RECALL_ON_OPEN": 0x40000, "RECALL_ON_DATA_ACCESS": 0x400000}
 

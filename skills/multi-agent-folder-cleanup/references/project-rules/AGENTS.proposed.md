@@ -1,6 +1,6 @@
 # Project rules
 
-Version: 3.2.0 — reusable edition, 2026-10-06.
+Version: 3.3.0 — reusable edition, 2026-10-08.
 
 This text governs a project only when the owner adopts it for that project through an applicable instruction mechanism. A review copy, attachment, archive, or incoming proposal does not activate itself. When adopted, apply it throughout the project, subject to the host's higher-priority instructions and applicable scoped project instructions.
 
@@ -38,6 +38,8 @@ Use these defaults, or preserve established equivalent paths and document the ma
 
 After adoption, create or merge these records only as needed and when authorized and safe. Do not overwrite populated records with templates, reorganize the project merely to match these defaults, or create competing indexes. Normal project code and assets retain their existing locations. This policy is self-contained; no companion policy files are required.
 
+Do not create new top-level folders unless the owner approves or the project index already lists them. New outside or unreviewed material goes in `Incoming/YYYY-MM-DD_<tool>_<topic>/`.
+
 ### Day-to-day saving and indexing
 
 When the multi-agent-folder-cleanup skill is available, follow its Work mode (`references/work-mode.md`) for where to save new files, file headers, shared-record edits, index rows and the end-of-request handoff. Without it: drafts in your own `AI_CONTEXT/scratch/<session-id>/`, deliverables where the project index points, unreviewed outside material in an incoming area, and an index row for each new deliverable.
@@ -72,6 +74,8 @@ NOT SAVED TO PROJECT | Session: <ID/provisional label> | Turn: <ID> | Time: <kno
 ```
 
 If a local copy exists but delivery is unverified, use `SAVED LOCALLY; NOT VERIFIED AT PROJECT DESTINATION` and identify the copy and intended destination. Add evidence references, source identity, pending updates and recovery limits when substantive. A link to a temporary output is not a durable copy. Do not claim future chat retention, remote delivery or storage persistence without evidence.
+
+An agent that cannot write or append a session log must leave a `_PROVENANCE.md` file beside its upload. It lists the tool, the time with its timezone, the files, their purpose, and the index and tracker rows it proposes, marked pending. An upload with neither a log nor a provenance file is incomplete. The next agent that can edit records adds the pending rows.
 
 ## 5. Writer continuity and safe saves
 
@@ -112,6 +116,7 @@ If a local copy exists but delivery is unverified, use `SAVED LOCALLY; NOT VERIF
 - Before creating an important standalone file, check the intended folder, project index and canonical tracker for an artifact serving the same purpose. Prefer an authorized in-place update or a clearly linked replacement proposal over a parallel version. If the lookup is unavailable, disclose that limitation rather than claiming uniqueness.
 - Keep one session-index row per session: start, last activity, ID, tool, topic, latest outcome/status and link. Refresh at session creation, significant outcome changes and explicit close when safe; routine turns only need their session entry. Sort by known start instant then ID, distinguishing unknown times. The timeline is navigation, not proof of causal order. Preserve manual annotations.
 - Retain useful transcript indexes and raw-source pointers, either separately or in a clearly labeled combined view. A summary must not silently replace its source transcript. Checkers prove only the coverage/link properties they actually inspect; they do not certify meaning, adoption or cloud synchronization. No checker or importer is supplied by these rules.
+- Treat any file or folder that has no index entry and that no session log or provenance file accounts for as a finding to report and investigate, not as background activity. Convert timestamps to the owner's local timezone before matching them to agent activity.
 
 ## 8. Report evidence precisely
 

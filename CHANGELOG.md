@@ -1,6 +1,15 @@
 # Changelog
 
-### 1.6.3 (candidate) — portfolio audit corrections
+### 1.6.4 (candidate) — add-only agents and activity attribution
+
+- Add-only agent fallback in Work mode: an agent that can only add files uploads into a dated `Incoming/` folder (never a new top-level folder) with a `_PROVENANCE.md` listing tool, time with timezone, files, status and PENDING index/tracker/session-index rows; the next agent with edit access applies them. An upload with neither a log nor a provenance file is incomplete. End-of-request checklist item added.
+- `muse` added to tool slugs; an unlisted tool uses its own short lowercase name and never skips the session log.
+- Audit mode B5 "Attribute activity": name searches are not evidence of absence, unmatched changes are unattributed-activity findings, timestamps are converted to the owner's local timezone, and timing-only evidence is reported as "consistent with".
+- Optional Project Rules 3.3.0: three additive lines in sections 3, 4 and 7. Gemini Apps and Opal packages still omit `references/project-rules/`.
+- Helper check for unattributed changes during `--orient` deferred (needs Python/PowerShell parity work).
+- Source: owner handoff from a Muse browser-upload review, 2026-10-08; Claude session `0e9d1f7d`.
+
+### 1.6.3 (released 2026-10-08) — portfolio audit corrections
 
 - Preserve filename-derived session times without a machine offset, report nonstandard session filename tool slugs and IDs, and show every portfolio child in brief mode (R158–R160).
 - Identify the running audit helper path and version during orientation, and label provider sync/index state unchecked (R164, R167).
