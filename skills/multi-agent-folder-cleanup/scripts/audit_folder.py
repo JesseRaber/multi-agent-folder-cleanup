@@ -1367,7 +1367,7 @@ def runtime_name(header):
     (parentheses, text after , ; / ` | or ' on '/' via '/' - ', and generic surface words) is dropped,
     so 'codex desktop, gpt-x' and 'codex' agree while 'grok' and 'grok bot' do not."""
     text = re.sub(r"\([^)]*\)", " ", (header or "").lower())
-    text = re.split(r"[,;/`|]| on | via | - ", text)[0]
+    text = re.split(r"[,;/`|\u2013\u2014]| on | via | - ", text)[0]
     words = [w for w in re.findall(r"[a-z0-9][a-z0-9.-]*", text) if w not in GENERIC_RUNTIME_WORDS]
     return " ".join(words)
 

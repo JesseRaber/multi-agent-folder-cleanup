@@ -1024,7 +1024,7 @@ $GenericRuntimeWords = @('desktop', 'app', 'cli', 'web', 'ide', 'device', 'cloud
 function Get-RuntimeName([string]$header) {
     # The runtime part of a Tool/runtime header (same rules as runtime_name in audit_folder.py).
     $text = [regex]::Replace(([string]$header).ToLowerInvariant(), '\([^)]*\)', ' ')
-    $text = [regex]::Split($text, '[,;/`|]| on | via | - ')[0]
+    $text = [regex]::Split($text, '[,;/`|\u2013\u2014]| on | via | - ')[0]
     $words = @([regex]::Matches($text, '[a-z0-9][a-z0-9.-]*') | ForEach-Object { $_.Value } | Where-Object { $GenericRuntimeWords -notcontains $_ })
     return ($words -join ' ')
 }

@@ -226,7 +226,7 @@ class RuntimeNameTests(unittest.TestCase):
             import audit_folder as a
         finally:
             sys.path.pop(0)
-        same = {"claude": ["claude", "claude , linked to owner pc via device bridge", "Claude (Opus 5; cloud)"],
+        same = {"claude": ["claude", "claude \u2014 linked to owner's PC", "claude , linked to owner pc via device bridge", "Claude (Opus 5; cloud)"],
                 "codex": ["codex", "codex / windows powershell and python", "Codex desktop, gpt-6 sol"],
                 "manus": ["manus device desktop powershell", "manus on user desktop `device:9c1ff412`"],
                 "antigravity": ["antigravity", "antigravity (gemini 3.8 flash high)"]}
