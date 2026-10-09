@@ -20,6 +20,7 @@ PY = SCRIPTS / "audit_folder.py"
 PS = SCRIPTS / "audit_folder.ps1"
 TEMPLATE = REPO / "skills/multi-agent-folder-cleanup/references/project-rules/AGENTS.proposed.md"
 ZIP_TIME = 1767243600  # identical modified time, as left by archive extraction
+FIXED_TIME = 1767330000
 
 
 def powershell():
@@ -80,6 +81,11 @@ def build(base):
     w(base / "port/projC/AGENTS.md", "# Wrapper\nAdopts [rules](AI_CONTEXT/PROJECT_RULES_3.2.0.md).\n")
     w(base / "port/projC/AI_CONTEXT/PROJECT_RULES_3.2.0.md", "Version: 3.2.0\n## 1. A\n- x\n")
     w(base / "port/projA - Copy/README.md", "copy\n")
+    # Whole-second, identical times outside zipped/: ordering then depends only on
+    # the ordinal path tie-break, which both helpers share.
+    for f in base.rglob("*"):
+        if f.is_file() and "zipped" not in f.parts:
+            os.utime(f, (FIXED_TIME, FIXED_TIME))
     return a
 
 

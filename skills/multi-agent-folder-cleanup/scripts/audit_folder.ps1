@@ -1292,7 +1292,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
             }
             if ($envP) { $prunedCount++ }
         }
-        $changedS = @($changed | Sort-Object -Property @{ Expression = { $_.MTime.UtcTicks }; Descending = $true }, @{ Expression = { $_.Rel }; Descending = $false })
+        # Newest first, then ordinal path order, exactly like audit_folder.py.
+        $changedS = @($changed | Sort-Ordinal -Key { ([DateTimeOffset]::MaxValue.UtcTicks - $_.MTime.UtcTicks).ToString('D19') + [char]0 + $_.Rel })
         $sinceLabel = if (-not $Since -and $dated.Count -and $latest.FilenameStart) { $latest.FilenameStart + ' (filename; offset unknown)' } else { Format-WorkTime $sinceT }
         Write-Line ("  files changed since {0} ({1}), excluding session logs and scratch: {2}" -f $sinceLabel, $basis, $changedS.Count)
         Write-Capped @($changedS | ForEach-Object { "{0}  {1}" -f (Format-WorkTime $_.MTime), $_.Rel })
