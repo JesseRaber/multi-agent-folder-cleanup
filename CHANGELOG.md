@@ -1,5 +1,20 @@
 # Changelog
 
+### 1.7.1 (unreleased candidate) — align with Project Rules 4.0.0
+
+- Bundled optional rules are now **Project Rules 4.0.0** (R226/R231): `references/project-rules/AGENTS.proposed.md` = the adopted 4.0.0 core (section 0 minimum rules, invariant sections 1–12, empty section 13 template; 17.9 KB vs 28.9 KB), plus `SECTION_0_PASTE_IN.txt` for hosts that never read the folder. `ADOPTION.md` rewritten: fill section 13 with the owner field by field, paste section 0 into each non-folder host with the project path.
+- Work mode and SKILL.md (R227): read-only limits task files, not the session log, unless the owner expressly prohibits all project writes; then the `NOT SAVED TO PROJECT` checkpoint line.
+- W2 tool slugs (R228): one established slug per runtime; a different runtime never shares one (`grok` vs `cursor-grokbot`); slugs come from the project's `Tool slugs in use:` line.
+- W5 (R230, R232, R233, R235): version-neutral reference to the project's `Sequential writers:` line; one pre-edit copy per shared file per session, only before a full-file replacement (none for appends; read-back stays mandatory); apply leftover PENDING rows from `Incoming/*/_PROVENANCE.md` as well as scratch files, changing only the marker; Windows write mechanics (no `>>`, no `Set-Content`/`Out-File` without UTF-8, no `Get-Content | Set-Content` rewrites, no regex replace across a shared file; change only your own session-ID line).
+- Helpers (Python and PowerShell, same output; read-only):
+  - `--orient` (R229): a session with a close entry in its log or a session-index status other than `in progress` is listed as closed, never as possibly active; activity is judged by log and scratch **file** times, not folder times; the window comes from `--active-minutes`, else the `AGENTS.md` `Active-writer window:` line, else 30, and is printed; idle `in progress` rows are noted; prints that an owner handoff message (invisible to the helper) overrides the listing. Also counts `_PROVENANCE.md` files with PENDING lines (R232), lists slugs used with several runtime headers (R228) and prints a Windows write-encoding reminder; `audit_folder.ps1` warns when it runs under Windows PowerShell 5.1 (R235).
+  - `--session-index` (R228): slugs listed in `Tool slugs in use:` are standard; a slug that appears with more than one `Tool/runtime` header is listed.
+  - `--pending` (R232): lists each `Incoming/*/_PROVENANCE.md` line marked PENDING and not APPLIED (previously a mention count).
+  - `--portfolio` (R165/R166/R231): core match compares sections 0–12 (1–12 for older rules); new `Section 13 complete` column.
+  - `verify_records.py` (R235): flags NUL bytes, UTF-16LE/BE segments, a UTF-16 BOM and mis-decoded UTF-16 line breaks (U+0A0D/U+0D0A/U+0D00/U+0A00) — damage that still decodes as valid UTF-8 and previously passed.
+- Behaviour change to note: an empty scratch folder no longer counts as writer activity (folder times are not used).
+- Sources: Project Rules 4.0.0 reviews and adoption 2026-10-09 (Claude session 1cdc3b65; Codex 501eca96/1490b5cc; Antigravity 3a4f02c7; Cursor Grok Bot 435368cf); build by Claude session 86263f12.
+
 ### 1.7.0 (released 2026-10-09) — stable release: add-only agents, sequential writers, sync-copy and pending-file checks
 
 - Add-only agent fallback in Work mode: an agent that can only add files uploads into a dated `Incoming/` folder (never a new top-level folder) with a `_PROVENANCE.md` listing tool, time with timezone, files, status and PENDING index/tracker/session-index rows; the next agent with edit access applies them. An upload with neither a log nor a provenance file is incomplete. End-of-request checklist item added.

@@ -1,4 +1,4 @@
-"""Stage 1 of v1.7.0: rules template 3.3.0 and Work-mode guidance (register R030, R155-R215)."""
+"""Stage 1 of v1.7.0 (updated for v1.7.1 / rules 4.0.0): rules template and Work-mode guidance (register R030, R155-R215)."""
 
 from pathlib import Path
 import re
@@ -24,28 +24,30 @@ class TemplateTests(unittest.TestCase):
     def setUp(self):
         self.t = read("references/project-rules/AGENTS.proposed.md")
 
-    def test_version_unchanged_at_330(self):
-        self.assertIn("Version: 3.3.0", self.t)
+    # v1.7.1 bundles Project Rules 4.0.0 (R226/R231); the 3.3.0 assertions moved to their 4.0.0 clauses.
+    def test_version_is_400(self):
+        self.assertIn("Version: 4.0.0", self.t)
 
     def test_section5_sequential_writer_default(self):
         s5 = section(self.t, "## 5.", "## 6.")
-        self.assertIn("Sequential writers (opt-in): only when the owner adds a line beginning `Sequential writers:`", s5)
-        self.assertIn("Even with it, stage when another writer may be active", s5)
-        self.assertNotRegex(s5, r"(?m)^[ \t]*(?:[-*][ \t]*)?Sequential writers:", "template must not opt in by itself")
+        self.assertIn("or the owner's line `Sequential writers: …` in section 13", s5)
+        self.assertIn("stages instead when another session is possibly active", s5)
+        core = section(self.t, "## 0.", "## 13.")
+        self.assertNotRegex(core, r"(?m)^[ \t]*(?:[-*][ \t]*)?Sequential writers:", "sections 0-12 must not opt in")
 
     def test_section5_same_name_and_conflict_copies(self):
+        self.assertIn("never save a second file with the same name in one folder", section(self.t, "## 0.", "## 1."))
         s5 = section(self.t, "## 5.", "## 6.")
-        self.assertIn("Never create a second file with the same name in the same folder.", s5)
         self.assertIn("`name (1).ext`", s5)
         self.assertIn("missing originals", s5)
 
     def test_section3_ai_context_continuity_only(self):
         s3 = section(self.t, "## 3.", "## 4.")
-        self.assertIn("Keep `AI_CONTEXT/` for continuity records", s3)
+        self.assertIn("`AI_CONTEXT/` holds continuity records only", s3)
 
     def test_section7_session_index_row_at_creation(self):
         s7 = section(self.t, "## 7.", "## 8.")
-        self.assertIn("Create the row with the session log (status `in progress`)", s7)
+        self.assertIn("created with the log as `in progress`", s7)
 
     def test_template_size_recorded(self):
         # R214 warns above 16 KB; the template itself is larger (R039 tracks trimming).
@@ -54,8 +56,8 @@ class TemplateTests(unittest.TestCase):
 
     def test_adoption_notes(self):
         a = read("references/project-rules/ADOPTION.md")
-        self.assertIn("needs Project Rules 3.1.0 or later", a)
-        self.assertIn("Only if the owner says yes, add `Sequential writers:", a)
+        self.assertIn("# Optional Project Rules 4.0.0", a)
+        self.assertIn("Keep the line only if the owner says yes", a)
 
 
 class WorkModeTests(unittest.TestCase):

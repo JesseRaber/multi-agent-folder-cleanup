@@ -33,10 +33,10 @@ Allowed values: opened; listed; path-validated search result; missing by direct 
 
 ## Rules matrix
 
-| Project | Rules version | Work routing | Core matches bundled template | Sequential-writer declaration |
-|---|---|---|---|---|
+| Project | Rules version | Work routing | Core matches bundled template | Sequential-writer declaration | Section 13 complete |
+|---|---|---|---|---|---|
 
-Rules version: the first `Version:` line of the root `AGENTS.md`, or `<version> (by reference)` when the root adopts a rules file by link. Work routing: `yes` when the section 3 "Day-to-day saving and indexing" subsection or the skill name is present (needs rules 3.1.0 or later). Core match: sections 1–12 compared line by line with the bundled `references/project-rules/AGENTS.proposed.md` as `match`, `differs (N lines)` or `unknown` (no template bundled, as in the Gemini Apps and Opal packages; never report `differs` then).
+Rules version: the first `Version:` line of the root `AGENTS.md`, or `<version> (by reference)` when the root adopts a rules file by link. Work routing: `yes` when the section 3 "Day-to-day saving and indexing" subsection or the skill name is present (needs rules 3.1.0 or later; Rules 4.0.0 drops the subsection by design, so `no` is expected there). Core match: sections 0–12 (1–12 before 4.0.0) compared line by line with the bundled `references/project-rules/AGENTS.proposed.md` as `match`, `differs (N lines)` or `unknown` (no template bundled, as in the Gemini Apps and Opal packages; never report `differs` then). Section 13 complete: `yes` when section 13 has an `Adopted:` line and no `<placeholder>` left; `n/a` before 4.0.0.
 
 ## Same-name control review
 

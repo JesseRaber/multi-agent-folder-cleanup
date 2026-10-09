@@ -6,6 +6,7 @@ R206, R207, R208, R211, R213, R214, R215. Every check is report-only.
 
 import hashlib
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -38,7 +39,9 @@ def w(path, data):
 
 def build(base):
     a = base / "port" / "projA"
-    w(a / "AGENTS.md", TEMPLATE.read_text(encoding="utf-8"))
+    # Rules 4.0.0 section 13 carries a `Sequential writers:` line to delete when agents run
+    # concurrently; this fixture models that choice so the declaration comes from quick context.
+    w(a / "AGENTS.md", re.sub(r"(?m)^Sequential writers:.*\n", "", TEMPLATE.read_text(encoding="utf-8")))
     w(a / "AI_CONTEXT/README_FIRST.md", "Read [quick](PROJECT_QUICK_CONTEXT.md) then `PROJECT_INDEX.md`.\n")
     w(a / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md",
       "# QC\nstate\nSequential writers: one owner; agents work one after another (owner, 2026-10-09)\n")
@@ -148,7 +151,7 @@ class HelperChecks(unittest.TestCase):
         self.assertNotIn("spending-notes.md", out)
         self.assertIn("pending files: 7, edit blocks: 7 (no Status: line: 1; Status: not first line: 0)", out)
         self.assertIn("[no Status: line]", next(l for l in out.splitlines() if "pending-index.md" in l))
-        self.assertIn("Incoming/2026-10-08_muse_x/_PROVENANCE.md (1 PENDING mentions)", out)
+        self.assertIn("Incoming/2026-10-08_muse_x/_PROVENANCE.md (1 PENDING lines)", out)
         self.assertIn("sequential-writer declaration found", out)
         self.assertEqual(before, self.snapshot(), "--pending must not write")
 
@@ -222,7 +225,7 @@ class HelperChecks(unittest.TestCase):
         self.assertIn("sequential-writer declaration    yes", out)
 
     def test_orient_without_declaration(self):
-        # The bundled template describes the rule but is not the owner's opt-in line.
+        # Section 0-12 text describing the rule is not the owner's opt-in line.
         (self.root / "AI_CONTEXT/PROJECT_QUICK_CONTEXT.md").write_text("# QC\nstate\n", encoding="utf-8")
         out = run_py(self.root, "--orient")
         self.assertIn("coordination: no sequential-writer declaration; stage PENDING edits", out)
@@ -265,14 +268,16 @@ class HelperChecks(unittest.TestCase):
     def test_portfolio_matrix(self):
         out = section(run_py(self.base / "port", "--portfolio"), "Portfolio root matrix (immediate children; advisory)")
         rows = {l.split(" | ")[0].strip(): l.split(" | ") for l in out.splitlines() if " | root-level | " in l}
-        self.assertEqual(rows["projA"][6:11], ["7 (1 no Status)", "3.3.0", "yes", "match", "yes"])
-        self.assertEqual(rows["projB"][7:9] + [rows["projB"][10]], ["3.2.0", "no", "no"])
+        # Rules 4.0.0 drops the skill-routing subsection by design, so Work routing is "no".
+        self.assertEqual(rows["projA"][6:11], ["7 (1 no Status)", "4.0.0", "no", "match", "yes"])
+        self.assertRegex(rows["projA"][11], r"^no \(\d+ placeholders\)$")
+        self.assertEqual(rows["projB"][7:9] + [rows["projB"][10], rows["projB"][11]], ["3.2.0", "no", "no", "n/a"])
         self.assertRegex(rows["projB"][9], r"^differs \(\d+ lines\)$")
         self.assertEqual(rows["projC"][7], "3.2.0 (by reference)")
         self.assertIn("possible replicas under this root: projA ~ projA - Copy", out)
         self.assertIn("projB/Handoffs/2026-10-08_handoff.md -> projA", out)
         self.assertIn("replica declaration: none (PORTFOLIO.md)", out)
-        self.assertIn("bundled template 3.3.0", out)
+        self.assertIn("bundled template 4.0.0", out)
 
     def test_portfolio_without_bundled_template(self):
         # Gemini Apps and Opal packages omit references/project-rules/.
