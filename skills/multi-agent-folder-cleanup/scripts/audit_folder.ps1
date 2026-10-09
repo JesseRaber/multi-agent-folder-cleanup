@@ -1024,9 +1024,11 @@ function Get-SlugVariants($sessions) {
     # Slugs that appear with more than one Tool/runtime header (R228).
     $seen = @{}
     foreach ($s in @($sessions)) {
-        if ($s.Slug -and $s.Header) {
+        # Parentheticals carry model, machine or connector detail; only the runtime name counts.
+        $runtime = ([regex]::Replace([regex]::Replace([string]$s.Header, '\([^)]*\)', ' '), '\s+', ' ')).Trim().ToLowerInvariant()
+        if ($s.Slug -and $runtime) {
             if (-not $seen.ContainsKey($s.Slug)) { $seen[$s.Slug] = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal) }
-            [void]$seen[$s.Slug].Add($s.Header.ToLowerInvariant())
+            [void]$seen[$s.Slug].Add($runtime)
         }
     }
     $out = [ordered]@{}
@@ -1064,7 +1066,7 @@ function Get-ProvenancePending([string]$project) {
     foreach ($child in @(Get-ChildItem -LiteralPath $inc -Directory -Force -ErrorAction SilentlyContinue | Where-Object { -not $_.LinkType } | Sort-Ordinal -Key { Get-OrdinalKey $_.Name })) {
         foreach ($pf in @(Get-ChildItem -LiteralPath $child.FullName -File -Force -ErrorAction SilentlyContinue | Where-Object { $_.Name.ToLower() -eq '_provenance.md' } | Sort-Ordinal -Key { $_.Name })) {
             $t = Read-SmallText $pf.FullName; if ($null -eq $t) { $t = '' }
-            $rows = @(($t -split "\r?\n") | Where-Object { $_ -cmatch '\bPENDING\b' -and $_ -cnotmatch '\bAPPLIED\b' } | ForEach-Object { $_.Trim() })
+            $rows = @(($t -split "\r?\n") | Where-Object { $_ -notmatch '^\s*#' -and $_ -cmatch '\bPENDING\b' -and $_ -cnotmatch '\bAPPLIED\b' } | ForEach-Object { $_.Trim() })
             if ($rows.Count) { $out.Add([pscustomobject]@{ Rel = ("Incoming/{0}/{1}" -f $child.Name, $pf.Name); Rows = $rows }) }
         }
     }
@@ -1221,7 +1223,12 @@ if ($Orient -or $SessionIndex -or $Pending) {
             if ($outcomes.Count) { $lastTitle = $outcomes[$outcomes.Count - 1].Groups[1].Value.Trim() }
             if (-not $nm.Success) { $non.Add($f.Name + ' (nonstandard filename)') }
             elseif (($CanonicalToolSlugs -cnotcontains $nm.Groups[3].Value) -and ($declaredSlugs -cnotcontains $nm.Groups[3].Value)) { $non.Add($f.Name + ' (nonstandard tool slug)') }
-            $closed = [regex]::IsMatch($text, $CloseEntryRx) -or (@($turns | Where-Object { [regex]::IsMatch($_.Groups[2].Value, $CloseTitleRx) }).Count -gt 0)
+            # Closed only when the LAST turn closes the session or a close entry follows the last
+            # turn heading; an earlier close followed by more turns means the session resumed.
+            if ($turns.Count) {
+                $lastTurn = $turns[$turns.Count - 1]
+                $closed = [regex]::IsMatch($lastTurn.Groups[2].Value, $CloseTitleRx) -or [regex]::new($CloseEntryRx).IsMatch($text, $lastTurn.Index)
+            } else { $closed = [regex]::IsMatch($text, $CloseEntryRx) }
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
                 Slug = $(if ($nm.Success) { $nm.Groups[3].Value.ToLowerInvariant() } else { '' }); Header = $header; Closed = $closed
                 Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource; FilenameStart = $filenameStart })
@@ -1348,7 +1355,9 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Line "    Set-Content/Out-File without -Encoding utf8, and replace only your own session-ID line (W5)."
         }
         if ($PSVersionTable.PSVersion.Major -lt 6) {
-            Write-Warning "This shell is Windows PowerShell $($PSVersionTable.PSVersion). Its '>>' and default Set-Content/Out-File write UTF-16LE or ANSI into UTF-8 records; use -Encoding utf8 (W5)."
+            # stderr, not the warning stream: PowerShell 5.1 -File copies warnings to stdout,
+            # which would break the Python/PowerShell report parity.
+            [Console]::Error.WriteLine("WARNING: this shell is Windows PowerShell $($PSVersionTable.PSVersion). Its '>>' and default Set-Content/Out-File write UTF-16LE or ANSI into UTF-8 records; use UTF-8 explicitly (W5).")
         }
 
         # Declared startup read order (README_FIRST links, in order).

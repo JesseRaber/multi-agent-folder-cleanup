@@ -82,8 +82,8 @@ def build(root: Path, window_line="Active-writer window: 45 minutes\n"):
     sess = "AI_CONTEXT/SESSIONS/"
     w(root, sess + f"2026-10-09_100000_grok_a_{S1}.md", log(S1, "grok", "grok (xAI Grok app)"))
     w(root, sess + f"2026-10-09_100000_grok_b_{S2}.md",
-      log(S2, "grok", "grok (Cursor agent Grok Bot)", "\nT002 | 2026-10-09T11:00:00-04:00 | Session close\n"))
-    w(root, sess + f"2026-10-09_100000_claude_c_{S3}.md", log(S3, "claude", "claude (Claude app)"))
+      log(S2, "grok", "Grok Bot (Cursor agent)", "\nT002 | 2026-10-09T11:00:00-04:00 | Session close\n"))
+    w(root, sess + f"2026-10-09_100000_claude_c_{S3}.md", log(S3, "claude", "claude (Claude app, Opus)"))
     w(root, sess + f"2026-10-09_100000_claude_d_{S4}.md", log(S4, "claude", "claude (Claude app)"), OLD)
     w(root, sess + f"2026-10-09_100000_cursor-grokbot_e_{S5}.md",
       log(S5, "cursor-grokbot", "cursor-grokbot (Cursor)"), OLD)
@@ -96,7 +96,7 @@ def build(root: Path, window_line="Active-writer window: 45 minutes\n"):
     w(root, "Incoming/2026-10-09_grok_review/_PROVENANCE.md",
       "Tool: grok\n- PENDING index row: | Incoming/2026-10-09_grok_review/report.md | Review |\n"
       "- APPLIED 1a2b3c4d by abc/T002 (was PENDING) tracker row\n"
-      "- PENDING tracker row: R999 review follow-up\n")
+      "- PENDING tracker row: R999 review follow-up\n## PENDING rows (heading, not a row)\n")
     w(root, "Incoming/2026-10-09_opal_x/_PROVENANCE.md", "- APPLIED 9f8e7d6c by abc/T003 index row\n")
 
 
@@ -131,7 +131,8 @@ class HelperTests(unittest.TestCase):
     def test_r228_slug_with_two_runtime_headers(self):
         out = run_py(self.root, "--session-index")
         self.assertIn("tool slugs used with more than one Tool/runtime header: 1", out)
-        self.assertIn("grok: grok (cursor agent grok bot) | grok (xai grok app)", out)
+        self.assertIn("grok: grok | grok bot", out)
+        self.assertNotIn("claude: ", out)   # model/machine detail in parentheses is not a second runtime
         self.assertNotIn(f"cursor-grokbot_e_{S5}.md (nonstandard tool slug)", out)   # declared in section 13
         self.assertIn("slugs with several headers       1", out)
 
@@ -182,6 +183,38 @@ class PortfolioTests(unittest.TestCase):
                 ps = run_ps(base, "-Portfolio")
                 pick = lambda t: [l for l in norm(t) if " | root-level | " in l or "Core match compares" in l]
                 self.assertEqual(pick(out), pick(ps))
+
+
+class ReviewFixTests(unittest.TestCase):
+    """Antigravity review of PR #24 (Audits/2026-10-09_Antigravity_v171_PR24_Review.md), F2-F4."""
+
+    def test_f4_resumed_session_is_not_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sess = "AI_CONTEXT/SESSIONS/"
+            w(root, sess + f"2026-10-09_100000_claude_resumed_{S1}.md", log(S1, "claude", "claude") +
+              "\nT002 | 2026-10-09T11:00:00-04:00 | Session close\nClosed: handed off\n"
+              "\nT003 | 2026-10-09T12:00:00-04:00 | owner resumed this chat\n")
+            w(root, sess + f"2026-10-09_100000_claude_done_{S2}.md", log(S2, "claude", "claude") +
+              "\nT002 | 2026-10-09T11:00:00-04:00 | final work\nSession closed: next start is X\n")
+            out = run_py(root, "--orient")
+            self.assertIn("1 distinct sessions", out)
+            active = out.split("possibly active writers")[1].split("closed sessions with recent")[0]
+            self.assertIn(f"session {S1[:8]}", active)
+            self.assertIn("closed sessions with recent file activity (not active writers): 1", out)
+            if powershell():
+                self.assertEqual(norm(out), norm(run_ps(root, "-Orient")))
+
+    def test_f3_utf16_log_parses_like_powershell(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            p = root / f"AI_CONTEXT/SESSIONS/2026-10-09_100000_antigravity_u16_{S1}.md"
+            p.parent.mkdir(parents=True)
+            p.write_bytes(log(S1, "antigravity", "antigravity").replace("\n", "\r\n").encode("utf-16"))
+            out = run_py(root, "--session-index")
+            self.assertIn(f"| {S1} | antigravity | u16 | did it |", out)
+            if powershell():
+                self.assertEqual(norm(out), norm(run_ps(root, "-SessionIndex")))
 
 
 class TemplateOptInTests(unittest.TestCase):

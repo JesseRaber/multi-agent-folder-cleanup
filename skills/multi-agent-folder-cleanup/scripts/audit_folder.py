@@ -1236,7 +1236,13 @@ def read_small_text(path, limit=SESSION_READ_LIMIT):
     if not content_read_allowed(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        # Same byte-order-mark detection as the PowerShell StreamReader: a UTF-16 log
+        # (e.g. written by Windows PowerShell 5.1) must parse identically in both helpers.
+        with open(path, "rb") as fh:
+            head = fh.read(3)
+        encoding = ("utf-16" if head[:2] in (b"\xff\xfe", b"\xfe\xff")
+                    else "utf-8-sig" if head == b"\xef\xbb\xbf" else "utf-8")
+        with open(path, "r", encoding=encoding, errors="replace") as fh:
             text = fh.read(limit + 1)
             if len(text) > limit:
                 print(f"  read incomplete (over {limit} characters): {os.path.basename(path)}; not parsed")
@@ -1312,8 +1318,7 @@ def load_sessions(root, sessions_rel):
         sessions.append({
             "name": name, "id": sid, "tool": tool, "topic": topic,
             "slug": (m.group(3).lower() if m else ""), "header": header,
-            "closed": bool(CLOSE_ENTRY_RE.search(text)) or any(
-                CLOSE_TITLE_RE.search(t[1]) for t in turns),
+            "closed": is_closed_log(text),
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
             "last_time": last_time, "mtime": mtime, "start_source": start_source,
             "filename_start": filename_start,
@@ -1324,6 +1329,16 @@ def load_sessions(root, sessions_rel):
     sessions.sort(key=lambda s: (s["started"] is None, s["started"] or 0, s["id"],
                                  s["name"].lower(), s["name"]))
     return sdir, sessions, nonstandard, blocked
+
+
+def is_closed_log(text):
+    """Closed only when the LAST turn closes the session or a close entry follows the last
+    turn heading; an earlier close followed by more turns means the session resumed."""
+    heads = list(TURN_HEAD_RE.finditer(text))
+    if not heads:
+        return bool(CLOSE_ENTRY_RE.search(text))
+    last = heads[-1]
+    return bool(CLOSE_TITLE_RE.search(last.group(2)) or CLOSE_ENTRY_RE.search(text, last.start()))
 
 
 def scope_info(root):
@@ -1348,8 +1363,10 @@ def slug_header_variants(sessions):
     """{slug: sorted distinct Tool/runtime headers} where one slug carries several (R228)."""
     seen = {}
     for s in sessions:
-        if s["slug"] and s["header"]:
-            seen.setdefault(s["slug"], set()).add(s["header"].lower())
+        runtime = re.sub(r"\s+", " ", re.sub(r"\([^)]*\)", " ", s["header"] or "")).strip().lower()
+        if s["slug"] and runtime:
+            # Parentheticals carry model, machine or connector detail; only the runtime name counts.
+            seen.setdefault(s["slug"], set()).add(runtime)
     return {k: sorted(v) for k, v in seen.items() if len(v) > 1}
 
 
@@ -1415,7 +1432,8 @@ def provenance_pending(root):
         for n in names:
             t = read_small_text(os.path.join(child.path, n)) or ""
             rows = [ln.strip() for ln in t.splitlines()
-                    if re.search(r"\bPENDING\b", ln) and not re.search(r"\bAPPLIED\b", ln)]
+                    if not ln.lstrip().startswith("#")  # a heading names a section, not a row
+                    and re.search(r"\bPENDING\b", ln) and not re.search(r"\bAPPLIED\b", ln)]
             if rows:
                 out.append((f"Incoming/{child.name}/{n}", rows))
     return out
