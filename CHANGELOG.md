@@ -2,6 +2,7 @@
 
 ### Unreleased (1.7.2 candidate; not released)
 
+- Work mode (R234): `references/work-mode.md` trimmed from 28.6 KB to 20.7 KB (-28%) by removing repetition and explanation that changed no decision; every W1–W7 rule, pinned phrase and section anchor kept (187 tests unchanged and passing).
 - Install guides and work-mode W3 release row (R237): keep the previous version's backup outside every folder the host scans for skills (Codex loads `SKILL.md` recursively, so a backup under `.codex/skills/_backups` loaded as a second same-name skill and shadowed 1.7.1), or rename its `SKILL.md` to a non-loading name; after install require exactly one `SKILL.md` with the skill's `name:` under the host skill roots; files matching the ZIP are not proof the host loads them. Test: `tests/test_r237_install_backups.py`.
 
 ### 1.7.1 (released 2026-10-09) — align with Project Rules 4.0.0
