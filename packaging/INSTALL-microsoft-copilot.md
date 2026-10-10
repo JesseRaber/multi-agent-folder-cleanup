@@ -8,4 +8,6 @@ Upload the complete ZIP through the agent's Skills interface. After upload, conf
 
 The Python helpers require only the standard library, but Copilot's sandbox has no direct network access. Connector/API work must use capabilities enabled through the agent orchestrator rather than network calls from a packaged script.
 
+When updating, remove or replace the earlier upload so the agent lists exactly one `multi-agent-folder-cleanup` skill, then confirm the reported version in a new conversation; an accepted upload is not proof the agent uses it.
+
 Expected loaded version: **Multi-Agent Folder Cleanup v1.7.1**.
