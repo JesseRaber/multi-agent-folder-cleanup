@@ -28,3 +28,13 @@ Earlier install history lives in the owner's project records; rows here start wi
 | reported 2026-10-09 14:22 -04:00 | 1.7.0 | microsoft-copilot-agent-only (5d58d782054a) | Grok | upload | accepted | — | user-reported | owner |
 | reported 2026-10-09 14:22 -04:00 | 1.7.0 | gemini-apps-only (46b446635d1c) | Gemini Spark (agent) | upload | accepted | — | user-reported | owner |
 | reported 2026-10-09 14:22 -04:00 | 1.7.0 | opal-only (00ac88c3f6c0) | Microsoft Opal | import | accepted | — | user-reported | owner |
+| 2026-10-09 19:54 -04:00 | 1.7.1 | UNIVERSAL-skill (b93ca6d7827d) | Codex standalone `%USERPROFILE%\.codex\skills` | replace 1.7.0 (backup `_backups\…pre-v1.7.1-20261009-1953`) | installed; 22/22 files match ZIP; py helpers and ps1 report 1.7.1 | owner 20:07: Codex still showed 1.7.0 — it loaded the backup's SKILL.md under `_backups` (R237) | observed (Claude 86263f12 T010/T011) | Claude |
+| 2026-10-09 20:10 -04:00 | 1.7.1 | — | Codex standalone `%USERPROFILE%\.codex\skills` | fix: backup `SKILL.md` renamed `SKILL.backup-not-loaded.md`; one SKILL.md for this skill under `.codex\skills` | after restart Codex shows 1.7.1 | 1.7.1 | observed rename (Claude 86263f12 T011); display user-reported 2026-10-09 21:01 (Claude 38dd5b3a T002) | Claude / owner |
+| 2026-10-09 19:54 -04:00 | 1.7.1 | UNIVERSAL-skill (b93ca6d7827d) | Antigravity `~/.gemini/config/skills` | replace 1.7.0 (backup outside skills: `skills_backups/…pre-v1.7.1-20261009-1953`) | installed; 22/22 files match ZIP; helpers 1.7.1 | — | observed (Claude 86263f12 T010) | Claude |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | UNIVERSAL-skill (b93ca6d7827d) | Claude app skill upload (synced) | upload | accepted; synced copy 22/22 files byte-identical to the asset | — | observed: synced copy compared in Claude session 38dd5b3a T001 | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | codex-chatgpt-plugin (86c6e72a8e76) | Codex Personal Plugin cache | update | 1.7.1 | — | user-reported | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | codex-chatgpt-plugin (86c6e72a8e76) | ChatGPT web app | upload | accepted | — | user-reported | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | microsoft-copilot-agent-only (53bc9997b195) | Microsoft 365 Copilot | upload | accepted | — | user-reported | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | microsoft-copilot-agent-only (53bc9997b195) | Grok | upload | accepted | — | user-reported | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | gemini-apps-only (589e890b38f5) | Gemini Spark (agent) | upload | accepted | — | user-reported | owner |
+| reported 2026-10-09 21:01 -04:00 | 1.7.1 | opal-only (5b1f97dce9e2) | Microsoft Opal | import | accepted | — | user-reported | owner |
