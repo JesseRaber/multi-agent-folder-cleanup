@@ -78,6 +78,19 @@ Portfolio smoke test:
 
 ---
 
+## Updating an existing install
+
+- Keep the backup of the previous version **outside** every folder the host
+  scans for skills (for Codex, not under `.codex/skills`, including
+  `_backups` subfolders: Codex loads every `SKILL.md` it finds recursively, and
+  an old backup loads as a second skill with the same name). If a backup must
+  stay inside, rename its `SKILL.md` to a non-loading name such as
+  `SKILL.backup-not-loaded.md`.
+- After install, list every `SKILL.md` under the host's skill roots and require
+  exactly one whose `name:` is `multi-agent-folder-cleanup`.
+- Files matching the ZIP are not proof the host loads them. Restart or refresh
+  the host, start a new session and confirm the reported version.
+
 ## Requirements
 
 - **Scripts:** Python 3.8+, standard library only. No dependencies to install.

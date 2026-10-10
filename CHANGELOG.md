@@ -1,5 +1,9 @@
 # Changelog
 
+### Unreleased (1.7.2 candidate; not released)
+
+- Install guides and work-mode W3 release row (R237): keep the previous version's backup outside every folder the host scans for skills (Codex loads `SKILL.md` recursively, so a backup under `.codex/skills/_backups` loaded as a second same-name skill and shadowed 1.7.1), or rename its `SKILL.md` to a non-loading name; after install require exactly one `SKILL.md` with the skill's `name:` under the host skill roots; files matching the ZIP are not proof the host loads them. Test: `tests/test_r237_install_backups.py`.
+
 ### 1.7.1 (released 2026-10-09) — align with Project Rules 4.0.0
 
 - Bundled optional rules are now **Project Rules 4.0.0** (R226/R231): `references/project-rules/AGENTS.proposed.md` = the adopted 4.0.0 core (section 0 minimum rules, invariant sections 1–12, empty section 13 template; 17.9 KB vs 28.9 KB), plus `SECTION_0_PASTE_IN.txt` for hosts that never read the folder. `ADOPTION.md` rewritten: fill section 13 with the owner field by field, paste section 0 into each non-folder host with the project path.
