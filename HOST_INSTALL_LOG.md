@@ -38,3 +38,12 @@ Earlier install history lives in the owner's project records; rows here start wi
 | reported 2026-10-09 21:01 -04:00 | 1.7.1 | microsoft-copilot-agent-only (53bc9997b195) | Grok | upload | accepted | — | user-reported | owner |
 | reported 2026-10-09 21:01 -04:00 | 1.7.1 | gemini-apps-only (589e890b38f5) | Gemini Spark (agent) | upload | accepted | — | user-reported | owner |
 | reported 2026-10-09 21:01 -04:00 | 1.7.1 | opal-only (5b1f97dce9e2) | Microsoft Opal | import | accepted | — | user-reported | owner |
+| 2026-10-10 02:28 -04:00 | 1.7.2 | UNIVERSAL-skill (aa90ad7d7c30) | Codex standalone `%USERPROFILE%\.codex\skills` | replace 1.7.1 (backup moved OUTSIDE skills: `%USERPROFILE%\skill-backups\codex\…pre-v1.7.2-20261010-0228`; old 1.7.0 `_backups` copy moved there too) | installed; owner-run script: 1 SKILL.md with this name; Claude: 22/22 files byte-identical to the asset | 1.7.2 after restart (user-reported 2026-10-10 13:32) | observed files (Claude 38dd5b3a T011); display user-reported | owner / Claude |
+| 2026-10-10 02:28 -04:00 | 1.7.2 | UNIVERSAL-skill (aa90ad7d7c30) | Antigravity `~/.gemini/config/skills` | replace 1.7.1 (backup `%USERPROFILE%\skill-backups\antigravity\…pre-v1.7.2-20261010-0228`) | installed; owner-run script: version 1.7.2, 1 copy | 1.7.2 after restart (user-reported 2026-10-10 13:32) | script output (owner-run); display user-reported | owner |
+| reported 2026-10-10 13:24 -04:00 | 1.7.2 | UNIVERSAL-skill (aa90ad7d7c30) | Claude app skill upload (synced) | upload | accepted; synced copy byte-identical to the asset | — | observed: synced copy compared in Claude session 38dd5b3a T012 | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | codex-chatgpt-plugin (695b2d55a380) | Codex Personal Plugin cache | update | 1.7.2 | — | user-reported | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | codex-chatgpt-plugin (695b2d55a380) | ChatGPT web app | upload | accepted | — | user-reported | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | microsoft-copilot-agent-only (d584594a3280) | Microsoft 365 Copilot | upload | accepted | — | user-reported | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | microsoft-copilot-agent-only (d584594a3280) | Grok | upload | accepted | — | user-reported | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | gemini-apps-only (a6223f6dfc78) | Gemini Spark (agent) | upload | accepted | — | user-reported | owner |
+| reported 2026-10-10 13:32 -04:00 | 1.7.2 | opal-only (c6538fc2e139) | Microsoft Opal | import | accepted | — | user-reported | owner |
