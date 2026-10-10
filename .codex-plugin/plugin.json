@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-folder-cleanup",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Audit, plan, and safely reorganize shared project folders or multi-project portfolios with connector evidence validation and verified execution boundaries.",
   "skills": "./skills/",
   "author": {

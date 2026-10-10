@@ -76,7 +76,7 @@ class CandidateTests(unittest.TestCase):
         for output, path in [(run_helper(self.root, "--orient"), PY),
                              *(([(run_helper(self.root, "-Orient", powershell=True), PS)] if POWERSHELL else []))]:
             self.assertIn(str(path), output)
-            self.assertIn("1.7.1", output.split("== Orient ==", 1)[0])
+            self.assertIn("1.7.2", output.split("== Orient ==", 1)[0])
 
     def test_pruned_state_does_not_claim_provider_sync(self):
         (self.root / "node_modules").mkdir()

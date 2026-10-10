@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v1.7.1**; published releases are listed on GitHub.
+Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v1.7.2**; published releases are listed on GitHub.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`1.7.1`; see `CHANGELOG.md`.
+`1.7.2`; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.7.1 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.7.2 (SKILL.md at <path>; helpers <version>)**.
 
 ## Install
 
