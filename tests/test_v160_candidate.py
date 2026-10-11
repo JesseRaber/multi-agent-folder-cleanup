@@ -38,14 +38,15 @@ def archive_once(source: Path, archived: Path) -> str:
 
 class CandidateGuidanceTests(unittest.TestCase):
     def test_register_requirements_are_routed_to_requested_sections(self) -> None:
-        work = (SKILL / "references/work-mode.md").read_text(encoding="utf-8")
+        work = "\n".join((SKILL / "references" / n).read_text(encoding="utf-8")
+                         for n in ("work-mode.md", "work-mode-baseline.md"))
         audit = (SKILL / "references/audit-mode.md").read_text(encoding="utf-8")
         records = (SKILL / "references/execute-records.md").read_text(encoding="utf-8")
         moves = (SKILL / "references/execute-moves.md").read_text(encoding="utf-8")
         principles = (SKILL / "references/cleanup-principles.md").read_text(encoding="utf-8")
         proposed = (SKILL / "references/project-rules/AGENTS.proposed.md").read_text(encoding="utf-8")
 
-        self.assertIn("map every actionable item", work)
+        self.assertIn("map every actionable item", principles)  # v1.8.0 P09: moved from Work mode
         self.assertIn("proof that it was completed or superseded", audit)
         self.assertIn("byte-for-byte pre-edit copy", work)
         self.assertIn("line endings", records)

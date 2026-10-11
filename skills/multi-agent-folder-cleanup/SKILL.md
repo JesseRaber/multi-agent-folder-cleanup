@@ -3,7 +3,7 @@ name: multi-agent-folder-cleanup
 description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
-  version: "1.7.2"
+  version: "1.8.0"
   repository: https://github.com/JesseRaber/multi-agent-folder-cleanup
 ---
 
@@ -11,7 +11,7 @@ metadata:
 
 Keep a shared workspace where an agent arriving cold can quickly tell what is true now, what is proposed, what is incoming, and what is historical—without choosing between plausible copies. Work mode keeps it that way during normal work; the cleanup modes repair it.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.7.2 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.8.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
 
 ## Choose the operating mode
 
@@ -19,16 +19,16 @@ State the mode in the first line. Use **Work** for ordinary project work in a sh
 
 | Mode | Typical request | Allowed work | Read |
 |---|---|---|---|
-| **Work** | Any task that creates, saves or updates files in a shared project folder | User-authorized task edits, session continuity and coordinated navigation updates. Use cleanup modes for folder reorganization. | [work-mode.md](references/work-mode.md) |
+| **Work** | Any task that creates, saves or updates files in a shared project folder | User-authorized task edits, session continuity and coordinated navigation updates. Use cleanup modes for folder reorganization. | [work-mode.md](references/work-mode.md); also [work-mode-baseline.md](references/work-mode-baseline.md) unless the root instruction file is Project Rules 4.0.0 or later |
 | **Audit** | “What is here?” “Why are agents confused?” “Who has been in this folder?” | Read-only inspection and an evidence report. | [preconditions.md](references/preconditions.md), [cleanup-principles.md](references/cleanup-principles.md), [audit-mode.md](references/audit-mode.md) |
 | **Plan** | “How should this be organized?” | Read-only inspection, an exact proposal, and literal mutation lists labeled **PROPOSED**. | preconditions, cleanup-principles, [plan-mode.md](references/plan-mode.md) |
-| **Execute** | Explicit approval of a specific mutation list | Only the approved moves, factual patches, or additive intake files. | preconditions, cleanup-principles, then [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md) |
+| **Execute** | Explicit approval of a specific mutation list | Only the approved moves, factual patches, or additive intake files. | preconditions, cleanup-principles, [execute-principles.md](references/execute-principles.md), then [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md) |
 
 Execute has three mutation types: **move execution** (mounted filesystem, literal move map, hydration checks, staging, hashes, final verification), **record-only execution** (approved exact factual patches to navigation or current-state records), and **additive-intake execution** (a new non-governing incoming package that never replaces existing authority).
 
-Read only the files for your mode. Also read [audit-tools.md](references/audit-tools.md) when a filesystem is mounted and you will run the helpers; [connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search or web listings; [portfolio-audit-template.md](references/portfolio-audit-template.md) when the root holds multiple projects; [navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files. Run helpers for routine work; inspect their source only for safety checks, debugging or review.
+Read only the files for your mode. Also read [audit-tools.md](references/audit-tools.md) when a filesystem is mounted and you will run the helpers; [connector-audit.md](references/connector-audit.md) for OneDrive, SharePoint, Graph, enterprise search or web listings; [portfolio-audit-template.md](references/portfolio-audit-template.md) when the root holds multiple projects; [navigation-templates.md](references/navigation-templates.md) only when creating or reviewing navigation files; [audit-edge-cases.md](references/audit-edge-cases.md) when the audit helper flags an edge case; [release-packages.md](references/release-packages.md) when building, staging or installing a package. Run helpers for routine work; inspect their source only for safety checks, debugging or review.
 
-An agent that can only add files (browser upload, a connector without edit or append) follows **Add-only agents** in [work-mode.md](references/work-mode.md): no new top-level folder, and a `_PROVENANCE.md` beside the upload. To answer who changed a folder, follow **B5 Attribute activity** in [audit-mode.md](references/audit-mode.md).
+An agent that can only add files (browser upload, a connector without edit or append) follows Project Rules 4.0.0 section 4 or **Add-only agents** in [work-mode-baseline.md](references/work-mode-baseline.md): no new top-level folder, and a `_PROVENANCE.md` beside the upload. To answer who changed a folder, follow **B5 Attribute activity** in [audit-mode.md](references/audit-mode.md).
 
 When the owner has opted in with a `Sequential writers:` line (agents work one after another) and no other writer looks active, the active agent edits shared records directly with read-back verification and applies leftover `PENDING_*` files whose base still matches (W5). Work with cloud connectors and sync folders by file id, state which view each listing came from, and never leave two live same-name files (W5 **Cloud connectors and sync folders**).
 
@@ -37,7 +37,7 @@ When the owner has opted in with a `Sequential writers:` line (agents work one a
 - In Work mode, carry out the user-authorized task without asking again for routine edits. This skill adds save/index/handoff guidance; it does not replace the task workflow. Cleanup-specific move maps and approval gates apply to folder reorganization, not ordinary task edits.
 - In cleanup Execute mode, the approved mutation list is the boundary. Discovery never expands it.
 - Folder cleanup does not authorize Git operations, deployments, database changes, permissions, credentials, scheduled jobs, sync settings, or domain-data promotion.
-- Cleanup deletion is never included by default. Actual documents, archives, and duplicates require separate approval naming each target. Prefer history or recycle bin over permanent deletion.
+- Cleanup deletion is never included by default. Actual documents, archives, and duplicates require separate approval naming each target. Prefer history or recycle bin over permanent deletion. Before any delete, run the **Deletion recycle-path test** in [execute-moves.md](references/execute-moves.md); a delete through a remote shell or device bridge without a passing test does not happen.
 - A failed safety check, changed source, collision, concurrent write, incomplete upload, or unapproved target is a stop condition even after approval.
 - Instruction files are protected. Propose exact factual corrections separately; never rewrite behavioral rules, authority, scope, permissions, or read order without explicit approval.
 - Do not publish, commit, push, release, or synchronize skill/repository changes without confirmation immediately before that action.
@@ -48,18 +48,11 @@ Discover root/scoped instruction files, owner directives, startup READMEs and ac
 
 Verify every required entrypoint exists. A missing entrypoint outranks ordinary duplicates because the next agent starts blind.
 
-Adopted project logging requirements govern in Audit and Plan as well as Execute. Do not reduce an every-request policy to substantive-only journaling. Read-only limits task files, not your session log. Two conditions prevent a write:
-
-- the owner expressly prohibited all project writes, including logs; or
-- recording is unavailable or cannot be saved safely with the project's required coordination and immediate content verification.
-
-Then make no project writes, give the owed `NOT SAVED TO PROJECT` checkpoint line and explain the limitation. If only a shared record cannot be saved safely, defer that write and continue independent authorized work. Never replace a shared journal merely to simulate append.
-
-Measure journal size. Above the configured threshold (default 100 KB), flag it and propose rotation into dated history plus a short current-tail file. Rotation requires approval and must preserve every entry.
+Follow the project's logging rule in every mode. Read-only limits task files, not your session log, unless the owner expressly prohibits all project writes; if you cannot save safely, give the `NOT SAVED TO PROJECT` checkpoint line and keep doing unaffected work. Never replace a shared journal merely to simulate append.
 
 ## Optional project rules
 
-For an owner requesting reusable project guidance, use [the optional Project Rules adoption guide](references/project-rules/ADOPTION.md). The accompanying `AGENTS.proposed.md` is a copyable template, not active instructions. Skill installation or cleanup approval does not adopt it; merge/adopt it only under a separate explicit project-specific request. Existing project policies and cleanup without this template remain supported. Some host packages (Gemini Apps, Opal) do not bundle `references/project-rules/`; if the guide is missing, say so and point the owner to the `-project-rules-optional` release ZIP or the repository instead of reconstructing the template.
+For reusable project rules, use [ADOPTION.md](references/project-rules/ADOPTION.md); the bundled `AGENTS.proposed.md` is a template, not active until the owner adopts it for a specific project. If the guide is missing from your package, say so.
 
 ## Keep evidence honest in every mode
 

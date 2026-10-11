@@ -1,6 +1,6 @@
 # Cleanup principles — Audit, Plan and Execute
 
-Read this in every Audit, Plan or Execute run, after [preconditions.md](preconditions.md) and before the mode file. Work mode does not need it.
+Read this in every Audit, Plan or Execute run, after [preconditions.md](preconditions.md) and before the mode file. Work mode does not need it. Audit also reads the inventory method in [audit-mode.md](audit-mode.md#inventory-against-artifacts-not-names); Execute also reads [execute-principles.md](execute-principles.md).
 
 ## Split mixed-scope requests
 
@@ -65,20 +65,6 @@ A divergent control artifact—authority map, exclusion register, schema, allowl
 
 Canonical status is an authority/navigation fact, not a file-property inference. Do not choose among roots or control artifacts by preferred-looking name, newest modified time, search order, size or matching hash. When same-name roots remain ambiguous, preserve their paths and stable identifiers and stop the affected root-dependent action.
 
-## Inventory against artifacts, not names
-
-With a mounted filesystem, run the deterministic helper described in [audit-tools.md](audit-tools.md). First confirm `--version` equals this skill's version; a mismatch is a mixed install whose documented checks may not exist. Prefer `--brief` or `--out` and read **Findings at a glance** before any detail section. With connector-only access, follow [connector-audit.md](connector-audit.md) and disclose the downgrade.
-
-Inventory substantive documents, archives, handoffs, next-prompt files, candidate/released/superseded packages, transcripts, datasets, scripts, outputs, mirrors, generated state, duplicate groups, required entrypoints, indexes in both directions, pending shared-edit artifacts, reparse points, case-mismatched references, and credential-name hints. Also measure what makes shared folders expensive or misleading for agents: the startup read set (flag `AGENTS.md` over 32 KiB, which Codex truncates), live-loading instruction names inside incoming/history/scratch/test fixtures, embedded skill copies at different versions, orphaned temp files from interrupted writes, and files their index never mentions.
-
-Normally execute the helpers and read their reports; load their implementation only when diagnosing, reviewing or changing the code. Blocked content reads are coverage gaps, never evidence that a file is empty or safe.
-
-For large roots, let the helper produce exhaustive structural results. Read in full only instructions, authority/current-state claims, handoffs, and representative duplicate candidates. Mark all metadata-only classifications explicitly.
-
-Generated state is not evidence. Excluding it from analysis does not remove it from cloud indexing. A local junction excluded from counts may still be materialized in OneDrive or SharePoint; report local and cloud views separately.
-
-Credential-name matches are warnings. Report probable private credentials separately from ambiguous cryptographic material and recognizable public certificate bundles; a `.pem` extension alone does not prove a private key. Keep content-read guards conservative: never open, stage, copy, quote or index browser profiles, cookies, login databases, `.env`, private-key candidates or tokens merely to classify them.
-
 ## Protect secrets without erasing private context
 
 Treat passwords, private keys, access or refresh tokens, session cookies, authorization headers, recovery codes and secret-bearing connection strings as secrets. Private links, local or cloud paths, names and ordinary business details may be sensitive or private, but they are not secrets merely because they are non-public.
@@ -100,40 +86,10 @@ Use exactly one bucket:
 
 Unknown files go to an owner-decision list, not a guess. Source snapshots are historical unless tied to a known reproducible commit. Generated state belongs in bucket 8, not history.
 
-## Create additive intake safely
-
-After explicit approval, a connector may create a new package only under an existing incoming, unreviewed, inbox, or quarantine area:
-
-- Label the package non-governing and candidate-only.
-- Preserve source-system provenance and date.
-- Prefer internal pointers and redacted extracts over raw customer records.
-- Exclude unnecessary names, addresses, contact details, signatures, payment links, account data, design IDs, and unrelated plans.
-- Keep unknown numeric values null.
-- Record duplicate and claim-family status using the evidence states above.
-- Do not edit accepted evidence, production data, authority, or exclusion controls.
-- After a multi-file upload, wait for completion, reopen the destination, and compare every filename and count with the approved manifest. Partial success is not permission to retry the whole batch blindly.
-
 ## Design for fast navigation
 
 Prefer a short root containing an entrypoint, instructions, status, authority map, index, and one current handoff. Adapt to the project’s vocabulary; do not impose a universal numbered tree. Preserve approved files and history. Read [navigation-templates.md](navigation-templates.md) before proposing navigation changes.
 
-## Execute with measured verification
+## Reconcile competing trackers
 
-For moves, use [execute-moves.md](execute-moves.md): generate the exact map review and proposal receipt; separately list owner decisions and exact navigation, staging and removal scope; obtain approval of that package; use receipt-bound preflight/baseline; copy and verify staging; recheck the approved plan and baseline source hashes immediately before movement; execute the approved resolved pairs; verify final hashes and source absence; apply approved navigation patches and remove only verified approved staging/empty folders. On target mismatch, preserve evidence and reconcile newer contributions before any recovery overwrite.
-
-For record-only or connector edits:
-
-- guard the complete current document with a hash, version, ETag, modified time, or equivalent;
-- re-read immediately before writing;
-- apply only an exact-context patch;
-- never use keyboard-only Home/End insertion in a virtualized editor;
-- stop if complete document state or expected context is unavailable;
-- reopen after save and verify the title/header, section order, marker count, stale-text removal, links, and protected-file invariants.
-
-A successful click, upload selection, or save message is not proof. Verify the resulting artifact directly.
-
-## Finish with proof
-
-Close with the matching verification block from [execute-moves.md](execute-moves.md) or [execute-records.md](execute-records.md). Report outcome first, measurements second, limitations third, and optional follow-up separately.
-
-A run is incomplete if any required fact, file, upload, final path, stale-claim removal, protected-file invariant, or concurrent-write conflict remains unverified. Never describe a production system, dataset, or folder as ready solely because cleanup succeeded.
+With several tracker-like files, establish the canonical one from owner direction, adopted instructions and navigation, never filename, date or completeness, and do not silently merge, rename or delete them. Before treating another as merged or retired, map every actionable item to its canonical tracker ID and record that mapping, keeping each item's status and source identity; search current state and history for completion or supersession before calling an item missing. Unmapped or unverifiable items stay open; a source-level "merged" label is not item-level evidence. Then classify the old file as evidence or History and point it to the canonical tracker; moving or deleting it is cleanup needing approval.

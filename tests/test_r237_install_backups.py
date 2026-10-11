@@ -7,6 +7,7 @@ import unittest
 REPO = Path(__file__).resolve().parents[1]
 PKG = REPO / "packaging"
 WORK = REPO / "skills/multi-agent-folder-cleanup/references/work-mode.md"
+RELEASE = REPO / "skills/multi-agent-folder-cleanup/references/release-packages.md"
 
 
 class InstallBackupGuidance(unittest.TestCase):
@@ -28,9 +29,12 @@ class InstallBackupGuidance(unittest.TestCase):
         row = [l for l in WORK.read_text(encoding="utf-8").splitlines()
                if l.startswith("| Candidate or release package")]
         self.assertEqual(len(row), 1)
-        self.assertIn("outside every folder the host scans for skills", row[0])
-        self.assertIn("exactly one `SKILL.md`", row[0])
-        self.assertIn("not proof the host loads them", row[0])
+        # v1.8.0 (R252/P06): the row points to an on-demand reference that carries the rule.
+        self.assertIn("[release-packages.md](release-packages.md)", row[0])
+        text = RELEASE.read_text(encoding="utf-8")
+        self.assertIn("outside every folder the host scans for skills", text)
+        self.assertIn("exactly one `SKILL.md`", text)
+        self.assertIn("not proof the host loads them", text)
 
 
 if __name__ == "__main__":

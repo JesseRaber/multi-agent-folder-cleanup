@@ -8,7 +8,7 @@ Execute has three mutation types. Use **D0–D7** when files move. Use **D8–D9
 
 ### D0–D7. Staged move protocol
 
-Preconditions: an approved literal map, zero collisions, no target over the path threshold.
+Preconditions: an approved literal map, zero collisions, no target over the path threshold. Use one filesystem environment end to end and literal paths throughout. Do not construct move or deletion commands from globs, unresolved environment variables or string-built paths handed between shells.
 
 ### D0. Preflight
 
@@ -66,6 +66,17 @@ Nothing here deletes user content. If a step seems to require deleting a documen
 - A parent left empty because the move took its last child is not always cosmetic. If its name is confusable with a live folder (`output/` beside `outputs/`), it is a new ambiguity the cleanup created. Name every such parent in the verification block. Remove it only if the approved map named it.
 - On Windows, keep path resolution and any recursive move or cleanup in one PowerShell process. Verify each resolved absolute path remains within the approved root; do not enumerate in PowerShell and hand string-built paths to another shell.
 - Refuse ordinary cleanup through a junction or symlink, including linked ancestors; do not use recursive removal to detach links. Leave the path in place and request a separately reviewed link-specific operation. A successful verifier result never authorizes removal by itself.
+
+### Deletion recycle-path test
+
+Before any approved delete (staging copies, empty folders or named targets), prove the recycle path works in the shell that will delete:
+
+1. Create one small test file in a scratch location on the same volume as the targets.
+2. Send it to the Recycle Bin or provider trash with the exact command you will use for the targets.
+3. Confirm it appears in the Recycle Bin (count before and after, or the item listed with its original location) and is gone from its path.
+4. If it does not appear, stop: report that deletes from this shell are permanent and propose another route (for example the same command run through a one-time interactive scheduled task under the owner's account, tested the same way). Do not delete the targets.
+
+A delete through a remote shell or device bridge without a passing test does not happen. Record the test result in the session log before the first target. On a synced root, also say whether the provider's online recycle bin was checked.
 
 ### D7. Update navigation
 

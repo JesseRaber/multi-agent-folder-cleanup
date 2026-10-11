@@ -22,7 +22,7 @@ from pathlib import Path
 import re
 import sys
 
-__version__ = '0.1.0'
+__version__ = '0.1.0'  # copied from the github-release skill v0.1.0 (scripts/); compare with the current skill before changing it (R244)
 SEMVER = re.compile(r'^\d+\.\d+\.\d+$')
 TEXT_SUFFIXES = {'.md', '.py', '.json', '.yml', '.yaml', '.txt', '.ps1', '.toml', '.cfg'}
 SKIP_DIRS = {'.git', '__pycache__', 'node_modules', 'dist'}

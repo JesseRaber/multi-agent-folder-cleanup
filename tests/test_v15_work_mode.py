@@ -248,7 +248,8 @@ class WorkModeTests(unittest.TestCase):
             self.assertIn("managed | root-level | managed | 1", out)
 
     def test_work_guidance_covers_new_lifecycles(self):
-        text = (REPO / "skills/multi-agent-folder-cleanup/references/work-mode.md").read_text(encoding="utf-8")
+        text = "\n".join((REPO / "skills/multi-agent-folder-cleanup/references" / n).read_text(encoding="utf-8")
+                         for n in ("work-mode.md", "work-mode-baseline.md", "release-packages.md"))
         for phrase in ("same task is active", "one explicitly current handoff per subject",
                        "Pending**, **Applied**, **Superseded**, **Conflicted** or **Unverifiable",
                        "same-version candidate", "exactly one authoritative project-wide tracker",

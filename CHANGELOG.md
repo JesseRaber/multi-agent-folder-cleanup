@@ -1,6 +1,14 @@
 # Changelog
 
-### 1.7.2 (candidate, not released) — install backups and Work-mode trim
+### 1.8.0 (candidate, not released) — smaller read sets, recycle-path test
+
+- Per-mode read sets (cl100k): Work 6,706 -> 4,757 on projects with Project Rules 4.0.0+ (S1: `work-mode-baseline.md` holds steps those rules already carry); Audit 8,185 -> 6,676 (S3 `audit-edge-cases.md`); Plan 6,055 -> 5,292 (S2 `execute-principles.md`); Execute moves +31 (R255, R183 added). Register R252 from the Grok Bot evaluation of 2026-10-10.
+- R255: Execute runs a recycle-path test before any delete and stops if the test file does not reach the Recycle Bin; no delete through a remote shell or bridge without a passing test.
+- P01-P10 trims, P13 one close entry, R193 quick tasks, R181 arrival line, R183 move-safety sentence, R134 navigation guard, R102 default prompt, R238-R240 on-demand notes, README FAQ Grok fix.
+- Helpers: `Generated` with UTC offset (R127/R179); space-before-offset start times parsed (R178); `--session-index` lists logs without a header block (R180).
+- Release tooling (R244): duplicate inline version step removed from `release.yml`; copied tooling notes its source version.
+
+### 1.7.2 (released 2026-10-10) — install backups and Work-mode trim
 
 - Work mode (R234): `references/work-mode.md` trimmed from 28.6 KB to 22.4 KB (-22%) by removing repetition and explanation that changed no decision; every W1–W7 rule, pinned phrase and section anchor kept (independent old/new rule comparison; its findings restored) (187 tests unchanged and passing).
 - Install guides and work-mode W3 release row (R237): keep the previous version's backup outside every folder the host scans for skills (Codex loads `SKILL.md` recursively, so a backup under `.codex/skills/_backups` loaded as a second same-name skill and shadowed 1.7.1), or rename its `SKILL.md` to a non-loading name; after install require exactly one `SKILL.md` with the skill's `name:` under the host skill roots; files matching the ZIP are not proof the host loads them. Test: `tests/test_r237_install_backups.py`.

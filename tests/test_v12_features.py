@@ -43,7 +43,10 @@ class V12FeatureTests(unittest.TestCase):
         # v1.5: cleanup-only sections moved unchanged to references/cleanup-principles.md;
         # SKILL.md is a router. Each heading must appear exactly once across the two.
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-        principles = (SKILL_ROOT / "references/cleanup-principles.md").read_text(encoding="utf-8")
+        # v1.8.0 (R252/S2): Execute-only sections moved to execute-principles.md and the
+        # inventory method to audit-mode.md; each heading still appears exactly once.
+        principles = "\n".join((SKILL_ROOT / "references" / n).read_text(encoding="utf-8")
+                                for n in ("cleanup-principles.md", "execute-principles.md", "audit-mode.md"))
         headings = [
             "## Choose the operating mode",
             "## Split mixed-scope requests",
@@ -59,7 +62,8 @@ class V12FeatureTests(unittest.TestCase):
         for heading in headings:
             with self.subTest(heading=heading):
                 self.assertEqual(skill.count(heading) + principles.count(heading), 1)
-        self.assertTrue(principles.rstrip().endswith("because cleanup succeeded."))
+        self.assertTrue((SKILL_ROOT / "references/execute-principles.md").read_text(encoding="utf-8")
+                        .rstrip().endswith("because cleanup succeeded."))
         self.assertIn("references/work-mode.md", skill)
         self.assertIn("references/cleanup-principles.md", skill)
 
