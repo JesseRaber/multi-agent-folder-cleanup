@@ -289,7 +289,11 @@ class VerifyRecordsTests(unittest.TestCase):
 
 class GuidanceTests(unittest.TestCase):
     def setUp(self):
-        self.work = (SKILL / "references/work-mode.md").read_text(encoding="utf-8")
+        # v1.8.0 (R252/S1, P07): the Work set is work-mode.md plus work-mode-baseline.md;
+        # Windows write mechanics moved to audit-tools.md (safe writes section).
+        self.work = "\n".join((SKILL / "references" / n).read_text(encoding="utf-8")
+                               for n in ("work-mode.md", "work-mode-baseline.md"))
+        self.tools = (SKILL / "references/audit-tools.md").read_text(encoding="utf-8")
         self.skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
 
     def test_r227_read_only_keeps_the_log(self):
@@ -315,9 +319,10 @@ class GuidanceTests(unittest.TestCase):
         self.assertIn("`PENDING` → `APPLIED <after-sha8> by <session>/<turn>`", self.work)
 
     def test_r235_windows_write_mechanics(self):
-        self.assertIn("Never use `>>` on a shared record", self.work)
-        self.assertIn("never regex-replace across a shared file", self.work)
-        self.assertIn("only the one line that carries your own session ID", self.work)
+        self.assertIn("Never use `>>` on a shared record", self.tools)
+        self.assertIn("never regex-replace across a shared file", self.tools)
+        self.assertIn("only the one line that carries your own session ID", self.tools)
+        self.assertIn("audit-tools.md#safe-writes-to-shared-records", self.work)
 
 
 class RulesBundleTests(unittest.TestCase):

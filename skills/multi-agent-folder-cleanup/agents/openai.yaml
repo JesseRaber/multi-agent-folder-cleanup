@@ -1,6 +1,6 @@
 interface:
   display_name: "Multi-Agent Folder Cleanup"
   short_description: "Keep shared project folders usable by many agents"
-  default_prompt: "Use $multi-agent-folder-cleanup to audit this shared project folder or portfolio and explain what is authoritative, stale, operationally verified, incoming, or ambiguous."
+  default_prompt: "Use $multi-agent-folder-cleanup for this shared project folder: pick the mode (Work for ordinary saving, logging and handoff; Audit, Plan or Execute for questions about the folder or reorganizing it) and state it first."
 policy:
   allow_implicit_invocation: true

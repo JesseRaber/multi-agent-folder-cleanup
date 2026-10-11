@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v1.7.2**; published releases are listed on GitHub.
+Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v1.8.0**; published releases are listed on GitHub.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`1.7.2`; see `CHANGELOG.md`.
+`1.8.0`; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.7.2 (SKILL.md at <path>; helpers <version>)**.
+Report as: **Loaded Multi-Agent Folder Cleanup v1.8.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
 
 ## Install
 
@@ -70,11 +70,16 @@ skills/multi-agent-folder-cleanup/
   SKILL.md                       concise routing and safety contract
   agents/openai.yaml             OpenAI discovery and starter-prompt metadata
   scripts/                       read-only audit, move- and record-verification helpers
+  references/work-mode.md        Work mode: saving, indexing, pending edits, handoff
+  references/work-mode-baseline.md  Work-mode steps for projects without Project Rules 4.0.0+
   references/preconditions.md    every-mode preconditions (read first)
   references/audit-mode.md       Audit protocol and report format
   references/plan-mode.md        Plan protocol and approval package
   references/execute-moves.md    staged move protocol, verification, recovery
   references/execute-records.md  record-only, connector and additive execution
+  references/execute-principles.md  intake, measured verification and proof (every Execute run)
+  references/audit-edge-cases.md  rarer inventory checks and confusion sources (on demand)
+  references/release-packages.md  package staging, backups and host installs (on demand)
   references/audit-tools.md      deterministic helper usage and limitations
   references/connector-audit.md   connector evidence and safe cloud-edit boundaries
   references/portfolio-audit-template.md  multi-project audit matrix
@@ -218,7 +223,7 @@ The tag must match the versions in `SKILL.md`, `.codex-plugin/plugin.json`, and 
 
 ### Which ZIP do I install?
 
-Use `…-UNIVERSAL-skill.zip` for Claude app skill upload, ChatGPT or Codex standalone skills, Grok, local models, and a normal skills folder. Claude Code, the Codex/ChatGPT plugin marketplace, Microsoft Copilot, Gemini Apps, and Opal each need the matching package in the install table. Releases before v1.5.0 used older asset names.
+Use `…-UNIVERSAL-skill.zip` for Claude app skill upload, ChatGPT or Codex standalone skills, local models, and a normal skills folder. Grok uses the Microsoft Copilot agent-only ZIP (`…-microsoft-copilot-agent-only.zip`), not UNIVERSAL: Grok rejects the `.ps1` files in UNIVERSAL. Claude Code, the Codex/ChatGPT plugin marketplace, Microsoft Copilot, Gemini Apps, and Opal each need the matching package in the install table. Releases before v1.5.0 used older asset names.
 
 ### Does this skill move or delete files?
 

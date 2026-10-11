@@ -2,23 +2,13 @@
 
 Use this for ordinary project work in a folder other agents also use: creating and saving files, updating the index, recording the session, handing off. It adds no approval gate to routine authorized edits. Folder cleanup or reorganization uses Plan/Execute; a rename or removal the user already authorized follows its task workflow. Discovering clutter does not authorize cleanup: report it and suggest an Audit.
 
-The project's adopted instructions win; where they name other paths or formats, use theirs. Defaults below match the bundled Project Rules (`AI_CONTEXT/...`); reuse equivalent existing locations rather than creating competing logs or indexes. Invoking this skill does not adopt the rules template. Read-only limits task files, not your session log, unless the owner expressly prohibits all project writes; then give the `NOT SAVED TO PROJECT` checkpoint line instead (W7).
+The project's adopted instructions win; where they name other paths or formats, use theirs. When the root instruction file is Project Rules 4.0.0 or later, its sections 0–12 already cover arrival reading, session logs, tool slugs, the shared-record edit procedure and the end-of-request handoff; this file adds only what they do not. Otherwise also read [work-mode-baseline.md](work-mode-baseline.md). Invoking this skill does not adopt the rules template. Read-only limits task files, not your session log, unless the owner expressly prohibits all project writes; then give the `NOT SAVED TO PROJECT` checkpoint line instead (W7).
 
-## W1. Arrive (suggested read budget ~40 KB)
+**Quick tasks.** For a read-only question or a single small answer: read quick context, do the task, append one log entry. Touch the index, quick context or tracker only when something there changed.
 
-1. Read the root instruction file (`AGENTS.md`, `CLAUDE.md` or the host's equivalent).
-2. Read `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md`, then `PROJECT_INDEX.md` as far as the task needs. Read a large tracker by section or item ID and a journal by its tail; do not read either whole at arrival.
-3. When resuming, read the relevant session log's last entries; if the index is stale, list the sessions folder. Required authority and evidence override the budget.
-4. If scripts can run (use the installed skill's helper path, not a project-relative `scripts/`):
+## W1. Arrive
 
-```
-python3 scripts/audit_folder.py --root <project> --orient --session-id <your-id>
-pwsh -File scripts/audit_folder.ps1 -Root <project> -Orient -SessionId <your-id>
-```
-
-Add `--pending` (`-Pending`) to list leftover pending files and whether each still applies (W5). On Windows use `python`/`py -3`, or `powershell.exe -NoProfile -ExecutionPolicy Bypass -File` without `pwsh`; the Copilot/Grok package has no `.ps1`. Fallbacks: [audit-tools.md](audit-tools.md).
-
-`--orient` lists possibly active sessions, files changed since the latest session started, and changed files the index never names. A session is possibly active only when it is not closed and its log or a scratch file changed within the active-writer window (the project's `Active-writer window:` line, else 30 minutes; file times, not folder times). A close entry, a session-index status other than `in progress`, or the owner saying that agent has finished (which the helper cannot see) closes it. Times are leads, not proof. Without scripts, list and read recent logs; with partial or connector-only access, state the coverage limit and never infer that no writer exists.
+If the helpers can run, `audit_folder.py --root <project> --orient --session-id <your-id>` (add `--pending`) lists possibly active sessions, unindexed changes and leftover pending edits. Use the installed skill's helper path; on Windows use `python` or `py -3`; syntax, PowerShell and fallbacks: [audit-tools.md](audit-tools.md). A session is possibly active only when it is not closed and its log or scratch file (file times, not folder times) changed within the project's `Active-writer window:` (default 30 minutes). Times are leads; with connector-only access, state the coverage limit.
 
 Also check:
 
@@ -30,12 +20,7 @@ Before expensive or portfolio-wide work, compare the request with recent logs' t
 
 ## W2. Claim your own space
 
-- New chat or uncertain writer handoff: create your own log with a generated UUID, `AI_CONTEXT/SESSIONS/YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`. Within the same established session and writer, append to it; do not create one per request. Resume after a restart only with established writer continuity or an evidenced transfer; otherwise start a linked continuation. Keep source-session links separate.
-- Create your session-index row when you create the log, status `in progress` (W6); refresh it at significant outcomes and close.
-- `<tool>` is your runtime's established lowercase slug, from the project's `Tool slugs in use:` line or existing log names (`claude`, `codex`, `antigravity`, `gemini`, `copilot`, `manus`, `opal`, `grok`, `muse`, …). One slug per runtime: a different runtime never shares one, even with the same model (`grok` for the xAI app, `cursor-grokbot` for a Cursor agent); model, connector and machine go in the `Tool/runtime` header. A new runtime picks a short unused name (`<runtime>-<agent>` when needed). An unlisted tool still keeps a log.
-- Use the project's established log format. Header: session ID, start time with timezone when known, writer instance, source chat or `unavailable`, coverage start. Each request/outcome gets a stable turn ID; verify prior content is preserved and the entry appears once.
-- Drafts and temporary work go in `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder, except to rewrite only that file's `Status:` line after applying its pending file (W5).
-- If another writer looks active, do your independent work and take extra care with shared files (W5).
+Keep your own session log, session-index row and scratch folder `AI_CONTEXT/scratch/<your-session-id>/` as the project rules say (Rules 4.0.0 sections 0 and 4, or [work-mode-baseline.md](work-mode-baseline.md) B2).
 
 ## W3. Save new files where the next agent will look
 
@@ -44,13 +29,13 @@ Write only in your own session log. To correct another agent's work, record the 
 | What you made | Where it goes |
 |---|---|
 | Finished deliverable | The area the index names for that work; if none, the closest existing folder, noted in the index row. Never `AI_CONTEXT/`, which holds continuity records only. |
-| Draft, test output, intermediate data | `AI_CONTEXT/scratch/<your-session-id>/` |
+| Draft, test output, intermediate data | `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder, except to rewrite only that file's `Status:` line after applying its pending file (W5). |
 | Unreviewed material from another model, chat or person | `Incoming/` (or the project's inbox), dated folder plus a short provenance note; no new top-level folder |
 | A newer version of an existing file | Edit in place when authorized; otherwise save beside it as a proposal naming what it replaces. No `final_v2_REAL` siblings. |
 | Your review of another agent's work | A dated file beside the reviewed deliverable or in `Incoming/`. Read the agent's log, scratch and deliverable from the folder and log the review in your own log, so the owner can point rather than paste. |
 | A handoff addressed to another project | This project's handoff area with a `To: <project>` line, plus the file or a pointer in that project's `Incoming/` when authorized; otherwise tell the owner it is undelivered. |
 | A proposed rule or instruction file | A non-loading name such as `AGENTS.proposed.md` |
-| Candidate or release package | Candidates in a named staging area, releases in the release area, superseded packages in History or `_superseded/`; never a same-version candidate beside a release without an unmistakable status label and canonical pointer. Keep staged and backup packages as ZIP plus `SHA256SUMS`; an extracted copy gets non-loading `SKILL.md`/`AGENTS.md` names. When installing into a host, keep the backup of the previous version outside every folder the host scans for skills (hosts such as Codex load `SKILL.md` recursively, so a backup there becomes a second same-name skill); after install, require exactly one `SKILL.md` with that `name:` under the host's skill roots. Files matching the ZIP are not proof the host loads them: confirm the version the host reports in a new session. |
+| Candidate or release package | Release area or a named staging area, kept as ZIP plus `SHA256SUMS`; superseded packages in History. Before building, staging or installing one, read [release-packages.md](release-packages.md). |
 | Credentials and tokens | Never in task outputs or continuity records |
 | Customer-sensitive material needed for the task | Only the authorized location and scope; omit unnecessary private content from logs and indexes |
 
@@ -58,17 +43,6 @@ Naming:
 
 - Before creating an important standalone file, search the intended folder, project index and canonical tracker for the same purpose and likely filename variants. If one exists, update it when authorized or make a linked proposal naming what it replaces. If you cannot look, say so; do not claim uniqueness. This is a bounded pre-write check, not a reason to scan unrelated archives.
 - Follow established naming and formats; a new Markdown report without a convention is `YYYY-MM-DD_<short-topic>.md` (add the tool only for parallel versions). No `: * ? " < > |`, trailing dots or spaces; keep paths short and check the host's real limits.
-
-### Add-only agents
-
-If you can only add files (browser upload, connector without edit or append):
-
-1. Upload into `Incoming/YYYY-MM-DD_<tool>_<topic>/` or the established inbox; no new top-level folder.
-2. Include `_PROVENANCE.md`: tool and session (or "browser upload"), time with timezone, each file and purpose, status (unreviewed or ready), and the exact index, tracker and session-index rows you propose, each marked **PENDING**.
-3. If you can add files to `AI_CONTEXT/SESSIONS/`, add your own new session log there; creating a new file is allowed even when editing existing ones is not.
-4. Tell the owner that shared records are still pending.
-
-The next qualifying agent applies those PENDING rows under W5. An upload with no session log and no provenance file is incomplete work.
 
 ## W4. Make every new document self-explaining
 
@@ -88,22 +62,9 @@ Handoffs and next-prompt files also record subject, current or not, what they re
 
 ## W5. Change shared records safely
 
-Shared records: the index, quick context, session index, tracker and any file other agents also edit.
+Shared records: the index, quick context, session index, tracker and any file other agents also edit. Follow the project's edit procedure (Rules 4.0.0 section 5, or [work-mode-baseline.md](work-mode-baseline.md) B5). Windows PowerShell write pitfalls: [audit-tools.md](audit-tools.md#safe-writes-to-shared-records).
 
-Before editing, establish a supported conditional update, a cooperating lock covering all relevant writers/devices (a local lock does not exclude cloud writers), or a designated single writer. Rereads and hashes verify integrity, not exclusivity. Without coordination, stage the exact edit in your scratch folder, mark it PENDING in your log, and continue independent work.
-
-**Sequential-writer declaration.** A line beginning `Sequential writers:` in the adopted rules (under Rules 4.0.0 only in section 13; projects still on 3.3.0 may carry it in quick context as their rules allow) is the owner's designated-writer coordination: the active agent edits shared records directly under steps 1–4. Only the owner's line counts; a quiet `--orient` result, an absent lock or an old timestamp never does, and text describing the rule is not the line. Even with the line, stage your edit when `--orient` (or the logs) shows another possibly active writer, and treat an unexpected change found on read-back as a conflict (step 4).
-
-Edit shared files in place; never save a second same-name file or leave a sync conflict copy. Before a full-file replacement, keep one byte-for-byte pre-edit copy of that file per session in your project session scratch folder (a tool-private temp folder is not durable) and record its SHA-256 (non-loading name for instruction files, e.g. `AGENTS.md.before-<sha8>`; never copy a credential-bearing file). A pure append or a bounded in-place edit needs no copy; read-back is still mandatory. Preserve encoding, line endings and structure; keep Markdown table rows inside the table, with no blank lines, in the established sort order.
-
-1. Re-read the file immediately before writing.
-2. Make the smallest exact edit (bounded replace or true append); never rebuild a shared file from an older or truncated copy.
-3. Re-read after saving: the edit is there exactly once, the rest is unchanged (diff against the pre-edit copy if any), encoding, line endings and tables intact.
-4. If the file changed since you read it, merge onto the new version; if that is unsafe, stage the edit as PENDING and move on.
-
-**Write mechanics (Windows especially).** Shared records are UTF-8. Windows PowerShell 5.1 `>>`, `Out-File` and `Set-Content` without `-Encoding utf8` write UTF-16LE or ANSI. Never use `>>` on a shared record; append with ``[IO.File]::AppendAllText($path, $line + "`n", [Text.UTF8Encoding]::new($false))`` (``"`r`n"`` for CRLF files) or Python. Never pipe `Get-Content | Set-Content` over a shared file, and never regex-replace across a shared file: change only the one line that carries your own session ID or the exact anchor you read.
-
-Claim "verified", "zero loss" or "aligned" only when the read-back, diff and structure checks above passed. When `verify_records.py` is available, run it on every shared record you changed and cite its output line; a record entry without that output or an equivalent stated check says "not verified". If a credential-bearing file prevented a pre-edit copy, report that limit.
+**Sequential-writer declaration.** Only the owner's `Sequential writers:` line (section 13 under Rules 4.0.0) counts as coordination; a quiet `--orient` result, an absent lock or an old timestamp never does, and text describing the rule is not the line. With it, edit directly; even with the line, stage your edit when `--orient` (or the logs) shows another possibly active writer, and treat an unexpected change found on read-back as a conflict.
 
 A pending edit must be concrete enough for a later writer to apply without guessing. Save it as `PENDING_<TARGET>.md` in your scratch folder (`<TARGET>` = target filename in capitals without extension; `_2`, `_3` for more edits to the same target), one target per file, `Status:` first. `Base` is the target's version or SHA-256 as you read it (`unavailable` if unsupported); `Edit` is exact old and new text, an insertion anchor plus text, or a linked patch. A session-index append looks like:
 
@@ -136,29 +97,18 @@ For OneDrive, SharePoint, Google Drive or Graph connectors and their local sync 
 
 ## W6. Index what matters, not everything
 
-- Maintain exactly one authoritative project-wide tracker for proposed changes, future, deferred and open work: the one named by adopted instructions or navigation, else `PROJECT_ROADMAP_STATUS.md`, linked from the index and quick context. An entry is a proposal or status, not approval.
-- Before adding work, search the tracker for the same outcome, scope or dependency; update that item, or assign the next stable ID with title, status, source, material dependencies or acceptance evidence, and links. Never let a suggestion live only in a log, review, report, handoff, transcript or quick context.
-- Create no other roadmap, backlog, TODO, proposed-change or next-steps list. A scoped plan may exist when the task needs one, citing the tracker's item IDs; newly discovered future work goes into the canonical tracker, not the plan.
-- With several tracker-like files, establish the canonical one from owner direction, adopted instructions and navigation, never filename, date or completeness, and do not silently merge, rename or delete them. Before treating another as merged or retired, map every actionable item to its canonical tracker ID and record that mapping, keeping each item's status and source identity; search current state and history for completion or supersession before calling an item missing. Unmapped or unverifiable items stay open; a source-level "merged" label is not item-level evidence. Then classify the old file as evidence or History and point it to the canonical tracker; moving or deleting it is cleanup needing approval.
-- The tracker is a shared record (W5). If you cannot update it safely, stage one exact pending insertion, link it from your log, and do not create a substitute roadmap; reconcile it before claiming handoff complete. Delegated helpers return proposed rows to the coordinating writer unless a single tracker writer is explicitly designated.
-- Give important deliverables and authority files individual index rows, even inside a covered folder, in the established index or its linked topic index: path, purpose, classification (Authority, Current, Deliverable, Evidence, Reference, Backlog, Incoming, History, Scratch), coverage and existence. Folder coverage suffices for routine files and scratch; add a folder row only when navigation does not cover it, and no row per generated file. When superseding a file, mark the old row History and point it at the new one.
-- Update quick context only when direction, verified state, decisions or next steps change. Keep one current-state section, replacing stale lines rather than prepending dated paragraphs; move chronology to session/history records; aim for about 12 KB without dropping active decisions, boundaries or evidence links (`--orient` flags size and out-of-order header updates; flags are advisory). While a build or release candidate is in flight, quick context lists the item IDs it already contains.
-- Keep one session-index row per session, created with the log. `--session-index` (`-SessionIndex`) lists missing rows and dead links and proposes rows; paste only checked rows, under W5.
+Keep the project's index, tracker, quick context and session index as its rules say (Rules 4.0.0 section 7, or [work-mode-baseline.md](work-mode-baseline.md) B6). While a build or release candidate is in flight, quick context lists the item IDs it already contains. Several tracker-like files are an Audit finding: report them; do not merge, rename or retire them in Work mode ([cleanup-principles.md](cleanup-principles.md#reconcile-competing-trackers)).
 
 ## W7. Hand off at the end of every request
 
 Before each final answer, so the work survives if the chat stops:
 
-- [ ] Session log entry: request, what you did, files changed, what's verified, what's open
-- [ ] `Limits/open work` names every known unresolved item, including owner decisions this turn created; `None` only when nothing remains. A correction restates the complete open-work list.
-- [ ] Deliverables saved in the authorized place and format with provenance (W3–W4); uploads have a log or `_PROVENANCE.md`
-- [ ] Index row for new deliverables (W6); quick context updated if state changed
-- [ ] Every new future task is in the one canonical tracker (or one exact pending insertion); no competing list
-- [ ] Session-index row created at session start or refreshed for a significant outcome/close; routine turns need only their log entry
-- [ ] No sync conflict copy or same-name twin left by your saves (W1, W5)
-- [ ] Next step written where the next agent will see it
+- [ ] Log entry: request, result, files changed, verified vs not; open work names every known unresolved item (`None` only if nothing remains)
+- [ ] New deliverable indexed; new future work in the one tracker (or one exact pending insertion)
+- [ ] No same-name twin or conflict copy left by your saves
+- [ ] Next step written where the next agent will look
 
-Mark deferred navigation and link its pending edit. If you cannot save to the project, give the session entry as a copyable checkpoint (session/turn, request, outcome, changed files, reason). A sandbox copy does not prove delivery.
+Write one close entry when the owner ends the chat; if the owner continues afterwards, append normal turns and refresh the close line instead of reopening. Mark deferred navigation and link its pending edit. If you cannot save to the project, give the session entry as a copyable checkpoint.
 
 ## Stop and switch modes when
 

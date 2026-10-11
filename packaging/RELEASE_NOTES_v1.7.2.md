@@ -1,6 +1,6 @@
 # multi-agent-folder-cleanup 1.7.2
 
-Status: candidate, not released.
+Status: released 2026-10-10 (GitHub release v1.7.2, published 02:24 -04:00, immutable).
 
 Patch release: install guidance for host backups (R237) and a smaller Work-mode reference (R234). No helper behavior changes; helpers report 1.7.2.
 

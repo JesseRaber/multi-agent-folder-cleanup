@@ -19,7 +19,7 @@ from pathlib import Path
 import sys
 import zipfile
 
-__version__ = '0.1.0'
+__version__ = '0.1.0'  # copied from the github-release skill v0.1.0 (scripts/); compare with the current skill before changing it (R244)
 SUMS = 'SHA256SUMS.txt'
 
 

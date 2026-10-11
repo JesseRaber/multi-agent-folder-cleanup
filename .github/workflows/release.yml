@@ -45,26 +45,16 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      - name: Check package versions agree
+      - name: Check marketplace catalog
+        # Version agreement is checked by packaging/check_versions.py below (R244).
         run: |
-          python3 - "${{ steps.ver.outputs.version }}" <<'EOF'
-          import json, sys, yaml
-          tag = sys.argv[1]
-          text = open('skills/multi-agent-folder-cleanup/SKILL.md', encoding='utf-8').read()
-          fm = yaml.safe_load(text.split('---')[1])
-          versions = {
-              'SKILL.md': str(fm.get('metadata', {}).get('version', '')),
-              '.codex-plugin/plugin.json': json.load(open('.codex-plugin/plugin.json'))['version'],
-              '.claude-plugin/plugin.json': json.load(open('.claude-plugin/plugin.json'))['version'],
-          }
-          mismatches = {name: value for name, value in versions.items() if value != tag}
-          if mismatches:
-              sys.exit(f"Version mismatch: build says {tag}, packages say {mismatches}")
+          python3 - <<'EOF'
+          import json, sys
           catalog = json.load(open('.claude-plugin/marketplace.json'))
           names = [p.get('name') for p in catalog.get('plugins', [])]
           if 'multi-agent-folder-cleanup' not in names:
               sys.exit('marketplace.json does not list multi-agent-folder-cleanup')
-          print(f"All package versions agree: {tag}")
+          print('marketplace.json lists multi-agent-folder-cleanup')
           EOF
 
       - name: Refuse if a release for this tag already exists

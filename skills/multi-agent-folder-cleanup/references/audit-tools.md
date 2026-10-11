@@ -49,10 +49,10 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python3 scripts/audit_folder.py --version    # audit_folder.py 1.7.2
-python3 scripts/verify_move.py --version     # verify_move.py 1.7.2
-python3 scripts/verify_records.py --version  # verify_records.py 1.7.2
-pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.7.2
+python3 scripts/audit_folder.py --version    # audit_folder.py 1.8.0
+python3 scripts/verify_move.py --version     # verify_move.py 1.8.0
+python3 scripts/verify_records.py --version  # verify_records.py 1.8.0
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 1.8.0
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
@@ -185,3 +185,14 @@ python3 scripts/verify_move.py verify --baseline /safe/plan/baseline.json --appr
 The helpers do not move files, prove human consent, guard separately proposed content patches, lock other writers, or verify cloud idle/sync state. Checks are point-in-time. Recheck changed scope and reconcile partial runs before resuming. Do not regenerate a receipt to bypass a mismatch. Final verify fails while any source remains; `--allow-source-present` is only for an approved copy. Preserve staging on failure and reconcile newer targets before authorized recovery.
 
 Run Windows-native preflight for OneDrive; elsewhere hydration remains unchecked. Keep proposal/review/baseline outputs outside the trees being moved, using new session-owned paths. Staging mirrors final relative paths. Required project continuity records keep their adopted location.
+
+## Safe writes to shared records
+
+Shared records are UTF-8. Windows PowerShell 5.1 `>>`, `Out-File` and `Set-Content` without `-Encoding utf8` write UTF-16LE or ANSI. Never use `>>` on a shared record; append with ``[IO.File]::AppendAllText($path, $line + "`n", [Text.UTF8Encoding]::new($false))`` (``"`r`n"`` for CRLF files) or Python. Never pipe `Get-Content | Set-Content` over a shared file, and never regex-replace across a shared file: change only the one line that carries your own session ID or the exact anchor you read.
+
+## Bridge, sync and shell notes
+
+- **Git through a bridged or mounted OneDrive path.** Even `git status` can create `.git/index.lock`; if the mount cannot delete it, the next Git writer is blocked. Run read-only Git with `git --no-optional-locks status`, or in a native shell on the owner's computer.
+- **Cloud-only files through a device bridge.** An `Input/output error` on a synced folder may be a cloud-only placeholder, not a damaged file. Hydrate or stage the file, then read it; report the placeholder state instead of calling the file unreadable.
+- **PowerShell 7 on Windows.** `pwsh` may be on `PATH` for one agent and absent for another on the same computer (`tests/run_tests.py --powershell pwsh` then exits 2). Look for `C:\Program Files\PowerShell\7\pwsh.exe`, or use `powershell.exe` (5.1); say which engine ran.
+- **Deletes from a remote shell.** A "send to Recycle Bin" call through a device bridge can delete permanently with no error. Run the recycle-path test in [execute-moves.md](execute-moves.md#deletion-recycle-path-test) first.

@@ -61,14 +61,17 @@ class TemplateTests(unittest.TestCase):
 
 
 class WorkModeTests(unittest.TestCase):
+    # v1.8.0 (R252/S1): steps covered by Project Rules 4.0.0 moved to work-mode-baseline.md,
+    # read only by projects without those rules; the shipped Work set is both files.
     def setUp(self):
-        self.w = read("references/work-mode.md")
+        self.lean = read("references/work-mode.md")
+        self.w = self.lean + "\n" + read("references/work-mode-baseline.md")
 
     def test_arrive_reads_tracker_by_section(self):
         self.assertIn("Read a large tracker by section or item ID and a journal by its tail", self.w)
 
     def test_arrive_conflict_copies_and_handoffs(self):
-        w1 = section(self.w, "## W1.", "## W2.")
+        w1 = section(self.lean, "## W1.", "## W2.")
         self.assertIn("**Sync conflict copies.**", w1)
         self.assertIn("**Undelivered handoffs.**", w1)
         self.assertIn("#cloud-connectors-and-sync-folders", w1)
@@ -80,24 +83,24 @@ class WorkModeTests(unittest.TestCase):
         self.assertIn("rewrite only that file's `Status:` line", self.w)
 
     def test_save_table_rows(self):
-        w3 = section(self.w, "## W3.", "## W4.")
+        w3 = section(self.lean, "## W3.", "## W4.")
         self.assertIn("Never `AI_CONTEXT/`, which holds continuity records only.", w3)
         self.assertIn("| Your review of another agent's work |", w3)
         self.assertIn("| A handoff addressed to another project |", w3)
         self.assertIn("ZIP plus `SHA256SUMS`", w3)
 
     def test_w5_declaration_and_pending(self):
-        w5 = section(self.w, "## W5.", "## W6.")
+        w5 = section(self.lean, "## W5.", "## W6.")
         self.assertIn("**Sequential-writer declaration.**", w5)
         self.assertIn("a quiet `--orient` result, an absent lock or an old timestamp never does", w5)
-        self.assertIn("Even with the line, stage your edit when `--orient`", w5)
+        self.assertIn("even with the line, stage your edit when `--orient`", w5)
         self.assertIn("`PENDING_<TARGET>.md`", w5)
         self.assertIn("**Apply leftover pending files.**", w5)
         self.assertIn("`Status: APPLIED <after-sha8> by <session>/<turn>`", w5)
         self.assertIn("Anything else is **Conflicted**", w5)
 
     def test_cloud_subsection(self):
-        c = section(self.w, "### Cloud connectors and sync folders", "## W6.")
+        c = section(self.lean, "### Cloud connectors and sync folders", "## W6.")
         for needle in ("**Say which view you used.**", "**Work by file id.**", "**Replace without twins.**",
                        "`Replaces: <old file id>`", "**One file type per shared record.**", "**Replicas.**",
                        "replica of unknown status"):
@@ -114,7 +117,8 @@ class WorkModeTests(unittest.TestCase):
 
 class AuditGuidanceTests(unittest.TestCase):
     def test_audit_mode(self):
-        a = read("references/audit-mode.md")
+        # v1.8.0 (R252/S3): rarer inventory checks moved to audit-edge-cases.md (read on demand).
+        a = read("references/audit-mode.md") + "\n" + read("references/audit-edge-cases.md")
         for needle in ("warning above 16 KB, high above 32 KiB", "**Sync conflict copies.**",
                        "retired legacy journal, N KB", "**Unpacked packages and working copies.**",
                        "**Continuity folder misuse.**", "fixed timestamps", "`pending-*`, any case"):

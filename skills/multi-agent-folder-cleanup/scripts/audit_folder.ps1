@@ -117,7 +117,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.7.2'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.8.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -610,7 +610,7 @@ if ($Out) {
 
 if (-not ($Orient -or $SessionIndex -or $Pending)) {
     Write-Line "Read-only audit of $RootFull"
-    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm zzz')"
 }
 
 # Explicit walk instead of Get-ChildItem -Recurse, for three reasons:
@@ -1155,7 +1155,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
     $script:InWork = $true
     $SessionNameRx = '^(\d{4}-\d{2}-\d{2})_(\d{6}|unknown-time)_([^_]+)_(.+)_(' + $UuidPattern + ')\.md$'
     $CanonicalToolSlugs = @('claude', 'claude-code', 'codex', 'antigravity', 'gemini', 'copilot', 'manus', 'opal', 'grok', 'muse')
-    $IsoRx = '\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?'
+    $IsoRx = '\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?'
     $TurnRx = '(?m)^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$'
     $WorkCap = if ($Brief) { 10 } else { 15 }
     $Now = [DateTimeOffset]::Now
@@ -1163,7 +1163,9 @@ if ($Orient -or $SessionIndex -or $Pending) {
         if (-not $value) { return $null }
         $m = [regex]::Match($value, $IsoRx)
         if (-not $m.Success) { return $null }
-        $t = $m.Value.Replace(' ', 'T')
+        # R178: Codex logs write '2026-10-06 22:49:40 -04:00' (space before the offset).
+        $t = [regex]::Replace($m.Value, '\s+(?=(?:Z|[+-]\d{2}:?\d{2})$)', '')
+        if ($t.Length -gt 10 -and $t[10] -eq ' ') { $t = $t.Substring(0, 10) + 'T' + $t.Substring(11) }
         $t = [regex]::Replace($t, '([+-]\d{2})(\d{2})$', '$1:$2')
         try { return [DateTimeOffset]::Parse($t, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal) } catch { return $null }
     }
@@ -1213,6 +1215,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
             $sid = if ($fields['session id']) { $fields['session id'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
             $uid = [regex]::Match($(if ($sid) { $sid } else { $f.Name }), $UuidPattern)
             if (-not $uid.Success) { $non.Add($f.Name + ' (no session UUID; not treated as a session log)'); continue }
+            $noHeader = -not ($fields['session id'] -or $fields['started'] -or $fields['start'] -or $fields['start time'] -or $fields['tool/runtime'])
             $header = if ($fields['tool/runtime']) { ([regex]::Replace($fields['tool/runtime'], '\s+', ' ')).Trim() } else { '' }
             $tool = if ($header) { $header } elseif ($nm.Success) { $nm.Groups[3].Value } else { 'unknown' }
             $tool = $tool.Split('(')[0].Trim(); if (-not $tool) { $tool = 'unknown' }
@@ -1247,7 +1250,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
             } else { $closed = [regex]::IsMatch($text, $CloseEntryRx) }
             $list.Add([pscustomobject]@{ Name = $f.Name; Id = $uid.Value.ToLower(); Tool = $tool; Topic = $topic; Started = $started
                 Slug = $(if ($nm.Success) { $nm.Groups[3].Value.ToLowerInvariant() } else { '' }); Header = $header; Closed = $closed
-                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource; FilenameStart = $filenameStart })
+                Turns = $ids.Count; LastTitle = $lastTitle; LastTime = $lastTime; MTime = [DateTimeOffset]$f.LastWriteTime; StartSource = $startSource; FilenameStart = $filenameStart; NoHeader = $noHeader })
         }
         $res.Sessions = @($list | Sort-Ordinal -Key { Get-SessionLoadKey $_ })
         $res.Nonstandard = @($non); $res.Blocked = @($blk)
@@ -1266,7 +1269,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
 
     Write-Line "Read-only work-mode check of $RootFull"
     if ($Orient) { Write-Line ("Helper: {0} (audit_folder.ps1 {1})" -f $PSCommandPath, $ScriptVersion) }
-    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    Write-Line "Generated $(Get-Date -Format 'yyyy-MM-dd HH:mm zzz')"
     $glance = [ordered]@{}
 
     if ($Orient) {
@@ -1575,6 +1578,8 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Capped @($stale)
             Write-Line ("  nonstandard session filenames: {0}" -f $S.Nonstandard.Count)
             Write-Capped $S.Nonstandard
+            $noHeaderList = @($S.Sessions | Where-Object { $_.NoHeader } | ForEach-Object { $_.Name } | Sort-Ordinal)
+            if ($noHeaderList.Count) { Write-Line ("  session logs without a header block (Session ID, Start, Tool/runtime): {0}" -f $noHeaderList.Count); Write-Capped $noHeaderList }
             $slugVariantCountI = Write-SlugVariants $S.Sessions
             if ($S.Blocked.Count) { Write-Line ("  session logs not parsed (blocked, unreadable or incomplete): {0}" -f $S.Blocked.Count); Write-Capped $S.Blocked }
             $glance['sessions missing from index'] = $missing.Count

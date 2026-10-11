@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "1.7.2"  # must equal SKILL.md metadata.version
+VERSION = "1.8.0"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -1178,7 +1178,7 @@ OUTCOME_FIELD_RE = re.compile(
     r"^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
 TURN_HEAD_RE = re.compile(r"^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$", re.MULTILINE)
-ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?")
+ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?")
 ROOT_STARTUP_NAMES = ("AGENTS.md", "CLAUDE.md", "GEMINI.md", "README.md")
 SESSION_READ_LIMIT = 1 << 20
 
@@ -1190,13 +1190,21 @@ def parse_iso(value):
     m = ISO_RE.search(value)
     if not m:
         return None
-    text = m.group(0).replace(" ", "T").replace("Z", "+00:00")
+    # R178: Codex logs write "2026-10-06 22:49:40 -04:00" (space before the offset).
+    text = re.sub(r"\s+(?=(?:Z|[+-]\d{2}:?\d{2})$)", "", m.group(0)).replace(" ", "T", 1).replace("Z", "+00:00")
     text = re.sub(r"(\.\d{6})\d+", r"\1", text)
     text = re.sub(r"([+-]\d{2})(\d{2})$", r"\1:\2", text)
     try:
         return datetime.fromisoformat(text).timestamp()
     except ValueError:
         return None
+
+
+def generated_stamp():
+    """Report time with its UTC offset (R127/R179), e.g. 2026-10-10 21:50 -04:00."""
+    now = datetime.now().astimezone()
+    z = now.strftime("%z")
+    return f"{now:%Y-%m-%d %H:%M} {z[:3]}:{z[3:]}"
 
 
 def fmt_time(epoch):
@@ -1285,6 +1293,7 @@ def load_sessions(root, sessions_rel):
             nonstandard.append(name + " (no session UUID; not treated as a session log)")
             continue
         sid = uid.group(0).lower()
+        no_header = not any(fields.get(k) for k in ("session id", "started", "start", "start time", "tool/runtime"))
         header = re.sub(r"\s+", " ", fields.get("tool/runtime") or "").strip()
         tool = header or (m.group(3) if m else "unknown")
         tool = tool.split("(")[0].strip() or "unknown"
@@ -1324,7 +1333,7 @@ def load_sessions(root, sessions_rel):
             "closed": is_closed_log(text),
             "started": started, "turns": len({t[0] for t in turns}), "last_title": last_title,
             "last_time": last_time, "mtime": mtime, "start_source": start_source,
-            "filename_start": filename_start,
+            "filename_start": filename_start, "no_header": no_header,
         })
     # Use a complete deterministic key. Duplicate IDs and equal timestamps are
     # valid audit findings, so neither may leave ordering to directory enumeration
@@ -1512,6 +1521,11 @@ def report_session_index(root, args, limited):
     print(f"  nonstandard session filenames: {len(nonstandard)}")
     for item in limited(nonstandard):
         print(f"    {item}")
+    no_header = sorted(s["name"] for s in sessions if s.get("no_header"))
+    if no_header:  # R180
+        print(f"  session logs without a header block (Session ID, Start, Tool/runtime): {len(no_header)}")
+        for item in limited(no_header):
+            print(f"    {item}")
     slug_variants = print_slug_variants(sessions, limited)
     if blocked:
         print(f"  session logs not parsed (blocked, unreadable or incomplete): {len(blocked)}")
@@ -1850,7 +1864,7 @@ def run_work_helpers(args, root):
     print(f"Read-only work-mode check of {root}")
     if args.orient:
         print(f"Helper: {os.path.abspath(__file__)} (audit_folder.py {VERSION})")
-    print(f"Generated {datetime.now():%Y-%m-%d %H:%M}")
+    print(f"Generated {generated_stamp()}")
     glance = {}
     if args.orient:
         glance.update(report_orient(root, args, limited))
@@ -2029,7 +2043,7 @@ def run_report(args, root, coverage_pairs):
     glance = {}
 
     print(f"Read-only audit of {root}")
-    print(f"Generated {datetime.now():%Y-%m-%d %H:%M}")
+    print(f"Generated {generated_stamp()}")
 
     walk = collect(root, prune_noise=args.prune_noise, max_seconds=args.max_seconds)
     all_files, folders = walk.files, walk.folders

@@ -2,6 +2,8 @@
 
 Read this only when creating or reviewing navigation files. Do not create cleanup navigation during an Audit. Required continuity recording follows the adopted project policy independently.
 
+When the project already has Project Rules or established continuity files (`AI_CONTEXT/PROJECT_QUICK_CONTEXT.md`, `PROJECT_INDEX.md`, a named tracker), do not add root `STATUS.md`, `AUTHORITY.md`, `HANDOFF.md` or `INDEX.md` beside them. Use the templates below as shapes for the existing files.
+
 Shared rules:
 
 - **Date everything.** An undated status file becomes a liability within a month.
