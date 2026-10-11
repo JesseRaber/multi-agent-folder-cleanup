@@ -1,6 +1,6 @@
 # multi-agent-folder-cleanup 1.8.0
 
-Status: candidate, not released. Built locally for owner review; not committed, pushed, tagged or published.
+Status: released 2026-10-10 (GitHub release v1.8.0).
 
 Minor release: smaller per-mode read sets (register R252, from the Grok Bot evaluation of 2026-10-10), a recycle-path test before any delete (R255), the README FAQ Grok fix, and small helper fixes.
 

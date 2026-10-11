@@ -1,6 +1,6 @@
 # Changelog
 
-### 1.8.0 (candidate, not released) — smaller read sets, recycle-path test
+### 1.8.0 (released 2026-10-10) — smaller read sets, recycle-path test
 
 - Per-mode read sets (cl100k): Work 6,706 -> 4,757 on projects with Project Rules 4.0.0+ (S1: `work-mode-baseline.md` holds steps those rules already carry); Audit 8,185 -> 6,676 (S3 `audit-edge-cases.md`); Plan 6,055 -> 5,292 (S2 `execute-principles.md`); Execute moves +31 (R255, R183 added). Register R252 from the Grok Bot evaluation of 2026-10-10.
 - R255: Execute runs a recycle-path test before any delete and stops if the test file does not reach the Recycle Bin; no delete through a remote shell or bridge without a passing test.
