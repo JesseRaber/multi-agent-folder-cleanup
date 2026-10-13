@@ -268,8 +268,8 @@ class HelperChecks(unittest.TestCase):
     def test_portfolio_matrix(self):
         out = section(run_py(self.base / "port", "--portfolio"), "Portfolio root matrix (immediate children; advisory)")
         rows = {l.split(" | ")[0].strip(): l.split(" | ") for l in out.splitlines() if " | root-level | " in l}
-        # Rules 4.0.0 drops the skill-routing subsection by design, so Work routing is "no".
-        self.assertEqual(rows["projA"][6:11], ["7 (1 no Status)", "4.0.0", "no", "match", "yes"])
+        # Rules 4.0.0 builds work routing into sections 0-12, so Work routing is "yes" (R268).
+        self.assertEqual(rows["projA"][6:11], ["7 (1 no Status)", "4.0.0", "yes", "match", "yes"])
         self.assertRegex(rows["projA"][11], r"^no \(\d+ placeholders\)$")
         self.assertEqual(rows["projB"][7:9] + [rows["projB"][10], rows["projB"][11]], ["3.2.0", "no", "no", "n/a"])
         self.assertRegex(rows["projB"][9], r"^differs \(\d+ lines\)$")

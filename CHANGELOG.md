@@ -1,5 +1,13 @@
 # Changelog
 
+### 1.8.1 (unreleased; ships with Project Rules 4.0.1 after the 2026-10-24 freeze) — helper accuracy
+
+- R268: portfolio `Work routing` reports `yes` for Rules 4.0.0+ (it checked only 3.x strings and showed `no` for 20 of 21 adopted projects); versions compared as numbers so 10.x sorts after 4.x. Python and PowerShell.
+- R269: pending-update counts skip pre-edit copies inside `before*`/`backup*` folders and report them on one line ("not counted: N"). Python and PowerShell.
+- R270: `verify_records.py` names a split table ("table split: rows continue the table that ended at line N") instead of "no separator row" / "isolated table row" when rows resume within 4 lines of the previous table.
+- R271: `--portfolio` lists projects whose `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md` is over 12 KB (Rules section 3). Python and PowerShell.
+- Tests: `tests/test_v181_candidate.py` (incl. PowerShell parity); three existing expectations updated for R268/R270. Checked against the owner's 21-project portfolio on 2026-10-13: Work routing yes 21/21; 2 backup copies excluded; 0 quick contexts over 12 KB after that day's rewrites.
+
 ### 1.8.0 (released 2026-10-10) — smaller read sets, recycle-path test
 
 - Per-mode read sets (cl100k): Work 6,706 -> 4,757 on projects with Project Rules 4.0.0+ (S1: `work-mode-baseline.md` holds steps those rules already carry); Audit 8,185 -> 6,676 (S3 `audit-edge-cases.md`); Plan 6,055 -> 5,292 (S2 `execute-principles.md`); Execute moves +31 (R255, R183 added). Register R252 from the Grok Bot evaluation of 2026-10-10.

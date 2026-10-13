@@ -173,7 +173,7 @@ class PortfolioTests(unittest.TestCase):
             out = run_py(base, "--portfolio")
             rows = {l.split(" | ")[0].strip(): [c.strip() for c in l.split(" | ")]
                     for l in out.splitlines() if " | root-level | " in l}
-            self.assertEqual(rows["filled"][7:12], ["4.0.0", "no", "match", "no", "yes"])
+            self.assertEqual(rows["filled"][7:12], ["4.0.0", "yes", "match", "no", "yes"])  # R268
             self.assertEqual(rows["blank"][9], "match")
             self.assertRegex(rows["blank"][11], r"^no \(\d+ placeholders\)$")
             self.assertEqual(rows["edited"][9], "differs (1 lines)")

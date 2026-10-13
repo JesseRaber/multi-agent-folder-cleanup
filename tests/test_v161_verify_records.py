@@ -106,9 +106,12 @@ class VerifyRecordsTests(unittest.TestCase):
     def test_rows_split_from_their_table_are_caught(self) -> None:
         # Rows appended under a later heading (the 2026-10-06 register incident).
         data = b"| ID | P |\n|---|---|\n| R1 | x |\n\n## Later\n\n| R2 | y |\n| R3 | z |\n"
-        self.assertFinding("no separator row", self.write("split.md", data))
+        # R270: a break within 4 lines of the previous table is named as a split.
+        self.assertFinding("table split", self.write("split.md", data))
         one = b"| ID | P |\n|---|---|\n| R1 | x |\n\n## Later\n\n| R2 | y |\n"
-        self.assertFinding("isolated table row", self.write("one.md", one))
+        self.assertFinding("table split", self.write("one.md", one))
+        far = b"| ID | P |\n|---|---|\n| R1 | x |\n\n## Later\n\ntext\n\nmore\n\n| R2 | y |\n"
+        self.assertFinding("isolated table row", self.write("far.md", far))
 
     def test_compare_reports_exact_normalized_and_different(self) -> None:
         a = self.write("a.md", b"x\ny\n")

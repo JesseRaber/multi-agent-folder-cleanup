@@ -689,6 +689,14 @@ function Write-Limited($items, [string]$indent) {
     for ($i = 0; $i -lt $take; $i++) { Write-Line ($indent + $items[$i]) }
     if ($items.Count -gt $take) { Write-Line ($more -f ($items.Count - $take)) }
 }
+$BackupDirRx = '(?i)^(before|backups?)([-_. ].*)?$'
+$QuickContextLimit = 12 * 1024
+function Test-BackupPath([string]$rel) {
+    # Pre-edit copies live in before/, before-T004/, backup/ folders (R269).
+    $segs = $rel.Replace('\', '/').Split('/')
+    for ($i = 0; $i -lt $segs.Count - 1; $i++) { if ([regex]::IsMatch($segs[$i], $BackupDirRx)) { return $true } }
+    return $false
+}
 function Test-PendingName([string]$name) {
     $low = $name.ToLower()
     if (-not ($low.EndsWith('.md') -or $low.EndsWith('.json'))) { return $false }
@@ -919,7 +927,7 @@ function Find-PendingFiles([string]$project, [string]$scratchRel = 'AI_CONTEXT/s
     foreach ($d in $dirs) {
         if (-not (Test-Path -LiteralPath $d -PathType Container)) { continue }
         foreach ($f in @(Get-ChildItem -LiteralPath $d -File -Force -ErrorAction SilentlyContinue)) {
-            if (Test-PendingName $f.Name) { [void]$found.Add($f.FullName) }
+            if ((Test-PendingName $f.Name) -and -not (Test-BackupPath (Get-RelUnder $f.FullName $project))) { [void]$found.Add($f.FullName) }
         }
     }
     return @($found | Sort-Ordinal -Key { Get-OrdinalKey (Get-RelUnder $_ $project) })
@@ -996,7 +1004,8 @@ function Get-RulesInfo([string]$project, $tcore) {
         }
     }
     $version = if ($m.Success) { $m.Groups[1].Value + $byRef } else { 'unversioned' }
-    $routing = if ($source.Contains('Day-to-day saving and indexing') -or $source.Contains('multi-agent-folder-cleanup')) { 'yes' } else { 'no' }
+    # Rules 4.0.0+ build the work routing into sections 0-12 (R268); compare versions as numbers.
+    $routing = if (($m.Success -and ([version]$m.Groups[1].Value) -ge [version]'4.0.0') -or $source.Contains('Day-to-day saving and indexing') -or $source.Contains('multi-agent-folder-cleanup')) { 'yes' } else { 'no' }
     $core = Get-RulesCore $source
     if ($null -eq $tcore) { $match = 'unknown (no template bundled)' }
     elseif ($null -eq $core) { $match = 'unknown (no sections 1-12)' }
@@ -2057,7 +2066,8 @@ else { Write-Line "  none detected by name" }
 
 Write-Section "Handoff and pending-update lifecycle warnings"
 $handoffs = @($files | Where-Object { $r = Get-Short $_.FullName; -not (Test-NonGoverning $r) -and ($_.Name -match '(?i)handoff|next[ _-].*prompt') })
-$pendingUpdates = @($files | Where-Object { Test-PendingName $_.Name } | ForEach-Object {
+$pendingBackups = @($files | Where-Object { (Test-PendingName $_.Name) -and (Test-BackupPath (Get-RelSlash $_.FullName)) }).Count
+$pendingUpdates = @($files | Where-Object { (Test-PendingName $_.Name) -and -not (Test-BackupPath (Get-RelSlash $_.FullName)) } | ForEach-Object {
         $t = Read-SmallText $_.FullName
         $st = if ($null -ne $t) { (Get-PendingInfo $t $_.Name).Status } else { $null }
         $mark = if ($st) { $st.Substring(0, 1).ToUpper() + $st.Substring(1).ToLower() } else { 'no Status:' }
@@ -2067,6 +2077,7 @@ Write-Line ("  handoff/next-prompt files outside non-governing areas: " + $hando
 Write-Limited @($handoffs | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
 Write-Line ("  pending shared-update artifacts: {0} (without a Status: first line: {1})" -f $pendingUpdates.Count, @($pendingUpdates | Where-Object { $_.Mark -eq 'no Status:' }).Count)
 Write-Limited @($pendingUpdates | ForEach-Object { "{0,-12} {1}" -f $_.Mark, $_.Rel }) '    '
+if ($pendingBackups) { Write-Line ("  pre-edit backup copies with pending names, not counted: {0} (inside before*/backup* folders)" -f $pendingBackups) }
 if ($pendingUpdates.Count) { Write-Line '  Run --pending for target and base checks; a status here is only what the file records.' }
 Write-Line ("  candidate/release/superseded ZIPs requiring channel review: " + $packageChannels.Count)
 Write-Limited @($packageChannels | ForEach-Object { Get-RelSlash $_.FullName } | Sort-Ordinal -Key { $_ }) '    '
@@ -2187,6 +2198,12 @@ if ($Portfolio) {
     }
     else { Write-Line "  no immediate child directories" }
     Write-Line "  Presence does not determine authority or operational state."
+    $overQc = @($children | ForEach-Object {
+            $qp = [IO.Path]::Combine($_.FullName, 'AI_CONTEXT', 'PROJECT_QUICK_CONTEXT.md')
+            if (Test-Path -LiteralPath $qp -PathType Leaf) { $len = (Get-Item -LiteralPath $qp -Force).Length; if ($len -gt $QuickContextLimit) { "{0}: {1} bytes" -f $_.Name, $len } } })
+    $qcNote = if ($overQc.Count) { ' (rewrite to current state; move history out)' } else { '' }
+    Write-Line ("  quick context over {0} KB: {1}{2}" -f ($QuickContextLimit / 1024), $overQc.Count, $qcNote)
+    Write-Limited $overQc '    '
     Write-Line ("  Core match compares sections 0-12 (1-12 before Rules 4.0.0) with the bundled template" + $(if ($tver) { " $tver" } else { ' (not bundled in this package: unknown)' }) + ".")
     $names = @($children | ForEach-Object { $_.Name })
     $groups = @{}

@@ -123,10 +123,20 @@ def check_text(path, text, check_links):
     base = os.path.dirname(os.path.abspath(path))
     in_fence = False
     table = []  # (lineno, line)
+    last_end = [0]  # last line of the previous table, to name split tables (R270)
 
     def flush():
         if not table:
             return
+        start, end = table[0][0], table[-1][0]
+        sep_ok = len(table) > 1 and all(TABLE_SEP_CELL.match(c) for c in table_cells(table[1][1]))
+        if last_end[0] and not sep_ok and 0 < start - last_end[0] <= 4:
+            found.append(f"line {start}: table split: rows continue the table that ended at line"
+                         f" {last_end[0]} (blank line or text inside the table)")
+            last_end[0] = end
+            table.clear()
+            return
+        last_end[0] = end
         if len(table) == 1:
             found.append(f"line {table[0][0]}: isolated table row (no header or separator)")
             table.clear()
