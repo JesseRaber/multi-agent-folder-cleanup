@@ -159,7 +159,7 @@ Measured on a real 18-project shared portfolio, v1.4.0 cuts what agents must rea
 - Complete upfront navigation, staging and removal scope; separated unresolved owner choices.
 - Recovery that preserves newer contributions rather than automatically restoring staged copies.
 - Evidenced instruction adoption and actual per-project continuity requirements.
-- An optional [Project Rules package](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md) (4.0.0 since v1.7.1), in every archive except `-gemini-apps-only.zip` and `-opal-only.zip`. Skill use does not adopt it.
+- An optional [Project Rules package](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md) (4.0.1 since v1.8.1; 4.0.0 in v1.7.1–v1.8.0), in every archive except `-gemini-apps-only.zip` and `-opal-only.zip`. Skill use does not adopt it.
 
 These address preventable failure modes observed in one model/project and inspected workflow wording. They are not proof of model-wide failure or universal safe execution.
 
@@ -251,7 +251,7 @@ Read-only `scripts/verify_records.py` for SHA-256, encoding, line endings, mojib
 
 ### Does install adopt the Project Rules?
 
-No. The optional template is Project Rules 4.0.0 (bundled since v1.7.1; not in the Gemini Apps or Opal packages). Adoption is a separate owner decision.
+No. The optional template is Project Rules 4.0.1 (4.0.0 bundled since v1.7.1, 4.0.1 since v1.8.1; not in the Gemini Apps or Opal packages). Adoption is a separate owner decision.
 
 ## Authority rule
 

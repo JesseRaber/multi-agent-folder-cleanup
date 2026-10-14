@@ -1,4 +1,4 @@
-# Optional Project Rules 4.0.0
+# Optional Project Rules 4.0.1
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md) and the [section 0 paste-in](SECTION_0_PASTE_IN.txt) for hosts that cannot read project files. It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename keeps the template from loading as live instructions. Do not copy private session logs or a source project's section 13 into another project.
 
@@ -14,7 +14,7 @@ This package contains one versioned, reusable [rules template](AGENTS.proposed.m
 2. Existing project: inventory the current root/scoped policies, adoption evidence, continuity paths and populated records (section 11). Save the prior root under a non-loading name such as `AGENTS.md.before-<sha8>` or `AGENTS.before.md`; never a literal `AGENTS.md` under scratch or backup. Never overwrite a populated journal, index or quick context with a template.
 3. Fill section 13 with the owner, one line each, replacing every `<placeholder>`:
    - `Project:` name, root path or provider id, canonical source if any.
-   - `Adopted:` `4.0.0 on <date> by <owner statement>`, and the activation event id in `AI_CONTEXT/POLICY_INSTALLATION.md`.
+   - `Adopted:` `4.0.1 on <date> by <owner statement>`, and the activation event id in `AI_CONTEXT/POLICY_INSTALLATION.md`.
    - `Owner timezone:` an IANA zone (`America/New_York`).
    - `Tracker:` the one canonical task tracker path (default `PROJECT_ROADMAP_STATUS.md`).
    - `Sequential writers:` ask the owner whether agents in this project always work one after another. The template ships this as a placeholder, so an unfilled copy never opts in. Only if the owner says yes, replace the placeholder with `Sequential writers: one owner; agents work one after another (owner, <date>)`; otherwise delete it. Only the owner's line enables direct shared-record edits under section 5.
@@ -34,9 +34,13 @@ Muse, Grok, Opal, Cursor agents, local models and similar hosts never load `AGEN
 
 ## Owner request to copy and adapt
 
-> Adopt the bundled Project Rules 4.0.0 for this named project. Inspect current instructions and continuity records, fill section 13 with me, preserve existing records and paths, and perform only the bounded policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading checks remain unverified.
+> Adopt the bundled Project Rules 4.0.1 for this named project. Inspect current instructions and continuity records, fill section 13 with me, preserve existing records and paths, and perform only the bounded policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading checks remain unverified.
 
 This quotation is an example for the owner to send, not an instruction to an agent reading the guide.
+
+## Changes in 4.0.1
+
+Eight wording changes to the core, each from a failure observed in use across the owner's 21 projects (2026-10-09 to 10-13 audits); sections 0-3, 6, 8-11 unchanged. Section 4: header fields accepted as plain or bold label lines; a multi-project read-only pass logs once, in the requesting project; after an append confirm the entry appears once, and on hosts without a true append (browser, Graph, whole-file writes) confirm the prior content survived. Section 5: `SUPERSEDED (<session>/<turn>: <reason>)` is a permitted marker beside `APPLIED`; applied and superseded staging files stay in place and are never counted as pending again. Section 7: one session-index column set and three Status values (`in progress`, `closed`, `unknown`), migrated at a project's next index edit; recording times come from the clock, never estimates. Section 12: apply or hand off your own pending edits at close. Section 13 template: one slug per runtime with legacy names declared; optional `Change policy:` line for a stability period. Projects on 4.0.0 migrate by replacing sections 0-12 and editing section 13 under section 11; no record or file is renamed.
 
 ## Changes in 4.0.0
 

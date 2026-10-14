@@ -1,6 +1,6 @@
 # Project rules
 
-Version: 4.0.0 — reusable core, 2026-10-09.
+Version: 4.0.1 — reusable core, 2026-10-14.
 
 These rules govern a project only after the owner adopts them for it (section 11). A copy, attachment or proposal does not activate itself. The host's own instructions and the owner's current directions outrank this file. Project-specific choices live only in section 13; everything else is the same in every project. No skill, helper or installer is required; where one exists it may automate a check but never changes a rule.
 
@@ -46,9 +46,9 @@ These rules govern a project only after the owner adopts them for it (section 11
 
 ## 4. Session log
 
-- One log per session, filename `YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`, UUID from a real generator (otherwise a clearly provisional label; never invented digits). Header: session ID, start time with offset, runtime slug (section 0.7) and writer instance, source chat or `unavailable`, parent session if forked, active writer. A new or forked chat is a new session; resume a log only with established writer continuity (section 5).
+- One log per session, filename `YYYY-MM-DD_HHMMSS_<tool>_<short-topic>_<uuid>.md`, UUID from a real generator (otherwise a clearly provisional label; never invented digits). Header: session ID, start time with offset, runtime slug (section 0.7) and writer instance, source chat or `unavailable`, parent session if forked, active writer — as label: value lines, plain or bulleted, bold labels allowed. A new or forked chat is a new session; resume a log only with established writer continuity (section 5). A read-only pass across several projects logs once, in the project it was requested from, and names each project it inspected; a pass that writes in a project logs there too.
 - Entries `T001`, `T002`… appended after the work and before each answer is sent: request, result, evidence, task files changed (or `none`), decisions/authorization, limits and open work. Routine entries need only request, result, outcome. Keep owner wording that sets scope; never copy private reasoning or the full answer.
-- Never rewrite earlier entries; correct with a new entry that cites the old one. On close, add key result, open work and the best next starting point; every entry must already stand alone if the chat stops.
+- Never rewrite earlier entries; correct with a new entry that cites the old one. After an append, confirm the new entry appears exactly once; on a host that cannot truly append (browser, Graph or other whole-file writes) also confirm the complete prior content survived before relying on the write. A true append needs no backup. On close, add key result, open work and the best next starting point; every entry must already stand alone if the chat stops.
 - Cannot write the log? Give this line with every answer:
   `NOT SAVED TO PROJECT | Session: <id> | Turn: <id> | Time: <time tz> | Request: <summary> | Result: <outcome> | Task files: <changes/none> | Reason: <limit>`
   Saved somewhere else? Say `SAVED LOCALLY; NOT VERIFIED AT PROJECT DESTINATION` and name both places. A reconstructed entry says so and whether checkpoints were given.
@@ -59,7 +59,7 @@ These rules govern a project only after the owner adopts them for it (section 11
 - Your own log and scratch are yours; append freely, verify the previous content survived and the entry appears once.
 - A shared record (index, quick context, session index, tracker, any file others edit) may be edited directly only when one of these holds: a supported conditional update; a cooperating lock covering every writer and device; a designated writer; or the owner's line `Sequential writers: …` in section 13. Under that line the active agent edits directly, but stages instead when another session is possibly active: it is not closed **and** its log file or a file in its scratch folder (file times, not folder times — connectors do not update folder times) changed within the active-writer window set in section 13 (30 minutes if unset). A session is closed when its log has a close entry, its session-index row is not `in progress`, or the owner's handoff message says that agent has finished — even if that chat is still open; an agent closed this way keeps working but re-reads before every shared write and stages on any change found. An `in progress` row with no file activity inside the window is not an active writer; note it and continue.
 - Direct edit procedure: re-read immediately before writing; smallest bounded edit or true append; keep encoding, line endings and table shape; re-read after and confirm the edit is present exactly once and nothing else changed. A changed-under-you file is a conflict: merge onto the new version or stage. Keep one pre-edit copy per shared file per session in your scratch before any full-file replacement (none for a pure append; never for a credential-bearing file). A success message, size or timestamp proves nothing; a pre-write hash check is not a conditional write.
-- Staging: `AI_CONTEXT/scratch/<session-id>/PENDING_<TARGET>.md`, first line `Status: PENDING`, then target path, base hash, exact old/new text or anchor, reason, session/turn, apply condition. One target per file. A qualifying writer — including the staging session itself once the other session closes or its window elapses — applies each pending edit (scratch `PENDING_*` files and PENDING rows in `Incoming/*/_PROVENANCE.md`) whose base hash or anchor still matches exactly once, verifies by read-back, and logs it. The only permitted edit to another session's staging or provenance file is changing its PENDING marker to `APPLIED <hash8> by <session>/<turn>`. Anything else is Conflicted — report, never guess. A staged edit is not an applied one; an old hash never authorizes overwriting newer work.
+- Staging: `AI_CONTEXT/scratch/<session-id>/PENDING_<TARGET>.md`, first line `Status: PENDING`, then target path, base hash, exact old/new text or anchor, reason, session/turn, apply condition. One target per file. A qualifying writer — including the staging session itself once the other session closes or its window elapses — applies each pending edit (scratch `PENDING_*` files and PENDING rows in `Incoming/*/_PROVENANCE.md`) whose base hash or anchor still matches exactly once, verifies by read-back, and logs it. The only permitted edits to another session's staging or provenance file are changing its PENDING marker to `APPLIED <hash8> by <session>/<turn>`, or to `SUPERSEDED (<session>/<turn>: <reason>)` when the change is already in the target in other words or no longer applies — the reason is required. Anything else is Conflicted — report, never guess. A staged edit is not an applied one; an old hash never authorizes overwriting newer work. Applied and superseded staging files stay where they are (their first line is the record) and are never counted as pending again; do not move or delete them.
 - Sync conflict copies (`name (1).ext`, `name-<COMPUTER>.ext`, same-name siblings) and missing originals: check at session start and end; report, and reconcile before shared edits only within authorization.
 - Writer transfer (resuming another writer's session log, not editing shared records) records old and new writer, time, last verified turn and evidence the old writer stopped. Ownership uncertain after a restart or fork → new linked session, keep logging. Local verification proves a local result only; cloud sync, replicas and remote writers are verified separately or stated as unverified.
 
@@ -72,8 +72,8 @@ Keep source session, chat (or `unavailable`), turn IDs, artifact and import time
 - **Tracker:** exactly one per project. Every proposed, deferred or discovered task goes there with a stable ID, status, source and links; search for an existing item before adding. Nothing of that kind lives only in a log, report, handoff or quick context. Tracker inclusion records work; it does not authorize it. Competing lists are never created; existing ones are reconciled into the canonical one and kept as History.
 - **Index:** a row per important authority file and deliverable; folder/descendant coverage for bulk content; state exclusions; mark present, missing, unavailable, unchecked. Before creating an important standalone file, check the folder, index and tracker for one serving the same purpose; update in place when authorized, else link the replacement. Update affected rows after adds, moves, renames and deletions; ordinary edits inside a covered folder need no row. A file or folder with no index row and no log or provenance entry is a finding to report, not background.
 - **Quick context:** rewrite only when direction, verified state, decisions, limits or next step change; keep purpose, current direction with its source, dated verified state, active records, open work, next step, navigation. Drop stale lines; never drop active decisions.
-- **Session index:** one row per session (start, last activity, ID, tool, topic, latest outcome, status, link) created with the log as `in progress`, refreshed at significant outcomes and close. Sorted by start; navigation only.
-- Timestamps carry an offset; convert to the owner timezone in section 13 before matching activity. Indexes, checkers and summaries prove only what they inspected; a summary never replaces its source.
+- **Session index:** columns `Start | Last activity | Session ID | Tool | Topic | Latest outcome | Status | Link`; Status is `in progress`, `closed` or `unknown`. One row per session, created with the log as `in progress`, refreshed at significant outcomes and close. Read the actual header before editing and map by name, never by position; a project on an older layout migrates at its next index edit, keeping existing rows. Sorted by start; navigation only.
+- Recording times are read from the system clock and carry an offset — never estimated or extrapolated; an estimated event time is labelled as an estimate and is not a recording time. Convert to the owner timezone in section 13 before matching activity. Indexes, checkers and summaries prove only what they inspected; a summary never replaces its source.
 
 ## 8. Report precisely
 
@@ -93,7 +93,7 @@ Adoption is per project and explicit. New project: record adoption, chosen paths
 
 ## 12. Finish
 
-Before claiming done: outputs exist, saved content matches intent, nothing unrelated changed, links resolve, no secret leaked, every operational claim has evidence. Then log the outcome (section 4), update navigation (section 7), state limits and open work plainly, and give the checkpoint line if saving failed. Never claim capture, sync, publication or adoption merely because a file was generated.
+Before claiming done: outputs exist, saved content matches intent, nothing unrelated changed, links resolve, no secret leaked, every operational claim has evidence. Then log the outcome (section 4), apply your own pending edits if the window has elapsed or hand them off by naming them in the close entry, update navigation (section 7), state limits and open work plainly, and give the checkpoint line if saving failed. Never claim capture, sync, publication or adoption merely because a file was generated.
 
 ## 13. Project scope (the only section that differs per project)
 
@@ -101,12 +101,13 @@ Replace every placeholder at adoption; keep lines short; add nothing that belong
 
 ```text
 Project: <name>; root: <path or provider id>; canonical source if any: <repo/url>
-Adopted: 4.0.0 on <date> by <owner statement>; activation event: <id> in AI_CONTEXT/POLICY_INSTALLATION.md
+Adopted: 4.0.1 on <date> by <owner statement>; activation event: <id> in AI_CONTEXT/POLICY_INSTALLATION.md
 Owner timezone: <IANA zone>
 Tracker: <path>            (default PROJECT_ROADMAP_STATUS.md; the only place this default is set)
 <only if the owner says agents never work at the same time, replace this line with: Sequential writers: one owner; agents work one after another (owner, <date>); otherwise delete it>
 Active-writer window: 30 minutes
-Tool slugs in use: <slug → runtime, one per line when two hosts could collide>
+Tool slugs in use: <slug = runtime (legacy: older slugs for the same runtime); …>  — one slug per runtime for new logs; legacy slugs name old files only and are never used again
+<optional: Change policy: Project Rules stay at <version> until <date>; audits may file findings in the tracker, but a rule changes before then only if it failed in actual use or contradicts another rule (owner, <date>)>
 Established paths differing from section 3: <none | mapping>
 Extra gates: <e.g. "publication, host installs, deletion and policy replacement each need a separate owner go">
 Retained from prior rules: <none | clause and path>

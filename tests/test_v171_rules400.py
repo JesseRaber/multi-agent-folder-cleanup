@@ -173,7 +173,7 @@ class PortfolioTests(unittest.TestCase):
             out = run_py(base, "--portfolio")
             rows = {l.split(" | ")[0].strip(): [c.strip() for c in l.split(" | ")]
                     for l in out.splitlines() if " | root-level | " in l}
-            self.assertEqual(rows["filled"][7:12], ["4.0.0", "yes", "match", "no", "yes"])  # R268
+            self.assertEqual(rows["filled"][7:12], ["4.0.1", "yes", "match", "no", "yes"])  # R268; 4.0.1 template since 1.8.1
             self.assertEqual(rows["blank"][9], "match")
             self.assertRegex(rows["blank"][11], r"^no \(\d+ placeholders\)$")
             self.assertEqual(rows["edited"][9], "differs (1 lines)")
@@ -328,7 +328,7 @@ class GuidanceTests(unittest.TestCase):
 class RulesBundleTests(unittest.TestCase):
     def test_r231_bundled_rules_400(self):
         t = (RULES / "AGENTS.proposed.md").read_text(encoding="utf-8")
-        self.assertRegex(t, r"(?m)^Version: 4\.0\.0 — reusable core, 2026-10-09\.$")
+        self.assertRegex(t, r"(?m)^Version: 4\.0\.1 — reusable core, 2026-10-14\.$")
         self.assertNotIn("candidate", t.split("\n## 0.")[0])
         for n in range(14):
             self.assertRegex(t, rf"(?m)^## {n}\. ")
