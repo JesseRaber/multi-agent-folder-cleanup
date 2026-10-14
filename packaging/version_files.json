@@ -65,23 +65,33 @@
       "pattern": "^### {v} "
     },
     {
-      "path": "wiki/Home.md",
-      "pattern": "Current version: \\*\\*{v}\\*\\*"
-    },
-    {
-      "path": "wiki/Changelog-summary.md",
-      "pattern": "^- \\*\\*{v}\\*\\*"
-    },
-    {
       "path": "tests/test_v163_candidate.py",
       "pattern": "\"{v}\""
+    },
+    {
+      "path": "wiki/Home.md",
+      "pattern": "Version \\*\\*{v}\\*\\*"
+    },
+    {
+      "path": "wiki/Changelog.md",
+      "pattern": "Current release: \\*\\*\\[v{v}\\]"
+    },
+    {
+      "path": "wiki/_Footer.md",
+      "pattern": "current release \\[v{v}\\]"
+    },
+    {
+      "path": "wiki/_Sidebar.md",
+      "pattern": "Release v{v}\\]"
     }
   ],
   "history": [
     "CHANGELOG.md",
     "packaging/RELEASE_NOTES_v*.md",
     "HOST_INSTALL_LOG.md",
-    "wiki/Changelog-summary.md",
-    "tests/*.py"
+    "tests/*.py",
+    "wiki/Changelog.md",
+    "wiki/FAQ.md",
+    "wiki/Scripts.md"
   ]
 }

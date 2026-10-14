@@ -1,0 +1,15 @@
+**Multi-Agent Folder Cleanup**
+
+- [Home](Home)
+- [Install](Install)
+- [Modes](Modes)
+- [Safety rules](Safety-rules)
+- [Scripts](Scripts)
+- [FAQ](FAQ)
+- [Changelog](Changelog)
+- [Skill (SKILL.md)](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/SKILL.md)
+- [Work mode](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/work-mode.md)
+- [Preconditions](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/preconditions.md)
+- [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md)
+- [Release v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1)
+- [Releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases)
