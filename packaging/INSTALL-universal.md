@@ -26,7 +26,7 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Work / Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.8.0 (SKILL.md at <path>; helpers <version>)
+> Report as: Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)
 > (`<version>` from an actual `--version` run, else `helpers not run`).
 > Work mode: read `references/work-mode.md`, plus `references/work-mode-baseline.md`
 > unless the project's root instruction file is Project Rules 4.0.0 or later.
@@ -107,7 +107,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.8.0 (SKILL.md at <path>; helpers <version>)**.
+**Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)**.
 
 ---
 

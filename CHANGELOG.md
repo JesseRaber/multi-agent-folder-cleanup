@@ -1,6 +1,6 @@
 # Changelog
 
-### 1.8.1 (unreleased; ships with Project Rules 4.0.1 after the 2026-10-24 freeze) — helper accuracy
+### 1.8.1 (released 2026-10-14) — Project Rules 4.0.1 and helper accuracy
 
 - R268: portfolio `Work routing` reports `yes` for Rules 4.0.0+ (it checked only 3.x strings and showed `no` for 20 of 21 adopted projects); versions compared as numbers so 10.x sorts after 4.x. Python and PowerShell.
 - R269: pending-update counts skip pre-edit copies inside `before*`/`backup*` folders and report them on one line ("not counted: N"). Python and PowerShell.

@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "1.8.0"  # must equal SKILL.md metadata.version
+VERSION = "1.8.1"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 

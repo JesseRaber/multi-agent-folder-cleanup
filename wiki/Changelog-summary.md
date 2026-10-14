@@ -2,6 +2,7 @@
 
 Taken from `CHANGELOG.md` (main).
 
+- **1.8.1** (2026-10-14) — bundled Project Rules 4.0.1; helper accuracy fixes (R268-R271, R274); install-guide and release-hygiene corrections (R275, R276).
 - **1.8.0** (2026-10-10) — smaller per-mode read sets, recycle-path test (R255) before any delete, helper and tooling fixes.
 - **1.7.2** (2026-10-10) — Work-mode trim; install backups must stay outside host skill-scan folders.
 - **1.7.1** (2026-10-09) — align with Project Rules 4.0.0; sequential-writer, provenance, and helper fixes.

@@ -71,12 +71,17 @@
     {
       "path": "wiki/Changelog-summary.md",
       "pattern": "^- \\*\\*{v}\\*\\*"
+    },
+    {
+      "path": "tests/test_v163_candidate.py",
+      "pattern": "\"{v}\""
     }
   ],
   "history": [
     "CHANGELOG.md",
     "packaging/RELEASE_NOTES_v*.md",
     "HOST_INSTALL_LOG.md",
-    "wiki/Changelog-summary.md"
+    "wiki/Changelog-summary.md",
+    "tests/*.py"
   ]
 }
