@@ -58,7 +58,39 @@ UTF16BE_RUN = re.compile(rb"(?:\x00[\x09\x0a\x0d\x20-\x7e]){4,}")
 MISDECODED_BREAK = re.compile("[\u0a0d\u0d0a\u0d00\u0a00]")
 FENCE = re.compile(r"^\s*(```|~~~)")
 INLINE_CODE = re.compile(r"(`+)(.+?)\1")
-LINK = re.compile(r"!?\[[^\]]*\]\(\s*(<[^>]*>|[^)\s]+)(?:\s+\"[^\"]*\")?\s*\)")
+LINK_OPEN = re.compile(r"\]\(\s*")
+
+
+def link_targets(text):
+    """Inline link destinations with balanced or escaped parentheses and
+    <angle> syntax (same rule as audit_folder.markdown_targets). A target
+    such as doc%20(1).md or ``doc\\(1\\).md`` is returned whole; the old
+    single-pass pattern stopped at the first ')' (R274a)."""
+    for match in LINK_OPEN.finditer(text):
+        start = match.end()
+        i = start
+        if i < len(text) and text[i] == "<":
+            end = text.find(">", i + 1)
+            if end >= 0:
+                yield text[i:end + 1]
+            continue
+        depth = 0
+        while i < len(text):
+            char = text[i]
+            if char == "\\" and i + 1 < len(text):
+                i += 2
+                continue
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                if depth == 0:
+                    break
+                depth -= 1
+            elif char.isspace() and depth == 0:
+                break
+            i += 1
+        if i > start and depth == 0 and i < len(text):
+            yield re.sub(r"\\([()])", r"\1", text[start:i])
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 TABLE_SEP_CELL = re.compile(r"^\s*:?-{1,}:?\s*$")
 
@@ -170,8 +202,7 @@ def check_text(path, text, check_links):
             flush()
         if not check_links:
             continue
-        for lm in LINK.finditer(plain):
-            target = lm.group(1)
+        for target in link_targets(plain):
             if target.startswith("<") and target.endswith(">"):
                 target = target[1:-1]
             target = target.split("#", 1)[0].split("?", 1)[0]

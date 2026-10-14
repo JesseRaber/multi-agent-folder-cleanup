@@ -110,6 +110,14 @@ ORPHAN_TEMP_RULES = [
 ARCHIVE_MAGIC = (b"PK\x03\x04", b"7z\xbc\xaf\x27\x1c", b"Rar!")
 CLOUD_ONLY_ATTRS = 0x1000 | 0x40000 | 0x400000  # Offline, RecallOnOpen, RecallOnDataAccess
 
+def fold(path):
+    """Comparison key for paths (same as verify_move.fold): normcase, plus an
+    explicit lowercase on macOS where normcase is a no-op but volumes are
+    case-insensitive by default (R274e)."""
+    path = os.path.normcase(path)
+    return path.lower() if sys.platform == "darwin" else path
+
+
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 # Files inside a browser profile that may hold live session credentials.
@@ -808,13 +816,16 @@ def parse_pending(text, name):
         except ValueError:
             obj = None
         if isinstance(obj, dict):
-            st = obj.get("status") or obj.get("Status")
+            # R274d: keys compared case-insensitively, as PowerShell property access is.
+            obj = {str(k).lower(): v for k, v in obj.items()}
+            st = obj.get("status")
             out["status"] = str(st).split()[0].upper() if st and str(st).split() else None
             out["status_first"] = out["status"] is not None
-            block = {"status": out["status"], "target": str(obj.get("target") or obj.get("Target") or obj.get("path") or ""),
+            block = {"status": out["status"], "target": str(obj.get("target") or obj.get("path") or ""),
                      "base": str(obj.get("base") or obj.get("base_sha256") or ""), "new": [], "old": []}
             for e in obj.get("edits") or []:
                 if isinstance(e, dict):
+                    e = {str(k).lower(): v for k, v in e.items()}
                     for key, bucket in (("new", "new"), ("new_line", "new"), ("new_text", "new"),
                                         ("old", "old"), ("insert_after", "old"), ("anchor", "old")):
                         v = e.get(key)
@@ -1191,10 +1202,10 @@ GENERIC_RUNTIME_WORDS = frozenset(("desktop", "app", "cli", "web", "ide", "devic
 SLUG_LINE_RE = re.compile(r"(?im)^\s*Tool slugs in use\s*:\s*(.+)$")
 WINDOW_LINE_RE = re.compile(r"(?im)^\s*Active-writer window\s*:\s*(\d+)\s*min")
 SESSION_FIELD_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
+    r"^\s*(?:[-*]\s*)?\**(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\**\s*:\**\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
 OUTCOME_FIELD_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$",
+    r"^\s*(?:[-*]\s*)?\**(?:Work/result|Latest outcome|Outcome)\**\s*:\**\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
 TURN_HEAD_RE = re.compile(r"^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$", re.MULTILINE)
 ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?")
@@ -2005,8 +2016,8 @@ def main():
     out_path = None
     if args.out:
         out_path = os.path.abspath(args.out)
-        try:
-            inside = os.path.commonpath([out_path, root]) == root
+        try:  # R274e: case-folded like verify_move.fold (Windows, macOS)
+            inside = fold(os.path.commonpath([out_path, root])) == fold(root)
         except ValueError:
             inside = False
         if inside:

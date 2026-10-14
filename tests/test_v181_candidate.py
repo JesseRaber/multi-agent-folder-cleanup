@@ -1,4 +1,5 @@
-"""v1.8.1 candidate (R268 work routing, R269 backup pending copies, R270 split tables, R271 quick-context size)."""
+"""v1.8.1 candidate (R268 work routing, R269 backup pending copies, R270 split tables, R271 quick-context size,
+R274 helper fixes from the Gemini audit of v1.8.0)."""
 
 from pathlib import Path
 import shutil
@@ -97,6 +98,105 @@ class V181Tests(unittest.TestCase):
         f.write_bytes(b"# Index\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nnote inside\n| 3 | 4 |\n")
         r = subprocess.run([sys.executable, str(VR), str(f)], capture_output=True, text=True, encoding="utf-8")
         self.assertIn("table split: rows continue the table that ended at line 5", r.stdout)
+
+
+class R274Tests(unittest.TestCase):
+    """Gemini Argon audit of 673223c (2026-10-13), register R274 a-e."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="r274-"))
+        self.root = self.tmp / "proj"
+        (self.root / "AI_CONTEXT" / "SESSIONS").mkdir(parents=True)
+        (self.root / "AGENTS.md").write_text("# Project rules\n\nVersion: 4.0.0 - test.\n", encoding="utf-8")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_a_verify_records_link_with_parentheses(self):
+        (self.root / "doc (1).md").write_text("x\n", encoding="utf-8")
+        (self.root / "na(me).md").write_text("x\n", encoding="utf-8")
+        (self.root / "plain.md").write_text("x\n", encoding="utf-8")
+        f = self.root / "idx.md"
+        # a: percent-encoded space with balanced parens; b: angle form; c: escaped parens; e: the one real miss.
+        f.write_text("[a](doc%20(1).md) [b](<doc (1).md>) [c](na\\(me\\).md) [d](plain.md) [e](missing%20(2).md)\n",
+                     encoding="utf-8")
+        r = subprocess.run([sys.executable, str(VR), str(f)], capture_output=True, text=True, encoding="utf-8")
+        self.assertNotIn("doc%20(1", r.stdout + r.stderr)
+        self.assertIn("link target not found: missing%20(2).md", r.stdout)
+        self.assertEqual(r.stdout.count("link target not found"), 1, r.stdout)
+
+    def _bold_log(self):
+        log = self.root / "AI_CONTEXT" / "SESSIONS" / f"2026-10-13_101500_claude_bold_{UUID}.md"
+        log.write_text("# Session log\n\n- **Session ID:** " + UUID + "\n- **Started:** 2026-10-13 10:15 -04:00\n"
+                       "- **Tool/runtime:** claude\n\n## T001\n- **Outcome:** did a thing that is long enough\n",
+                       encoding="utf-8")
+
+    def test_c_bold_header_labels_parse(self):
+        self._bold_log()
+        out = run(self.root, "--session-index")
+        self.assertNotIn("without a header block", out)
+        self.assertNotIn("(filename; offset unknown)", out)
+
+    def test_d_pending_json_keys_case_insensitive(self):
+        scratch = self.root / "AI_CONTEXT" / "scratch" / UUID
+        scratch.mkdir(parents=True)
+        body = ('{"Status": "PENDING", "Target": "AI_CONTEXT/SESSION_INDEX.md", "Base": "abcd1234",'
+                ' "Edits": [{"Old": "anchor text long enough here", "New": "replacement text long enough"}]}')
+        (scratch / "PENDING_upper.json").write_text(body, encoding="utf-8")
+        (scratch / "PENDING_lower.json").write_text(body.lower().replace('"pending"', '"PENDING"'), encoding="utf-8")
+        out = section(run(self.root, "--pending"), "Pending files (report only)")
+        self.assertIn("pending files: 2, edit blocks: 2 (no Status: line: 0;", out)
+        upper = [l for l in out.splitlines() if "PENDING_upper.json" in l]
+        lower = [l for l in out.splitlines() if "PENDING_lower.json" in l]
+        self.assertEqual(upper[0].split()[0:2], lower[0].split()[0:2], out)  # same state label
+
+    def test_e_out_inside_root_rejected_case_insensitively(self):
+        target = self.root / "report.txt"
+        cmd = [sys.executable, str(PY), "--root", str(self.root), "--orient", "--out", str(target)]
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("--out must be outside the audited root", r.stderr)
+        if sys.platform == "win32":  # casing differs only in the drive letter and folder
+            swapped = str(target).swapcase()
+            r = subprocess.run([sys.executable, str(PY), "--root", str(self.root), "--orient", "--out", swapped],
+                               capture_output=True, text=True, encoding="utf-8")
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("--out must be outside the audited root", r.stderr)
+
+    def test_b_orient_out_prints_header_python(self):
+        self._bold_log()
+        out = run(self.root, "--orient", "--out", str(self.tmp / "py.txt"))
+        self.assertIn("Read-only work-mode check of", out)
+        self.assertIn("Helper: ", out)
+        self.assertIn("(audit_folder.py ", out)
+        self.assertIn("Generated ", out)
+        self.assertIn("== Findings at a glance ==", out)
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell not available")
+    def test_b_orient_out_header_parity_powershell(self):
+        self._bold_log()
+        py = run(self.root, "--orient", "--out", str(self.tmp / "py.txt"))
+        ps = run(self.root, "-Orient", "-Out", str(self.tmp / "ps.txt"), powershell=True)
+        for needle in ("Read-only work-mode check of", "Helper: ", "Generated ", "== Findings at a glance =="):
+            self.assertIn(needle, ps, needle)
+        # Same line set before the glance section apart from the helper file name and timestamp.
+        def head(text):
+            keep = []
+            for ln in text.splitlines():
+                if ln.startswith("== "):
+                    break
+                if ln.startswith(("Helper:", "Generated")):
+                    ln = ln.split(" ")[0]
+                keep.append(ln.rstrip().replace("\\", "/"))
+            return keep
+        self.assertEqual(head(py), head(ps))
+
+    @unittest.skipUnless(POWERSHELL, "PowerShell not available")
+    def test_c_bold_header_labels_parity_powershell(self):
+        self._bold_log()
+        ps = run(self.root, "-SessionIndex", powershell=True)
+        self.assertNotIn("without a header block", ps)
+        self.assertNotIn("(filename; offset unknown)", ps)
 
 
 if __name__ == "__main__":

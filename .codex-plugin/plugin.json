@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-folder-cleanup",
   "version": "1.8.0",
-  "description": "Audit, plan, and safely reorganize shared project folders or multi-project portfolios with connector evidence validation and verified execution boundaries.",
+  "description": "Keep shared project folders usable by many AI agents: Work mode for saving, naming, indexing, session logs and handoff; Audit, Plan and Execute modes to inspect and safely reorganize folders or portfolios with verified execution boundaries.",
   "skills": "./skills/",
   "author": {
     "name": "Jesse Raber",
@@ -15,20 +15,22 @@
     "agent-handoff",
     "onedrive",
     "sharepoint",
-    "audit"
+    "audit",
+    "work-mode"
   ],
   "interface": {
     "displayName": "Multi-Agent Folder Cleanup",
-    "shortDescription": "Audit project folders and portfolios safely",
-    "longDescription": "Find conflicting authority, cross-project search contamination, stale indexes, missing entrypoints, documentary-only claims, duplicate or pointer records, generated noise, and unsafe move or connector-edit conditions. Plan or execute only an explicitly approved mutation list and verify the result.",
+    "shortDescription": "Keep shared project folders usable by many agents",
+    "longDescription": "Work mode: where to save, how to name, one authoritative tracker and index, session logging and handoff, plus read-only orient, session-index and pending checks. Cleanup modes: find conflicting authority, cross-project search contamination, stale indexes, missing entrypoints, documentary-only claims, duplicate or pointer records, generated noise and unsafe move or connector-edit conditions; plan or execute only an explicitly approved mutation list and verify the result.",
     "developerName": "Jesse Raber",
     "category": "Productivity",
     "capabilities": [
+      "Work mode: save, name, index, log and hand off in shared folders",
       "Folder and portfolio audit",
       "Connector evidence validation",
       "Reorganization planning",
       "Verified move, record-only, and additive-intake checks"
     ],
-    "defaultPrompt": "Use $multi-agent-folder-cleanup to audit this shared project folder or portfolio and explain what is authoritative, stale, operationally verified, incoming, or ambiguous."
+    "defaultPrompt": "Use $multi-agent-folder-cleanup for this shared project folder: pick the mode (Work for ordinary saving, logging and handoff; Audit, Plan or Execute for questions about the folder or reorganizing it) and state it first."
   }
 }

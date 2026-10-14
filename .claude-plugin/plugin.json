@@ -1,7 +1,7 @@
 {
   "name": "multi-agent-folder-cleanup",
   "version": "1.8.0",
-  "description": "Audit, plan, and safely reorganize a shared project folder or multi-project portfolio so agents can validate authority, separate documentary from operational state, reject cross-project search contamination, and avoid duplicate or ambiguous trees.",
+  "description": "Keep shared project folders usable by many AI agents: Work mode for saving, naming, indexing, session logs and handoff; Audit, Plan and Execute modes to inspect and safely reorganize a folder or portfolio, validate authority, separate documentary from operational state and avoid duplicate or ambiguous trees.",
   "author": {
     "name": "Jesse Raber",
     "url": "https://jesseraber.net"
@@ -15,6 +15,7 @@
     "onedrive",
     "sharepoint",
     "audit",
-    "file-organization"
+    "file-organization",
+    "work-mode"
   ]
 }

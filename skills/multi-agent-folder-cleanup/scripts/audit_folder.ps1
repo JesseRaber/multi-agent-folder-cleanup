@@ -1219,7 +1219,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
             if ($null -eq $text) { $blk.Add($f.Name); continue }
             $head = if ($text.Length -gt 4096) { $text.Substring(0, 4096) } else { $text }
             $fields = @{}
-            foreach ($fm in [regex]::Matches($head, '(?im)^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$')) { $fields[$fm.Groups[1].Value.ToLower()] = $fm.Groups[2].Value }
+            foreach ($fm in [regex]::Matches($head, '(?im)^\s*(?:[-*]\s*)?\**(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\**\s*:\**\s*(.+?)\s*$')) { $fields[$fm.Groups[1].Value.ToLower()] = $fm.Groups[2].Value }
             $nm = [regex]::Match($f.Name, $SessionNameRx)
             $sid = if ($fields['session id']) { $fields['session id'] } elseif ($nm.Success) { $nm.Groups[5].Value } else { '' }
             $uid = [regex]::Match($(if ($sid) { $sid } else { $f.Name }), $UuidPattern)
@@ -1648,9 +1648,13 @@ if ($Orient -or $SessionIndex -or $Pending) {
         $utf8w = [System.Text.UTF8Encoding]::new($false)
         $streamW = [System.IO.File]::Open($OutFull, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write)
         try { $bytesW = $utf8w.GetBytes((($script:ReportLines) -join "`n") + "`n"); $streamW.Write($bytesW, 0, $bytesW.Length) } finally { $streamW.Dispose() }
-        $onW = $false
+        # R274b: header lines (check, Helper, Generated) print before the glance section, as in audit_folder.py.
+        $onW = $true
         foreach ($ln in $script:ReportLines) {
-            if ($ln.StartsWith('== ') -and $ln.EndsWith(' ==')) { $onW = ($ln -eq '== Findings at a glance ==') }
+            if ($ln.StartsWith('== ') -and $ln.EndsWith(' ==')) {
+                $onW = ($ln -eq '== Findings at a glance ==')
+                if ($onW) { Write-Host "" }
+            }
             if ($onW -and $ln.Trim()) { Write-Host $ln }
         }
         Write-Host ""

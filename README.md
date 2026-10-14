@@ -6,7 +6,7 @@ Canonical source for the skill and its OpenAI and Claude plugin packages. This b
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
-Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki) · [install](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Install) · [modes](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Modes) · [scripts](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Scripts) · [FAQ](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/FAQ) · [changelog](CHANGELOG.md)
+Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki) · [install](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Install) · [modes](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Modes) · [safety rules](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Safety-rules) · [FAQ](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/FAQ) · [changelog](CHANGELOG.md)
 
 ## Version
 
@@ -100,6 +100,13 @@ The skill folder contains the maintained workflow. Plugin manifests and release 
 - `packaging/check_versions.py` and `packaging/verify_release.py` (from the github-release skill) gate versions and verify published assets; `HOST_INSTALL_LOG.md` records per-host installs.
 - The packager pins ZIP metadata so Windows and Linux builds give identical archives; `.gitattributes` keeps text LF.
 
+## What v1.6.2 through v1.8.0 add
+
+- v1.7.x: add-only agents with `_PROVENANCE.md`, opt-in sequential writers, sync-copy and pending-file checks; alignment with Project Rules 4.0.0; `--orient`, `--session-index` and `--pending` work-mode checks; install backups kept outside host skill-scan folders.
+- v1.8.0: smaller per-mode read sets, a recycle-path test before any delete (R255), `Generated` lines with UTC offset, the `Loaded … (SKILL.md at <path>; helpers <version>)` arrival line.
+- v1.6.2–v1.6.3: draft-first release workflow with version gates and deterministic ZIPs; portfolio audit corrections.
+- Details and register IDs: [CHANGELOG.md](CHANGELOG.md).
+
 ## What v1.6.1 adds
 
 - `scripts/verify_records.py`: a read-only checker for shared records (UTF-8, BOM, line endings, mojibake, dead relative links, broken Markdown tables, `--compare` and `--expect-sha256`). Work mode asks agents to cite its output before calling a shared-record edit verified.
@@ -152,7 +159,7 @@ Measured on a real 18-project shared portfolio, v1.4.0 cuts what agents must rea
 - Complete upfront navigation, staging and removal scope; separated unresolved owner choices.
 - Recovery that preserves newer contributions rather than automatically restoring staged copies.
 - Evidenced instruction adoption and actual per-project continuity requirements.
-- An optional [Project Rules 3.0.0 package](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md), included in every install archive. Skill use does not adopt it.
+- An optional [Project Rules package](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md) (4.0.0 since v1.7.1), in every archive except `-gemini-apps-only.zip` and `-opal-only.zip`. Skill use does not adopt it.
 
 These address preventable failure modes observed in one model/project and inspected workflow wording. They are not proof of model-wide failure or universal safe execution.
 
@@ -181,6 +188,11 @@ python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
   --root <folder> --hash-files --out /safe/outside/report.txt \
   --entrypoint AGENTS.md --entrypoint AI_CONTEXT/PROJECT_QUICK_CONTEXT.md \
   --index-coverage AI_CONTEXT/SESSION_INDEX.md=AI_CONTEXT/SESSIONS
+
+# Work-mode checks (read-only; v1.7.1+): who is active, index vs logs, pending shared-record edits
+python skills/multi-agent-folder-cleanup/scripts/audit_folder.py --root <project> --orient
+python skills/multi-agent-folder-cleanup/scripts/audit_folder.py --root <project> --session-index
+python skills/multi-agent-folder-cleanup/scripts/audit_folder.py --root <project> --pending
 
 # Optional advisory checks
 python skills/multi-agent-folder-cleanup/scripts/audit_folder.py \
@@ -239,7 +251,7 @@ Read-only `scripts/verify_records.py` for SHA-256, encoding, line endings, mojib
 
 ### Does install adopt the Project Rules?
 
-No. The optional template is 3.3.0. Adoption is a separate owner decision.
+No. The optional template is Project Rules 4.0.0 (bundled since v1.7.1; not in the Gemini Apps or Opal packages). Adoption is a separate owner decision.
 
 ## Authority rule
 
