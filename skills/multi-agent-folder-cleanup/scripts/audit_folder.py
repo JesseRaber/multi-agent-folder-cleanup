@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "1.8.0"  # must equal SKILL.md metadata.version
+VERSION = "1.8.1"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -109,6 +109,14 @@ ORPHAN_TEMP_RULES = [
 ]
 ARCHIVE_MAGIC = (b"PK\x03\x04", b"7z\xbc\xaf\x27\x1c", b"Rar!")
 CLOUD_ONLY_ATTRS = 0x1000 | 0x40000 | 0x400000  # Offline, RecallOnOpen, RecallOnDataAccess
+
+def fold(path):
+    """Comparison key for paths (same as verify_move.fold): normcase, plus an
+    explicit lowercase on macOS where normcase is a no-op but volumes are
+    case-insensitive by default (R274e)."""
+    path = os.path.normcase(path)
+    return path.lower() if sys.platform == "darwin" else path
+
 
 UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
@@ -663,6 +671,7 @@ CONFLICT_HOST_RE = re.compile(r"^(.+)-([A-Z0-9][A-Z0-9-]{3,14})(\.[^.]+)$")
 # The owner's opt-in line (Project Rules 3.3.0 section 5): a line that begins
 # "Sequential writers:". Prose that merely describes the rule does not count.
 DECLARATION_RE = re.compile(r"(?im)^[ \t]*(?:[-*][ \t]*)?\**Sequential writers\**[ \t]*:")
+QUICK_CONTEXT_LIMIT = 12 * 1024  # Rules section 3 (R271)
 RULES_VERSION_RE = re.compile(r"(?im)^\s*\**Version\**\s*:\s*\**\s*(\d+\.\d+\.\d+)")
 PLACEHOLDER_RE = re.compile(r"<(?![A-Za-z][A-Za-z0-9+.-]*:)[A-Za-z][^<>\n]{0,80}>")
 STATUS_LINE_RE = re.compile(r"^\s*(?:[-*]\s*)?\**Status\**\s*:\s*\**\s*([A-Za-z]+)")
@@ -678,6 +687,20 @@ AGENTS_WARN_BYTES = 16384
 
 def is_pending_name(name):
     return name.lower().endswith(PENDING_EXTS) and bool(PENDING_NAME_RE.search(name))
+
+
+# Pre-edit copies live in folders such as before/, before-T004/, backup/ (R269).
+BACKUP_DIR_RE = re.compile(r"(?i)^(before|backups?)([-_. ].*)?$")
+
+
+def in_backup_dir(rel_path):
+    """True when any folder in a root-relative slash path is a pre-edit backup folder."""
+    return any(BACKUP_DIR_RE.match(seg) for seg in rel_path.split("/")[:-1])
+
+
+def version_tuple(value):
+    """'4.0.0' -> (4, 0, 0); numeric so 10.0.0 sorts after 4.0.0 (R268)."""
+    return tuple(int(x) for x in re.findall(r"\d+", value or "")[:3])
 
 
 def conflict_copies(rels):
@@ -793,13 +816,16 @@ def parse_pending(text, name):
         except ValueError:
             obj = None
         if isinstance(obj, dict):
-            st = obj.get("status") or obj.get("Status")
+            # R274d: keys compared case-insensitively, as PowerShell property access is.
+            obj = {str(k).lower(): v for k, v in obj.items()}
+            st = obj.get("status")
             out["status"] = str(st).split()[0].upper() if st and str(st).split() else None
             out["status_first"] = out["status"] is not None
-            block = {"status": out["status"], "target": str(obj.get("target") or obj.get("Target") or obj.get("path") or ""),
+            block = {"status": out["status"], "target": str(obj.get("target") or obj.get("path") or ""),
                      "base": str(obj.get("base") or obj.get("base_sha256") or ""), "new": [], "old": []}
             for e in obj.get("edits") or []:
                 if isinstance(e, dict):
+                    e = {str(k).lower(): v for k, v in e.items()}
                     for key, bucket in (("new", "new"), ("new_line", "new"), ("new_text", "new"),
                                         ("old", "old"), ("insert_after", "old"), ("anchor", "old")):
                         v = e.get(key)
@@ -919,7 +945,8 @@ def find_pending(project, scratch_rel="AI_CONTEXT/scratch"):
             names = [e.name for e in os.scandir(base) if e.is_file(follow_symlinks=False)]
         except OSError:
             continue
-        found.extend(os.path.join(base, n) for n in names if is_pending_name(n))
+        found.extend(os.path.join(base, n) for n in names
+                     if is_pending_name(n) and not in_backup_dir(relslash(os.path.join(base, n), project)))
     return sorted(set(found), key=lambda p: (relslash(p, project).lower(), relslash(p, project)))
 
 
@@ -1001,7 +1028,10 @@ def rules_info(project, tcore):
                     source, by_ref, m = ref, " (by reference)", RULES_VERSION_RE.search(ref)
                     break
     version = (m.group(1) + by_ref) if m else "unversioned"
-    routing = "yes" if ("Day-to-day saving and indexing" in source
+    # Rules 4.0.0+ build the work routing into sections 0-12 and drop the 3.x
+    # subsection and skill name by design (R268); compare versions as numbers.
+    routing = "yes" if (m and version_tuple(m.group(1)) >= (4, 0, 0)
+                        or "Day-to-day saving and indexing" in source
                         or "multi-agent-folder-cleanup" in source) else "no"
     core = rules_core(source)
     if tcore is None:
@@ -1172,10 +1202,10 @@ GENERIC_RUNTIME_WORDS = frozenset(("desktop", "app", "cli", "web", "ide", "devic
 SLUG_LINE_RE = re.compile(r"(?im)^\s*Tool slugs in use\s*:\s*(.+)$")
 WINDOW_LINE_RE = re.compile(r"(?im)^\s*Active-writer window\s*:\s*(\d+)\s*min")
 SESSION_FIELD_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\s*:\s*(.+?)\s*$",
+    r"^\s*(?:[-*]\s*)?\**(Session ID|Started|Start(?:\s+time)?|Tool/runtime)\**\s*:\**\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
 OUTCOME_FIELD_RE = re.compile(
-    r"^\s*(?:[-*]\s*)?(?:Work/result|Latest outcome|Outcome)\s*:\s*(.+?)\s*$",
+    r"^\s*(?:[-*]\s*)?\**(?:Work/result|Latest outcome|Outcome)\**\s*:\**\s*(.+?)\s*$",
     re.MULTILINE | re.IGNORECASE)
 TURN_HEAD_RE = re.compile(r"^(?:#{2,4}\s+|\*\*)?(T\d{3,})\b(?!-)(.*)$", re.MULTILINE)
 ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?: ?(?:Z|[+-]\d{2}:?\d{2}))?")
@@ -1986,8 +2016,8 @@ def main():
     out_path = None
     if args.out:
         out_path = os.path.abspath(args.out)
-        try:
-            inside = os.path.commonpath([out_path, root]) == root
+        try:  # R274e: case-folded like verify_move.fold (Windows, macOS)
+            inside = fold(os.path.commonpath([out_path, root])) == fold(root)
         except ValueError:
             inside = False
         if inside:
@@ -2463,13 +2493,16 @@ def run_report(args, root, coverage_pairs):
     section("Handoff and pending-update lifecycle warnings")
     handoffs = []
     pending_updates = []
+    pending_backups = 0
     package_channels = []
     for p, _size, _mtime in files:
         r = relslash(p, root)
         name = os.path.basename(p).lower()
         if not is_non_governing(r) and ("handoff" in name or re.search(r"next[ _-].*prompt", name)):
             handoffs.append(r)
-        if is_pending_name(name):
+        if is_pending_name(name) and in_backup_dir(r):
+            pending_backups += 1
+        elif is_pending_name(name):
             text = read_small_text(p)
             status = parse_pending(text, name)["status"] if text is not None else None
             marker = status.capitalize() if status else "no Status:"
@@ -2481,6 +2514,9 @@ def run_report(args, root, coverage_pairs):
     print(f"  pending shared-update artifacts: {len(pending_updates)}"
           f" (without a Status: first line: {sum(1 for _r, m in pending_updates if m == 'no Status:')})")
     for r, state in limited(sorted(pending_updates)): print(f"    {state:12} {r}")
+    if pending_backups:
+        print(f"  pre-edit backup copies with pending names, not counted: {pending_backups}"
+              " (inside before*/backup* folders)")
     if pending_updates:
         print("  Run --pending for target and base checks; a status here is only what the file records.")
     print(f"  candidate/release/superseded ZIPs requiring channel review: {len(package_channels)}")
@@ -2584,6 +2620,15 @@ def run_report(args, root, coverage_pairs):
         else:
             print("  no immediate child directories")
         print("  Presence does not determine authority or operational state.")
+        over_qc = []
+        for n, *_r in rows:
+            qp = os.path.join(root, n, "AI_CONTEXT", "PROJECT_QUICK_CONTEXT.md")
+            if os.path.isfile(qp) and os.path.getsize(qp) > QUICK_CONTEXT_LIMIT:
+                over_qc.append((n, os.path.getsize(qp)))
+        print(f"  quick context over {QUICK_CONTEXT_LIMIT // 1024} KB: {len(over_qc)}"
+              + (" (rewrite to current state; move history out)" if over_qc else ""))
+        for n, size in limited(over_qc):
+            print(f"    {n}: {size} bytes")
         print("  Core match compares sections 0-12 (1-12 before Rules 4.0.0) with the bundled template"
               + (f" {tver}" if tver else " (not bundled in this package: unknown)") + ".")
         names = [n for n, *_ in rows]

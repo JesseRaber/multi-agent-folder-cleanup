@@ -1,5 +1,17 @@
 # Changelog
 
+### 1.8.1 (released 2026-10-14) — Project Rules 4.0.1 and helper accuracy
+
+- R268: portfolio `Work routing` reports `yes` for Rules 4.0.0+ (it checked only 3.x strings and showed `no` for 20 of 21 adopted projects); versions compared as numbers so 10.x sorts after 4.x. Python and PowerShell.
+- R269: pending-update counts skip pre-edit copies inside `before*`/`backup*` folders and report them on one line ("not counted: N"). Python and PowerShell.
+- R270: `verify_records.py` names a split table ("table split: rows continue the table that ended at line N") instead of "no separator row" / "isolated table row" when rows resume within 4 lines of the previous table.
+- R271: `--portfolio` lists projects whose `AI_CONTEXT/PROJECT_QUICK_CONTEXT.md` is over 12 KB (Rules section 3). Python and PowerShell.
+- R274 (Gemini audit of 673223c, 2026-10-13): (a) `verify_records.py` reads link targets with balanced or escaped parentheses (`doc%20(1).md`, sync-conflict copies) instead of stopping at the first `)`; (b) `audit_folder.ps1 -Orient -Out` prints the check, `Helper:` and `Generated` lines before the glance section like Python; (c) session-log header and outcome labels may be bold (`- **Session ID:** …`) in both helpers; (d) pending `.json` keys are matched case-insensitively in Python, as PowerShell already did; (e) `--out` root confinement compares case-folded paths (Windows, macOS).
+- R275 docs: `INSTALL-universal.md` paste-in routes Work mode to `work-mode.md` (+ `work-mode-baseline.md` below Rules 4.0.0) and cleanup modes to `preconditions.md` + `cleanup-principles.md`; the Custom GPT upload list includes both; all install guides show the full arrival line; README names Project Rules 4.0.0 (not in the Gemini Apps or Opal packages) and links the Safety-rules wiki page; plugin manifests describe Work mode.
+- R276 release hygiene: `version_files.json` tracks `wiki/Home.md` and `wiki/Changelog-summary.md`; CI runs `check_versions.py --previous <latest tag>` and installs pinned `requirements-dev.txt`; executable bits cleared on two text files; wiki Install table lists the optional rules package and drops reconciliation notes; wiki changelog summary backfilled (1.2.0–1.4.0, 1.5.0/1.5.1 release dates, 1.6.1–1.6.3); README summarizes v1.6.2–v1.8.0 and shows the work-mode helper flags.
+- Bundled Project Rules template is **4.0.1** (`references/project-rules/AGENTS.proposed.md`, `ADOPTION.md`): eight core wording changes from the 2026-10-12/13 portfolio and rules-behavior audits (register R253 P11/P12, R256/R260/R273, R257, R264, R265, R278; details in `ADOPTION.md` "Changes in 4.0.1"). Section 0 unchanged, so `SECTION_0_PASTE_IN.txt` is unchanged.
+- Tests: `tests/test_v181_candidate.py` (incl. PowerShell parity; R274 a–e); three existing expectations updated for R268/R270. Checked against the owner's 21-project portfolio on 2026-10-13: Work routing yes 21/21; 2 backup copies excluded; 0 quick contexts over 12 KB after that day's rewrites.
+
 ### 1.8.0 (released 2026-10-10) — smaller read sets, recycle-path test
 
 - Per-mode read sets (cl100k): Work 6,706 -> 4,757 on projects with Project Rules 4.0.0+ (S1: `work-mode-baseline.md` holds steps those rules already carry); Audit 8,185 -> 6,676 (S3 `audit-edge-cases.md`); Plan 6,055 -> 5,292 (S2 `execute-principles.md`); Execute moves +31 (R255, R183 added). Register R252 from the Grok Bot evaluation of 2026-10-10.

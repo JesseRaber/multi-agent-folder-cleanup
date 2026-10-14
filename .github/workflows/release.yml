@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install validation dependency
-        run: python -m pip install --disable-pip-version-check PyYAML
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
 
       - name: Resolve version
         id: ver

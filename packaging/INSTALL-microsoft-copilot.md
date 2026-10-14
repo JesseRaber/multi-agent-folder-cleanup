@@ -10,4 +10,4 @@ The Python helpers require only the standard library, but Copilot's sandbox has 
 
 When updating, remove or replace the earlier upload so the agent lists exactly one `multi-agent-folder-cleanup` skill, then confirm the reported version in a new conversation; an accepted upload is not proof the agent uses it.
 
-Expected loaded version: **Multi-Agent Folder Cleanup v1.8.0**.
+Expected arrival line: **Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)** (Copilot has no `.ps1`; `helpers <version>` comes from `audit_folder.py --version` or reads `helpers not run`).

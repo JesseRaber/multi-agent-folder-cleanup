@@ -26,10 +26,13 @@ When a host has no native skill loader, paste this into its instructions:
 > folder, duplicate or superseded docs, a stale index, or wants a folder
 > audited, restructured, or moved with verification, follow `SKILL.md`.
 > State the operating mode (Work / Audit / Plan / Execute) in the first line.
-> Report as: Loaded Multi-Agent Folder Cleanup v1.8.0.
-> Read `references/preconditions.md` before any run, then only the file for the
-> mode: `work-mode.md`, `audit-mode.md`, `plan-mode.md`, `execute-moves.md` or
-> `execute-records.md`. If `SKILL.md` is loaded, follow its mode routing.
+> Report as: Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)
+> (`<version>` from an actual `--version` run, else `helpers not run`).
+> Work mode: read `references/work-mode.md`, plus `references/work-mode-baseline.md`
+> unless the project's root instruction file is Project Rules 4.0.0 or later.
+> Cleanup modes: read `references/preconditions.md` and `references/cleanup-principles.md`,
+> then only `audit-mode.md`, `plan-mode.md`, or `execute-principles.md` with
+> `execute-moves.md` or `execute-records.md`. If `SKILL.md` is loaded, follow its mode routing.
 > Never move or delete anything without an explicitly approved move map.
 
 ## Updating an existing install
@@ -55,9 +58,11 @@ interface or configured skills directory. For distribution across supported
 ChatGPT and Codex surfaces, use the `-codex-chatgpt-plugin.zip` package.
 
 Custom GPT / Project without a skill ZIP: upload `SKILL.md`,
-`references/preconditions.md`, `references/work-mode.md`, `references/audit-mode.md`,
-`references/plan-mode.md` and `references/navigation-templates.md` as knowledge
-files and paste the instruction block above.
+`references/work-mode.md`, `references/work-mode-baseline.md`,
+`references/preconditions.md`, `references/cleanup-principles.md`,
+`references/audit-mode.md`, `references/plan-mode.md` and
+`references/navigation-templates.md` as knowledge files and paste the
+instruction block above.
 
 ---
 
@@ -102,7 +107,7 @@ routes to them.
 > Audit this portfolio of project folders. Label counts by scope, reject search results from the wrong project, and separate documentary claims from operationally verified state.
 
 A loaded skill states **Mode: Audit** first and reports
-**Loaded Multi-Agent Folder Cleanup v1.8.0**.
+**Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)**.
 
 ---
 
