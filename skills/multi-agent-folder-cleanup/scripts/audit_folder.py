@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "1.8.1"  # must equal SKILL.md metadata.version
+VERSION = "1.9.0"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -870,16 +870,70 @@ def parse_pending(text, name):
     return out
 
 
+def project_reference(root, target):
+    """Resolve local targets without reading outside the project, including links."""
+    import ntpath
+    target = target.replace("\\", "/")
+    # A drive-relative path depends on process state; foreign Windows roots
+    # cannot be resolved on POSIX. Do not reinterpret either as local children.
+    drive, tail = ntpath.splitdrive(target)
+    if drive and (not tail.startswith("/") or os.name != "nt"):
+        return None
+    full = os.path.abspath(os.path.join(root, target))
+    resolved = os.path.realpath(full)
+    base = os.path.realpath(root)
+    try:
+        if os.path.normcase(os.path.commonpath([base, resolved])) != os.path.normcase(base):
+            return None
+    except ValueError:
+        return None
+    return full
+
+
+def orient_indexes(root, explicit):
+    """Discover coverage, never choose authority between competing indexes."""
+    if explicit:
+        return list(explicit), []
+    text = read_small_text(os.path.join(root, "AGENTS.md")) or ""
+    body = re.search(r"(?ms)^## 13\.[^\n]*\n(.*?)(?=^## |\Z)", text)
+    declared = []
+    if body:
+        for line in body.group(1).splitlines():
+            m = re.match(r"^\s*(?:[-*]\s*)?\**Index\**\s*:\s*(.+?)\s*$", line, re.I)
+            if m:
+                value = m.group(1).strip().strip("`")
+                link = re.fullmatch(r"\[[^]]*\]\((.+)\)", value)
+                declared.append(clean_local_reference(link.group(1) if link else value))
+    if declared:
+        paths = list(dict.fromkeys(declared))
+    else:
+        paths = [p for p in ("PROJECT_INDEX.md", "INDEX.md", "AI_CONTEXT/PROJECT_INDEX.md")
+                 if os.path.isfile(os.path.join(root, *p.split("/")))]
+    warnings = ["multiple index candidates; checking all, authority not selected"] if len(paths) > 1 else []
+    return paths or ["PROJECT_INDEX.md"], warnings
+
+
+def pending_display_key(line):
+    # Keep the existing deterministic path/block order within each group.
+    return 1 if line.startswith(("Applied (recorded)", "Superseded (recorded)")) else 0
+
+
 def classify_block(block, root, source_id=""):
     recorded = {"APPLIED": "Applied", "SUPERSEDED": "Superseded", "CONFLICTED": "Conflicted",
                 "UNVERIFIABLE": "Unverifiable"}
-    raw = block["target"].strip().strip("`'\"\\ ")
+    raw = block["target"].strip().strip("`'\" ")
+    # Older staging records wrapped relative references in single backslashes.
+    # Preserve those records without stripping the double prefix from UNC paths.
+    if raw.startswith("\\") and not raw.startswith("\\\\") and raw.endswith("\\"):
+        raw = raw[1:-1]
     target = clean_local_reference(raw) if raw else ""
     if block["status"] in recorded:
         return recorded[block["status"]] + " (recorded)", target
     if not target:
         return "Unverifiable (no Target)", ""
-    full = os.path.join(root, *target.replace("\\", "/").lstrip("/").split("/"))
+    full = project_reference(root, target)
+    if full is None:
+        return "Unverifiable (target outside root or unsupported path)", target
     if not os.path.isfile(full):
         return "Unverifiable (target not found)", target
     current = read_small_text(full)
@@ -1571,16 +1625,19 @@ def report_orient(root, args, limited):
     now = time.time()
     print("  basis: file modified times on this machine; unreliable across sync replicas,")
     print("         after cloud hydration and for clock skew. Leads only, not proof.")
+    index_paths, index_warnings = orient_indexes(root, args.index_path)
+    for warning in index_warnings:
+        print(f"  index discovery: {warning}")
     # Startup read set.
     startup = [n for n in ROOT_STARTUP_NAMES if os.path.isfile(os.path.join(root, n))]
-    for extra in ([args.quick_context] + list(args.index_path or ["PROJECT_INDEX.md"])):
-        p = os.path.join(root, *extra.replace("\\", "/").split("/"))
-        if os.path.isfile(p) and extra not in startup:
+    for extra in ([args.quick_context] + index_paths):
+        p = project_reference(root, extra)
+        if p and os.path.isfile(p) and extra not in startup:
             startup.append(extra)
     total = 0
     print("  startup read set:")
     for n in startup:
-        size = os.path.getsize(os.path.join(root, *n.split("/")))
+        size = os.path.getsize(project_reference(root, n))
         total += size
         print(f"    {n}  {size // 1024} KB")
     print(f"    total {total // 1024} KB (budget {args.read_budget_kb} KB)"
@@ -1809,10 +1866,12 @@ def report_orient(root, args, limited):
           " run --portfolio on the parent folder to list handoffs addressed to this project")
 
     # New files the index never mentions.
-    index_paths = list(args.index_path or ["PROJECT_INDEX.md"])
     index_text = ""
     for ip in index_paths:
-        t = read_small_text(os.path.join(root, *ip.replace("\\", "/").split("/")))
+        full = project_reference(root, ip)
+        t = read_small_text(full) if full else None
+        if not t:
+            print(f"  index {ip}: NOT FOUND, unreadable or outside root")
         if t:
             index_text += t
     unindexed = []
@@ -1857,7 +1916,7 @@ def report_pending(root, args, limited):
                          + (f"  [{flag}]" if flag and k == 0 else ""))
     print(f"  pending files: {len(found)}, edit blocks: {len(states)}"
           f" (no Status: line: {missing}; Status: not first line: {late})")
-    for ln in limited(lines):
+    for ln in limited(sorted(lines, key=pending_display_key)):
         print(f"    {ln}")
     applicable = sum(1 for s in states if s.startswith("Pending ("))
     applied = sum(1 for s in states if s == "Applied (not marked)")

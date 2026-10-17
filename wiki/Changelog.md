@@ -1,13 +1,13 @@
 # Changelog
 
-Current release: **[v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
+Current release: **[v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
 
-## v1.8.1 — Project Rules 4.0.1 and helper accuracy
+## v1.9.0 — Project Rules 4.0.1 and helper accuracy
 
 - Bundled Project Rules template 4.0.1: eight core wording changes (sections 4, 5, 7, 12) from the 2026-10-12/13 portfolio and rules-behavior audits; section 0 unchanged. Projects on 4.0.0 migrate by replacing sections 0-12 and editing section 13.
 - Helpers: Work routing detected for Rules 4.0.0+ (numeric version compare); pre-edit copies in `before*`/`backup*` not counted as pending; split-table and oversized-quick-context findings; link targets with balanced or escaped parentheses; `-Orient -Out` header parity; bold log labels; case-insensitive pending JSON keys; case-folded `--out` confinement.
 - Install guides route Work-mode reads correctly and show the full arrival line; README names Rules 4.0.1; plugin manifests describe Work mode; CI checks stale previous-version mentions and installs pinned dependencies.
-- Release notes: [v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1).
+- Release notes: [v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0).
 
 ## v1.8.0 — smaller read sets, recycle-path test
 

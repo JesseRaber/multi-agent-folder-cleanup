@@ -26,4 +26,4 @@ Deletion is never in scope by default. Before any delete in Execute, run the rec
 
 Optional Project Rules are a separate adoption. Installing the skill does not install them.
 
-Current release: [v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1).
+Current release: [v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0).

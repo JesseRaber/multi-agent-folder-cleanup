@@ -4,7 +4,7 @@ Agent skill for a shared project folder used by more than one AI model. It is fo
 
 Canonical skill: [`skills/multi-agent-folder-cleanup/`](https://github.com/JesseRaber/multi-agent-folder-cleanup/tree/main/skills/multi-agent-folder-cleanup)
 
-Version **1.8.1**. Report as: **Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)**, taking the helper version from an actual `--version` run or saying `helpers not run`. Current release: [v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1).
+Version **1.9.0**. Report as: **Loaded Multi-Agent Folder Cleanup v1.9.0 (SKILL.md at <path>; helpers <version>)**, taking the helper version from an actual `--version` run or saying `helpers not run`. Current release: [v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0).
 
 This page is a short pointer. The repository is the authority. A release archive, chat upload, or host-local cache is not. Protocol lives in the skill folder, not here, so this page does not drift into a second copy.
 
@@ -16,7 +16,7 @@ Goal: an agent opening a shared folder cold can tell what is true now, what is p
 - [Modes](Modes) — Work, Audit, Plan, and Execute
 - [Scripts](Scripts) — read-only audit, move, and record checks
 - [FAQ](FAQ) — common install and safety questions
-- [Changelog](Changelog) — what changed through v1.8.1 (v1.8.1 released 2026-10-14)
+- [Changelog](Changelog) — what changed through v1.9.0 (v1.9.0 released 2026-10-14)
 - [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md) — repository landing page
 
 ## Install

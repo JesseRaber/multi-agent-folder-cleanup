@@ -1,5 +1,12 @@
 # Changelog
 
+### 1.9.0 — Pending-target resolution and index discovery
+
+- Resolve absolute pending targets inside the project and refuse external paths, traversal and external links/junctions. Preserve legacy relative-path markup.
+- Show unresolved pending edits before recorded Applied/Superseded history while keeping totals and display limits.
+- Discover declared or conventional project indexes for orientation; honor explicit flags and report competing candidates without selecting authority.
+- Add regression coverage across Python and both PowerShell editions, and Windows/Ubuntu package checksum comparison.
+
 ### 1.8.1 (released 2026-10-14) — Project Rules 4.0.1 and helper accuracy
 
 - R268: portfolio `Work routing` reports `yes` for Rules 4.0.0+ (it checked only 3.x strings and showed `no` for 20 of 21 adopted projects); versions compared as numbers so 10.x sorts after 4.x. Python and PowerShell.

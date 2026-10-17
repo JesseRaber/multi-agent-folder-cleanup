@@ -117,7 +117,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '1.8.1'   # must equal SKILL.md metadata.version
+$ScriptVersion = '1.9.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -863,14 +863,62 @@ function Get-SubstringCount([string]$hay, [string]$needle) {
     while (($i = $hay.IndexOf($needle, $i, [StringComparison]::Ordinal)) -ge 0) { $n++; $i += $needle.Length }
     return $n
 }
+function Resolve-ProjectReference([string]$projectRoot, [string]$target) {
+    try {
+        $slashTarget = $target.Replace('\', '/')
+        if ([IO.Path]::DirectorySeparatorChar -eq '/' -and $slashTarget -match '^([A-Za-z]:|//)') { return $null }
+        $target = $slashTarget.Replace('/', [IO.Path]::DirectorySeparatorChar)
+        if ($target -match '^[A-Za-z]:(?:$|[^\\/])') { return $null }
+        $base = [IO.Path]::GetFullPath($projectRoot).TrimEnd('\', '/')
+        $full = [IO.Path]::GetFullPath([IO.Path]::Combine($base, $target))
+        if ($full -ne $base -and -not $full.StartsWith($base + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) { return $null }
+        # Refuse links/junctions rather than reading their potentially external targets.
+        $cursor = $full
+        while ($cursor -and $cursor.Length -gt $base.Length) {
+            if (Test-Path -LiteralPath $cursor) {
+                if (Test-LinkDirectory (Get-Item -LiteralPath $cursor -Force)) { return $null }
+            }
+            $cursor = [IO.Path]::GetDirectoryName($cursor)
+        }
+        return $full
+    } catch { return $null }
+}
+function Get-OrientIndexes {
+    if ($IndexPath.Count) { return $IndexPath }
+    $text = Read-SmallText (Join-RootRel 'AGENTS.md')
+    $body = [regex]::Match([string]$text, '(?ms)^## 13\.[^\n]*\n(.*?)(?=^## |\z)')
+    $paths = [Collections.Generic.List[string]]::new()
+    if ($body.Success) {
+        foreach ($line in ($body.Groups[1].Value -split '\r?\n')) {
+            $m = [regex]::Match($line, '(?i)^\s*(?:[-*]\s*)?\**Index\**\s*:\s*(.+?)\s*$')
+            if ($m.Success) {
+                $value = $m.Groups[1].Value.Trim().Trim('`')
+                $link = [regex]::Match($value, '^\[[^]]*\]\((.+)\)$')
+                if ($link.Success) { $value = $link.Groups[1].Value }
+                $value = Get-CleanReference $value
+                if (-not $paths.Contains($value)) { $paths.Add($value) }
+            }
+        }
+    }
+    if (-not $paths.Count) {
+        foreach ($p in @('PROJECT_INDEX.md', 'INDEX.md', 'AI_CONTEXT/PROJECT_INDEX.md')) {
+            if (Test-Path -LiteralPath (Join-RootRel $p) -PathType Leaf) { $paths.Add($p) }
+        }
+    }
+    if ($paths.Count -gt 1) { Write-Line '  index discovery: multiple index candidates; checking all, authority not selected' }
+    if (-not $paths.Count) { $paths.Add('PROJECT_INDEX.md') }
+    return $paths.ToArray()
+}
 function Get-BlockState($block, [string]$projectRoot, [string]$sourceId) {
     $recorded = @{ 'APPLIED' = 'Applied'; 'SUPERSEDED' = 'Superseded'; 'CONFLICTED' = 'Conflicted'; 'UNVERIFIABLE' = 'Unverifiable' }
-    $raw = $block.Target.Trim().Trim([char[]]@('`', "'", '"', '\', ' '))
+    $raw = $block.Target.Trim().Trim([char[]]@('`', "'", '"', ' '))
+    # Legacy single-backslash wrappers are markup; retain real UNC prefixes.
+    if ($raw.StartsWith('\') -and -not $raw.StartsWith('\\') -and $raw.EndsWith('\')) { $raw = $raw.Substring(1, $raw.Length - 2) }
     $target = if ($raw) { Get-CleanReference $raw } else { '' }
     if ($block.Status -and $recorded.ContainsKey($block.Status)) { return @(($recorded[$block.Status] + ' (recorded)'), $target) }
     if (-not $target) { return @('Unverifiable (no Target)', '') }
-    $full = $projectRoot
-    foreach ($seg in $target.Replace('\', '/').TrimStart('/').Split('/')) { if ($seg) { $full = [IO.Path]::Combine($full, $seg) } }
+    $full = Resolve-ProjectReference $projectRoot $target
+    if (-not $full) { return @('Unverifiable (target outside root or unsupported path)', $target) }
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return @('Unverifiable (target not found)', $target) }
     $current = Read-SmallText $full
     if ($null -eq $current) { return @('Unverifiable (target unreadable)', $target) }
@@ -1285,13 +1333,13 @@ if ($Orient -or $SessionIndex -or $Pending) {
         Write-Section 'Orient'
         Write-Line '  basis: file modified times on this machine; unreliable across sync replicas,'
         Write-Line '         after cloud hydration and for clock skew. Leads only, not proof.'
-        $idxList = if ($IndexPath.Count) { @($IndexPath) } else { @('PROJECT_INDEX.md') }
+        $idxList = @(Get-OrientIndexes)
         $startup = [Collections.Generic.List[string]]::new()
         foreach ($n in @('AGENTS.md', 'CLAUDE.md', 'GEMINI.md', 'README.md')) { if (Test-Path -LiteralPath (Join-RootRel $n) -PathType Leaf) { $startup.Add($n) } }
-        foreach ($extra in @($QuickContext) + $idxList) { if ((Test-Path -LiteralPath (Join-RootRel $extra) -PathType Leaf) -and -not $startup.Contains($extra)) { $startup.Add($extra) } }
+        foreach ($extra in @($QuickContext) + $idxList) { $resolved = Resolve-ProjectReference $RootFull $extra; if ($resolved -and (Test-Path -LiteralPath $resolved -PathType Leaf) -and -not $startup.Contains($extra)) { $startup.Add($extra) } }
         $total = 0
         Write-Line '  startup read set:'
-        foreach ($n in $startup) { $sz = (Get-Item -LiteralPath (Join-RootRel $n) -Force).Length; $total += $sz; Write-Line ("    {0}  {1} KB" -f $n, [Math]::Floor($sz / 1024)) }
+        foreach ($n in $startup) { $sz = (Get-Item -LiteralPath (Resolve-ProjectReference $RootFull $n) -Force).Length; $total += $sz; Write-Line ("    {0}  {1} KB" -f $n, [Math]::Floor($sz / 1024)) }
         Write-Line (("    total {0} KB (budget {1} KB)" -f [Math]::Floor($total / 1024), $ReadBudgetKB) + $(if ($total -gt $ReadBudgetKB * 1024) { '  OVER BUDGET' } else { '' }))
         $qcFlag = $false
         $qcPath = Join-RootRel $QuickContext
@@ -1508,7 +1556,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
         # Sibling projects are outside this root, so their contents are never read here.
         Write-Line '  handoffs from sibling projects: not read (outside this root); run --portfolio on the parent folder to list handoffs addressed to this project'
         $idxText = ''
-        foreach ($ip in $idxList) { $t = Read-SmallText (Join-RootRel $ip); if ($t) { $idxText += $t } }
+        foreach ($ip in $idxList) { $resolved = Resolve-ProjectReference $RootFull $ip; $t = if ($resolved) { Read-SmallText $resolved } else { $null }; if ($t) { $idxText += $t } else { Write-Line ("  index {0}: NOT FOUND, unreadable or outside root" -f $ip) } }
         $unindexed = @()
         $sessIdx = $SessionIndexFile.Replace('\', '/')
         if ($idxText) {
@@ -1617,7 +1665,9 @@ if ($Orient -or $SessionIndex -or $Pending) {
             }
         }
         Write-Line ("  pending files: {0}, edit blocks: {1} (no Status: line: {2}; Status: not first line: {3})" -f $pfound.Count, $pstates.Count, $missingN, $lateN)
-        Write-Capped @($plines)
+        $activeLines = @($plines | Where-Object { $_ -notmatch '^(Applied|Superseded) \(recorded\)' })
+        $recordedLines = @($plines | Where-Object { $_ -match '^(Applied|Superseded) \(recorded\)' })
+        Write-Capped @($activeLines + $recordedLines)
         $applicableN = @($pstates | Where-Object { $_.StartsWith('Pending (') }).Count
         $appliedN = @($pstates | Where-Object { $_ -eq 'Applied (not marked)' }).Count
         $malformedN = $missingN
