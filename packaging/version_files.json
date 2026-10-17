@@ -92,6 +92,7 @@
     "tests/*.py",
     "wiki/Changelog.md",
     "wiki/FAQ.md",
-    "wiki/Scripts.md"
+    "wiki/Scripts.md",
+    "README.md"
   ]
 }
