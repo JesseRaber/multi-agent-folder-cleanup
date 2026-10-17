@@ -1,6 +1,11 @@
 # Changelog
 
-Current release: **[v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
+Current release: **[v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
+
+## v1.9.0 — pending targets and index discovery
+
+- Contained absolute pending targets; unresolved-first reporting; declared/conventional index discovery with ambiguity reporting.
+- Windows/Ubuntu package checksum comparison; Project Rules remain 4.0.1.
 
 ## v1.8.1 — Project Rules 4.0.1 and helper accuracy
 

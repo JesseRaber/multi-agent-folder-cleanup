@@ -1,6 +1,6 @@
 # Install Multi-Agent Folder Cleanup
 
-Install the current release, **v1.8.1**, from [GitHub releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1). The repository is the authority if a downloaded copy disagrees with it.
+Install the current release, **v1.9.0**, from [GitHub releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0). The repository is the authority if a downloaded copy disagrees with it.
 
 This page names the package. Host steps stay in the install guides shipped inside each ZIP and in the [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md).
 
@@ -8,13 +8,13 @@ This page names the package. Host steps stay in the install guides shipped insid
 
 | Your AI app | Download | Why this package |
 |---|---|---|
-| Claude app skill upload, ChatGPT or Codex standalone skills, local models, any skills folder | `multi-agent-folder-cleanup-1.8.1-UNIVERSAL-skill.zip` | Full skill folder, including Work mode and the Python and PowerShell helpers |
-| Claude Code `/plugin install` | `multi-agent-folder-cleanup-1.8.1-claude-code-plugin.zip` | Plugin layout. The Claude app uploader rejects this ZIP |
-| Codex / ChatGPT plugin marketplace | `multi-agent-folder-cleanup-1.8.1-codex-chatgpt-plugin.zip` | OpenAI plugin package. Directory publication is a separate OpenAI review and is not claimed here |
-| Microsoft Copilot agent skill upload, **Grok** | `multi-agent-folder-cleanup-1.8.1-microsoft-copilot-agent-only.zip` | No `.ps1`. Copilot's skill upload rejects PowerShell scripts; Grok rejects the Universal ZIP because of `audit_folder.ps1` and accepts this one |
-| Gemini Apps skill upload | `multi-agent-folder-cleanup-1.8.1-gemini-apps-only.zip` | Omits audit scripts, `agents/openai.yaml`, and project rules. Gemini's upload scan rejects the audit script; regular Gemini chat rejects packages with scripts |
-| Opal skill import | `multi-agent-folder-cleanup-1.8.1-opal-only.zip` | Markdown only: `SKILL.md` plus `references/*.md` |
-| Optional Project Rules template only | `multi-agent-folder-cleanup-1.8.1-project-rules-optional.zip` | Copyable template. Installing the skill does not adopt it |
+| Claude app skill upload, ChatGPT or Codex standalone skills, local models, any skills folder | `multi-agent-folder-cleanup-1.9.0-UNIVERSAL-skill.zip` | Full skill folder, including Work mode and the Python and PowerShell helpers |
+| Claude Code `/plugin install` | `multi-agent-folder-cleanup-1.9.0-claude-code-plugin.zip` | Plugin layout. The Claude app uploader rejects this ZIP |
+| Codex / ChatGPT plugin marketplace | `multi-agent-folder-cleanup-1.9.0-codex-chatgpt-plugin.zip` | OpenAI plugin package. Directory publication is a separate OpenAI review and is not claimed here |
+| Microsoft Copilot agent skill upload, **Grok** | `multi-agent-folder-cleanup-1.9.0-microsoft-copilot-agent-only.zip` | No `.ps1`. Copilot's skill upload rejects PowerShell scripts; Grok rejects the Universal ZIP because of `audit_folder.ps1` and accepts this one |
+| Gemini Apps skill upload | `multi-agent-folder-cleanup-1.9.0-gemini-apps-only.zip` | Omits audit scripts, `agents/openai.yaml`, and project rules. Gemini's upload scan rejects the audit script; regular Gemini chat rejects packages with scripts |
+| Opal skill import | `multi-agent-folder-cleanup-1.9.0-opal-only.zip` | Markdown only: `SKILL.md` plus `references/*.md` |
+| Optional Project Rules template only | `multi-agent-folder-cleanup-1.9.0-project-rules-optional.zip` | Copyable template. Installing the skill does not adopt it |
 
 Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can use [the repository](https://github.com/JesseRaber/multi-agent-folder-cleanup) directly.
 
@@ -44,6 +44,6 @@ Get-FileHash .\multi-agent-folder-cleanup-*.zip -Algorithm SHA256
 
 ## Loaded check
 
-A loaded skill reports **Loaded Multi-Agent Folder Cleanup v1.8.1 (SKILL.md at <path>; helpers <version>)**. A folder question starts with **Mode: Audit** and stays read-only until a specific mutation list is approved.
+A loaded skill reports **Loaded Multi-Agent Folder Cleanup v1.9.0 (SKILL.md at <path>; helpers <version>)**. A folder question starts with **Mode: Audit** and stays read-only until a specific mutation list is approved.
 
 See [Modes](Modes), [Scripts](Scripts), and [FAQ](FAQ).

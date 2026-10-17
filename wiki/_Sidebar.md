@@ -11,5 +11,5 @@
 - [Work mode](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/work-mode.md)
 - [Preconditions](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/preconditions.md)
 - [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md)
-- [Release v1.8.1](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.8.1)
+- [Release v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0)
 - [Releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases)
