@@ -70,7 +70,7 @@ A loaded skill answers with **Mode: Audit** on the first line and offers a
 read-only inventory before proposing anything. If it starts suggesting a folder
 tree immediately, the skill did not load.
 
-The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v1.9.0 (SKILL.md at <path>; helpers <version>)**.
+The skill also reports itself as **Loaded Multi-Agent Folder Cleanup v2.0.0 (SKILL.md at <path>; helpers <version>)**.
 
 Portfolio smoke test:
 

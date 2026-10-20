@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v1.9.0**; published releases are listed on GitHub.
+Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v2.0.0**; published releases are listed on GitHub.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,9 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`1.9.0`; see `CHANGELOG.md`.
+`2.0.0`; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v1.9.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
+Report as: **Loaded Multi-Agent Folder Cleanup v2.0.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
 
 ## Install
 
@@ -60,6 +60,10 @@ This repository is also its own Claude marketplace catalog:
 ### Other hosts
 
 Copy or upload only `skills/multi-agent-folder-cleanup/`, preserving its `SKILL.md`, `agents/`, `scripts/`, and `references/` directories. Do not install from a mixed archive containing nested packages or loose duplicate scripts.
+
+## Apply project rules
+
+Invoke the skill with your host's skill picker or supported slash command, then say **Apply project rules to this folder**. Setup uses the bundled rules template, preserves existing project records, fills project-specific choices from evidence and generates matching host instructions when needed. The explicit apply request authorizes that bounded setup; it does not publish, install skills or change global settings. See [adoption and host-aware setup](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md).
 
 ## Repository layout
 

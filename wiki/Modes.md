@@ -1,9 +1,10 @@
-# Work, Audit, Plan, and Execute
+# Setup, Work, Audit, Plan, and Execute
 
-Multi-Agent Folder Cleanup uses four modes. State the mode in the first line. The repository files are the protocol; this page only routes to them.
+Multi-Agent Folder Cleanup uses five modes. State the mode in the first line. The repository files are the protocol; this page only routes to them.
 
 | Mode | Use it when | It may | It may not |
 |---|---|---|---|
+| Setup | Applying bundled project rules to a named folder | Bounded adoption/migration, preserved continuity records, verified setup and host-specific instruction output | Reset populated records, infer unavailable permissions, change other projects or global settings |
 | Work | Saving, naming, indexing, or handing off ordinary work in a shared folder | Authorized task edits, a session log, and coordinated navigation updates | Reorganize the folder. Discovering clutter does not authorize cleanup |
 | Audit | Asking what is here, or why agents are confused | Read-only inspection and an evidence report | Move, rename, or delete |
 | Plan | Asking how the folder should be organized | A proposed tree and a literal source-to-target map labeled PROPOSED | Execute that map |
@@ -14,6 +15,7 @@ A question about the folder itself defaults to Audit unless execution is explici
 ## Where to read
 
 - Router: [SKILL.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/SKILL.md)
+- Setup: [ADOPTION.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md)
 - Work: [work-mode.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/work-mode.md); also [work-mode-baseline.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/work-mode-baseline.md) unless the project has adopted Project Rules 4.0.0 or later
 - Cleanup start: [preconditions.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/preconditions.md) and [cleanup-principles.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/cleanup-principles.md)
 - Audit: [audit-mode.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/audit-mode.md) (rarer checks and confusion sources in [audit-edge-cases.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/skills/multi-agent-folder-cleanup/references/audit-edge-cases.md) on demand)
@@ -26,4 +28,4 @@ Deletion is never in scope by default. Before any delete in Execute, run the rec
 
 Optional Project Rules are a separate adoption. Installing the skill does not install them.
 
-Current release: [v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0).
+Current release: [v2.0.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.0.0).

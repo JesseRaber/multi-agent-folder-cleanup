@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-folder-cleanup",
-  "version": "1.9.0",
+  "version": "2.0.0",
   "description": "Keep shared project folders usable by many AI agents: Work mode for saving, naming, indexing, session logs and handoff; Audit, Plan and Execute modes to inspect and safely reorganize a folder or portfolio, validate authority, separate documentary from operational state and avoid duplicate or ambiguous trees.",
   "author": {
     "name": "Jesse Raber",
