@@ -1,6 +1,10 @@
 # Changelog
 
-Current release: **[v1.9.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v1.9.0)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
+Current release: **[v2.0.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.0.0)**. The full history is [CHANGELOG.md](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/CHANGELOG.md). This page does not replace it.
+
+## 2.0.0 — Project setup and scoped workflows
+
+Setup, host-aware instructions, browser-safe saves, scoped approval and append-only closeout. Project Rules remain4.0.1.
 
 ## v1.9.0 — pending targets and index discovery
 

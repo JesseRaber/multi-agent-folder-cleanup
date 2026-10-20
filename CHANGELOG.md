@@ -1,5 +1,15 @@
 # Changelog
 
+### 2.0.0 — Project setup and scoped workflows
+
+- Add Setup mode to adopt bundled project rules for a named folder while preserving existing records and project-specific choices.
+- Generate host-aware instruction blocks using observed access, including browser/connector-only save and provenance fallbacks.
+- Reuse one explicit approval across a defined workflow while retaining scope, verification, host security and cleanup safeguards.
+- Strengthen closeout coverage and append-only continuation without imposing a mandatory handoff document on every request.
+- File verified published release assets with clear current-version navigation and separate candidates from published packages.
+- Keep the bundled Project Rules core at 4.0.1; upgrading this skill does not replace adopted project policies.
+
+
 ### 1.9.0 — Pending-target resolution and index discovery
 
 - Resolve absolute pending targets inside the project and refuse external paths, traversal and external links/junctions. Preserve legacy relative-path markup.
