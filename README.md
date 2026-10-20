@@ -61,6 +61,10 @@ This repository is also its own Claude marketplace catalog:
 
 Copy or upload only `skills/multi-agent-folder-cleanup/`, preserving its `SKILL.md`, `agents/`, `scripts/`, and `references/` directories. Do not install from a mixed archive containing nested packages or loose duplicate scripts.
 
+## Apply project rules
+
+Invoke the skill with your host's skill picker or supported slash command, then say **Apply project rules to this folder**. Setup uses the bundled rules template, preserves existing project records, fills project-specific choices from evidence and generates matching host instructions when needed. The explicit apply request authorizes that bounded setup; it does not publish, install skills or change global settings. See [adoption and host-aware setup](skills/multi-agent-folder-cleanup/references/project-rules/ADOPTION.md).
+
 ## Repository layout
 
 ```text

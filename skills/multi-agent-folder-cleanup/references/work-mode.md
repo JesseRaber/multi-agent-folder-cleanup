@@ -108,7 +108,9 @@ Before each final answer, so the work survives if the chat stops:
 - [ ] No same-name twin or conflict copy left by your saves
 - [ ] Next step written where the next agent will look
 
-Write one close entry when the owner ends the chat; if the owner continues afterwards, append normal turns and refresh the close line instead of reopening. Mark deferred navigation and link its pending edit. If you cannot save to the project, give the session entry as a copyable checkpoint.
+At owner-requested closeout or a substantive phase/transfer boundary, compare available messages with relevant saved records. Preserve missing decisions and rationale, findings and useful failed approaches, constraints, corrections, proposed guidance, verification limits and unresolved conflicts in their existing destinations; link adequately captured content. Keep attributed history append-only, current context concise and proposals in the one tracker. A transfer handoff is optional under W4; no automatic transcript export or full closeout is required for routine requests. Verify saved coverage and links, and disclose unavailable material or pending edits. Recheck only claims material to the next action; dated evidence stays dated. Closeout does not adopt proposals or change project authority.
+
+Append a close entry when the owner ends the chat. If the same writer continues afterwards, preserve that entry, append subsequent turns and a dated continuation or close update, and follow the project's closed-session shared-write safeguards. Mark deferred navigation and link its pending edit. If you cannot save to the project, give the session entry as a copyable checkpoint.
 
 ## Stop and switch modes when
 

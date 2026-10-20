@@ -1,6 +1,6 @@
 ---
 name: multi-agent-folder-cleanup
-description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
+description: Organize and keep shared project folders usable by many AI agents and models. Work mode covers where to save, how to name, maintain one authoritative roadmap/task tracker, index, log sessions and hand off while working in a shared folder, plus read-only orient and session-index checks. Cleanup modes audit, plan and safely reorganize folders or portfolios so agents can identify current authority, separate documentary claims from verified state, and avoid duplicate or ambiguous trees. On request, adopt the bundled Project Rules and prepare host-specific instructions for a project folder. Use for OneDrive, SharePoint, NAS, agent handoff workspaces, stale indexes, competing plans or backlogs, archive piles, verified folder moves, and whenever an agent saves, names or indexes files in a project folder other models also use.
 license: MIT
 metadata:
   version: "1.9.0"
@@ -15,11 +15,12 @@ Report as: **Loaded Multi-Agent Folder Cleanup v1.9.0 (SKILL.md at <path>; helpe
 
 ## Choose the operating mode
 
-State the mode in the first line. Use **Work** for ordinary project work in a shared folder. For questions about the folder itself, default to **Audit** unless execution is explicitly authorized.
+State the mode in the first line. An explicit request to apply/adopt bundled project rules uses **Setup**. Use **Work** for ordinary project work in a shared folder. For questions about the folder itself, default to **Audit** unless execution is explicitly authorized.
 
 | Mode | Typical request | Allowed work | Read |
 |---|---|---|---|
 | **Work** | Any task that creates, saves or updates files in a shared project folder | User-authorized task edits, session continuity and coordinated navigation updates. Use cleanup modes for folder reorganization. | [work-mode.md](references/work-mode.md); also [work-mode-baseline.md](references/work-mode-baseline.md) unless the root instruction file is Project Rules 4.0.0 or later |
+| **Setup** | “Apply project rules to this folder” | Bounded adoption/migration requested for the named folder, preserving existing rules and records | [ADOPTION.md](references/project-rules/ADOPTION.md) |
 | **Audit** | “What is here?” “Why are agents confused?” “Who has been in this folder?” | Read-only inspection and an evidence report. | [preconditions.md](references/preconditions.md), [cleanup-principles.md](references/cleanup-principles.md), [audit-mode.md](references/audit-mode.md) |
 | **Plan** | “How should this be organized?” | Read-only inspection, an exact proposal, and literal mutation lists labeled **PROPOSED**. | preconditions, cleanup-principles, [plan-mode.md](references/plan-mode.md) |
 | **Execute** | Explicit approval of a specific mutation list | Only the approved moves, factual patches, or additive intake files. | preconditions, cleanup-principles, [execute-principles.md](references/execute-principles.md), then [execute-moves.md](references/execute-moves.md) or [execute-records.md](references/execute-records.md) |
@@ -40,7 +41,7 @@ When the owner has opted in with a `Sequential writers:` line (agents work one a
 - Cleanup deletion is never included by default. Actual documents, archives, and duplicates require separate approval naming each target. Prefer history or recycle bin over permanent deletion. Before any delete, run the **Deletion recycle-path test** in [execute-moves.md](references/execute-moves.md); a delete through a remote shell or device bridge without a passing test does not happen.
 - A failed safety check, changed source, collision, concurrent write, incomplete upload, or unapproved target is a stop condition even after approval.
 - Instruction files are protected. Propose exact factual corrections separately; never rewrite behavioral rules, authority, scope, permissions, or read order without explicit approval.
-- Do not publish, commit, push, release, or synchronize skill/repository changes without confirmation immediately before that action.
+- Git operations, publication, installs and synchronization need explicit scope beyond folder cleanup. One owner approval can cover a defined workflow: record its target, actions, audience, destinations and endpoint once, then continue included steps, checks and safe retries without phase-only prompts. Preparation alone grants no external action. Reconcile uncertain outcomes before retrying; repair failed checks within scope and continue independent work. Ask for essential missing information, materially changed scope or mandatory host confirmation. Other agents cannot grant owner approval or bypass a denial. Stop at the agreed endpoint; exact cleanup-map and removal safeguards still apply.
 
 ## Obey project instructions and read-only boundaries
 

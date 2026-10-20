@@ -2,22 +2,46 @@
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md) and the [section 0 paste-in](SECTION_0_PASTE_IN.txt) for hosts that cannot read project files. It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename keeps the template from loading as live instructions. Do not copy private session logs or a source project's section 13 into another project.
 
+## Setup entrypoint and authorization
+
+Invoke this skill using the host's skill picker or supported slash syntax, then request **Apply project rules to this folder** (or name a reachable folder). Plain-language requests work too; no one slash command is promised across hosts. An explicit apply/adopt request authorizes the bounded adoption below for that resolved project, including necessary continuity setup and verification; do not ask for a second ceremonial approval. A request to explain, review or draft rules does not adopt them. This workflow does not authorize installing skills, changing account-wide settings, publishing, or migrating other projects.
+
+Use the version bundled with the actual source/package; report that version, not an inferred newest release. Resolve the target folder and current authority before writing. A missing template or inaccessible destination is a disclosed blocker; do not reconstruct the rules from memory. Keep independent authorized work moving while awaiting essential input. A conflicting existing policy, uncertain target or missing essential owner choice warrants one bundled clarification, not a prompt at every step.
+
+Infer project facts from current files and reuse explicit owner decisions. Do not invent a canonical repository, license, audience or permission. New project: create only necessary established continuity records at permitted locations. Existing project: preserve its tracker, paths and populated records; follow migration safeguards below. Already adopted with matching core and current scope: verify/report rather than reset files or append duplicate activation. An incomplete prior migration must be reconciled before recording activation. Never infer sequential writers from quiet file times; without an owner declaration omit that optional line and use permitted staging/coordination.
+
+## Host-aware instructions output
+
+Identify the product/runtime and accessible sources, not just a model name. Use trusted current runtime context or an observed host setup; if unavailable, ask which host only when the answer changes required output. Keep the shared rules in the bundled template and section 0 source; adapters supply routing and actual project details, not divergent policy copies.
+
+| Observed surface | What to return |
+|---|---|
+| Claude app Project, with a project instruction field | A clearly labelled block for that field, based on section 0 with the actual reachable full-rules reference; distinguish Claude Code. |
+| Manus or another host with an observed instruction/settings field | The same project-specific minimum block, naming the observed destination. If the setting is unverified, provide a labelled task-start fallback without inventing menu steps. |
+| Codex or another filesystem host that actually discovers this project's root instructions | Verify the applicable root and access. Omit redundant paste-in text when discovery is established; otherwise state the missing setup. |
+| ChatGPT Project | Return project-instruction text when needed. ChatGPT Projects, plain chats, custom GPTs and Codex are different surfaces; do not exclude a host merely because its model is GPT. |
+| Unknown or chat-only surface | A neutral task-start block plus explicit file-access and persistence limits. |
+
+Construct a required settings block from `SECTION_0_PASTE_IN.txt`, substituting the resolved project's full-rules reference. Keep its minimum rules intact. Never tell a cloud-only host that a local Windows path is readable: use an accessible provider reference, or state that the owner must attach/connect the rules. Label what to paste and where, and distinguish **generated**, **saved/pasted**, and **fresh-host loading verified**. A settings block does not grant file access. Generate only the current host's block unless the owner requests others; record unknown surfaces instead of asserting permanent capabilities for every brand. Do not change global host preferences automatically.
+
+End with rules version/location, adoption completed or staged, retained records, the copyable block if required, unresolved setup and verification limits. A local save or generated block is not proof of host loading. Future changes to host interfaces require updated observation, not a new rules core.
+
 ## Layout
 
 - **Section 0** — the minimum rules any model needs. Also the paste-in for hosts that do not load the project folder.
-- **Sections 1–12** — the invariant core. Identical in every project that adopts 4.0.0; `--portfolio` reports `Core match` against this bundled copy.
+- **Sections 1–12** — the invariant core. Identical in every project that adopts this rules version; `--portfolio` reports `Core match` against this bundled copy.
 - **Section 13** — the only per-project text. Every project-specific choice lives here; nothing project-specific goes in sections 0–12.
 
 ## Adopt in a project (new or existing)
 
-1. Get the owner's explicit adoption for the named project. Installing the skill, an attachment or a file copy activates nothing.
+1. Establish the owner's explicit adoption for the named project (the Setup apply/adopt request above qualifies). Installing the skill, an attachment or a file copy activates nothing.
 2. Existing project: inventory the current root/scoped policies, adoption evidence, continuity paths and populated records (section 11). Save the prior root under a non-loading name such as `AGENTS.md.before-<sha8>` or `AGENTS.before.md`; never a literal `AGENTS.md` under scratch or backup. Never overwrite a populated journal, index or quick context with a template.
-3. Fill section 13 with the owner, one line each, replacing every `<placeholder>`:
+3. Fill section 13 from verified project facts and explicit owner choices, one line each, replacing every `<placeholder>`:
    - `Project:` name, root path or provider id, canonical source if any.
    - `Adopted:` `4.0.1 on <date> by <owner statement>`, and the activation event id in `AI_CONTEXT/POLICY_INSTALLATION.md`.
    - `Owner timezone:` an IANA zone (`America/New_York`).
    - `Tracker:` the one canonical task tracker path (default `PROJECT_ROADMAP_STATUS.md`).
-   - `Sequential writers:` ask the owner whether agents in this project always work one after another. The template ships this as a placeholder, so an unfilled copy never opts in. Only if the owner says yes, replace the placeholder with `Sequential writers: one owner; agents work one after another (owner, <date>)`; otherwise delete it. Only the owner's line enables direct shared-record edits under section 5.
+   - `Sequential writers:` reuse an existing explicit declaration; otherwise ask only if that choice is needed to complete the requested setup. The template ships this as a placeholder, so an unfilled copy never opts in. Only if the owner says yes, replace the placeholder with `Sequential writers: one owner; agents work one after another (owner, <date>)`; otherwise delete it. Only the owner's line enables direct shared-record edits under section 5.
    - `Active-writer window:` minutes (30 unless the owner chooses otherwise). The helpers read this line.
    - `Tool slugs in use:` one slug per runtime, `slug = runtime`; two hosts that could collide get distinct slugs (`grok` for the xAI app, `cursor-grokbot` for a Cursor agent). The helpers treat listed slugs as standard and flag one slug used with several runtime headers.
    - `Established paths differing from section 3:`, `Extra gates:`, `Retained from prior rules:` — `none` when nothing applies.
@@ -26,7 +50,7 @@ This package contains one versioned, reusable [rules template](AGENTS.proposed.m
 
 ## Paste section 0 into hosts that do not read the folder
 
-Muse, Grok, Opal, Cursor agents, local models and similar hosts never load `AGENTS.md`. For each one the owner uses on this project:
+For any observed host that does not automatically load the project instructions, follow the adapter above. Do not infer file loading solely from the host brand. For each such host the owner uses on this project:
 
 1. Copy [SECTION_0_PASTE_IN.txt](SECTION_0_PASTE_IN.txt).
 2. Replace `<project>` in the `Full rules:` line with the project's folder name (or the path that host can reach).

@@ -92,8 +92,9 @@ class GuidanceTests(unittest.TestCase):
 
     def test_r193_quick_tasks_and_p13_one_close(self):
         self.assertIn("**Quick tasks.**", self.work)
-        self.assertIn("Write one close entry when the owner ends the chat", self.work)
-        self.assertIn("refresh the close line instead of reopening", self.work)
+        self.assertIn("Append a close entry when the owner ends the chat", self.work)
+        self.assertIn("preserve that entry, append subsequent turns", self.work)
+        self.assertNotIn("refresh the close line", self.work)
 
     def test_r181_arrival_line(self):
         self.assertIn("if no helper ran, say `helpers not run`", self.skill)
