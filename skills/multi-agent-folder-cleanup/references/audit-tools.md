@@ -49,10 +49,10 @@ These are structural findings, not authority decisions. A suggested exclusion is
 ## Check the helper version first
 
 ```bash
-python3 scripts/audit_folder.py --version    # audit_folder.py 2.0.0
-python3 scripts/verify_move.py --version     # verify_move.py 2.0.0
-python3 scripts/verify_records.py --version  # verify_records.py 2.0.0
-pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 2.0.0
+python3 scripts/audit_folder.py --version    # audit_folder.py 2.1.0
+python3 scripts/verify_move.py --version     # verify_move.py 2.1.0
+python3 scripts/verify_records.py --version  # verify_records.py 2.1.0
+pwsh -ExecutionPolicy Bypass -File scripts/audit_folder.ps1 -Version # audit_folder.ps1 2.1.0
 ```
 
 Each must equal the `metadata.version` in SKILL.md. A mismatch means a mixed install (for example a new SKILL.md over older scripts): its documented checks may not exist. Reinstall from one release before relying on it.
@@ -196,3 +196,9 @@ Shared records are UTF-8. Windows PowerShell 5.1 `>>`, `Out-File` and `Set-Conte
 - **Cloud-only files through a device bridge.** An `Input/output error` on a synced folder may be a cloud-only placeholder, not a damaged file. Hydrate or stage the file, then read it; report the placeholder state instead of calling the file unreadable.
 - **PowerShell 7 on Windows.** `pwsh` may be on `PATH` for one agent and absent for another on the same computer (`tests/run_tests.py --powershell pwsh` then exits 2). Look for `C:\Program Files\PowerShell\7\pwsh.exe`, or use `powershell.exe` (5.1); say which engine ran.
 - **Deletes from a remote shell.** A "send to Recycle Bin" call through a device bridge can delete permanently with no error. Run the recycle-path test in [execute-moves.md](execute-moves.md#deletion-recycle-path-test) first.
+
+### Orientation hygiene checks
+
+`--orient` / `-Orient` reports immediate Incoming/ and configured scratch subfolders over 100 MB (100,000,000 logical file bytes). The metadata-only scan includes generated directories, skips links/junctions, never reads file contents for sizes, and counts placeholder flags separately. It is bounded by `--max-seconds` / `-MaxSeconds`, or five seconds when unset. Partial sums are lower bounds; coverage gaps prevent an all-clear. Logical lengths do not prove physical allocation, hydration, synchronization or disposability. Preserve source and durable evidence and propose only qualified rebuildable-output moves.
+
+The same report lists direct Markdown session logs without an index-table mention of their filename or UUID, using the configured session/index paths. A nonstandard filename can match its guarded Session ID header. Unavailable indexes/listings are reported as unavailable, never zero omissions. These are matching leads, not authority to backfill, invent history or close sessions.

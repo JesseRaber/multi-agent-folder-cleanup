@@ -40,7 +40,7 @@ import re
 import sys
 from urllib.parse import unquote
 
-VERSION = "2.0.0"  # must equal SKILL.md metadata.version
+VERSION = "2.1.0"  # must equal SKILL.md metadata.version
 
 BOM = b"\xef\xbb\xbf"
 # Common UTF-8-read-as-cp1252/latin-1 sequences, plus the replacement character.

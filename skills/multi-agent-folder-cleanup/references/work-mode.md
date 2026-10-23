@@ -18,9 +18,11 @@ Also check:
 
 Before expensive or portfolio-wide work, compare the request with recent logs' topics, latest outcomes and open work. If the same task is active, coordinate rather than duplicate it; if complete, reuse its evidence and check only gaps. Record the request promptly in your own log; that log is the in-progress signal, so create no separate claim file. Treat summaries as leads and verify what your task depends on.
 
+When creating a project folder, offer onboarding: use the bundled proposed rules, or copy an owner-authorized sibling policy as `AGENTS.proposed.md` for review. Strip sibling-specific scope from the proposal and fill only verified destination facts. Ask the owner to adopt; a copied policy does not activate itself. Follow the current governing instructions and record the request meanwhile; do not claim the proposed section 0 is already adopted.
+
 ## W2. Claim your own space
 
-Keep your own session log, session-index row and scratch folder `AI_CONTEXT/scratch/<your-session-id>/` as the project rules say (Rules 4.0.0 sections 0 and 4, or [work-mode-baseline.md](work-mode-baseline.md) B2).
+Create the session-index row with the log; if shared writes are unavailable, stage its exact target, insertion anchor and row text. Keep your own session log, session-index row and scratch folder `AI_CONTEXT/scratch/<your-session-id>/` as the project rules say (Rules 4.0.0 sections 0 and 4, or [work-mode-baseline.md](work-mode-baseline.md) B2).
 
 ## W3. Save new files where the next agent will look
 
@@ -29,7 +31,8 @@ Write only in your own session log. To correct another agent's work, record the 
 | What you made | Where it goes |
 |---|---|
 | Finished deliverable | The area the index names for that work; if none, the closest existing folder, noted in the index row. Never `AI_CONTEXT/`, which holds continuity records only. |
-| Draft, test output, intermediate data | `AI_CONTEXT/scratch/<your-session-id>/`. Never write in another session's scratch folder, except to rewrite only that file's `Status:` line after applying its pending file (W5). |
+| Rebuildable output (builds, dependencies, caches, checkouts, test runs) | Outside the synced project, in an owner-accessible local workspace. Keep final packages, checksums and a pointer in the indexed project location. |
+| Draft, intermediate data and durable test evidence | `AI_CONTEXT/scratch/<your-session-id>/`, except rebuildable output (see above). Never write in another session's scratch folder, except to rewrite only that file's `Status:` line after applying its pending file (W5). |
 | Unreviewed material from another model, chat or person | `Incoming/` (or the project's inbox), dated folder plus a short provenance note; no new top-level folder |
 | A newer version of an existing file | Edit in place when authorized; otherwise save beside it as a proposal naming what it replaces. No `final_v2_REAL` siblings. |
 | Your review of another agent's work | A dated file beside the reviewed deliverable or in `Incoming/`. Read the agent's log, scratch and deliverable from the folder and log the review in your own log, so the owner can point rather than paste. |

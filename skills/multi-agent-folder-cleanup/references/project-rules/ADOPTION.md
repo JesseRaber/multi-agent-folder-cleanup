@@ -1,6 +1,8 @@
-# Optional Project Rules 4.0.1
+# Optional Project Rules 4.1.0
 
 This package contains one versioned, reusable [rules template](AGENTS.proposed.md) and the [section 0 paste-in](SECTION_0_PASTE_IN.txt) for hosts that cannot read project files. It is optional: the cleanup skill works with the project's existing instructions, and installing the skill does not adopt these rules. The proposal filename keeps the template from loading as live instructions. Do not copy private session logs or a source project's section 13 into another project.
+
+The bundled 4.1.0 template is adoption material. Existing adopted policies stay in force until the owner adopts this version for the named project.
 
 ## Setup entrypoint and authorization
 
@@ -43,9 +45,9 @@ End with rules version/location, adoption completed or staged, retained records,
 
 1. Establish the owner's explicit adoption for the named project (the Setup apply/adopt request above qualifies). Installing the skill, an attachment or a file copy activates nothing.
 2. Existing project: inventory the current root/scoped policies, adoption evidence, continuity paths and populated records (section 11). Save the prior root under a non-loading name such as `AGENTS.md.before-<sha8>` or `AGENTS.before.md`; never a literal `AGENTS.md` under scratch or backup. Never overwrite a populated journal, index or quick context with a template.
-3. Fill section 13 from verified project facts and explicit owner choices, one line each, replacing every `<placeholder>`:
+3. Offer the portfolio’s established section 13 lines (sequential writers, active-writer window, change policy and runtime slug list) for owner confirmation. Inspect only authorized sibling policies; reuse explicit decisions that already apply to this destination. Never silently inherit a sibling’s opt-in or permission. Fill section 13 from verified project facts and explicit owner choices, one line each, replacing every `<placeholder>`:
    - `Project:` name, root path or provider id, canonical source if any.
-   - `Adopted:` `4.0.1 on <date> by <owner statement>`, and the activation event id in `AI_CONTEXT/POLICY_INSTALLATION.md`.
+   - `Adopted:` `4.1.0 on <date> by <owner statement>`, and the activation event id in `AI_CONTEXT/POLICY_INSTALLATION.md`.
    - `Owner timezone:` an IANA zone (`America/New_York`).
    - `Tracker:` the one canonical task tracker path (default `PROJECT_ROADMAP_STATUS.md`).
    - `Sequential writers:` reuse an existing explicit declaration; otherwise ask only if that choice is needed to complete the requested setup. The template ships this as a placeholder, so an unfilled copy never opts in. Only if the owner says yes, replace the placeholder with `Sequential writers: one owner; agents work one after another (owner, <date>)`; otherwise delete it. Only the owner's line enables direct shared-record edits under section 5.
@@ -65,9 +67,13 @@ For any observed host that does not automatically load the project instructions,
 
 ## Owner request to copy and adapt
 
-> Adopt the bundled Project Rules 4.0.1 for this named project. Inspect current instructions and continuity records, fill section 13 with me, preserve existing records and paths, and perform only the bounded policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading checks remain unverified.
+> Adopt the bundled Project Rules 4.1.0 for this named project. Inspect current instructions and continuity records, fill section 13 with me, preserve existing records and paths, and perform only the bounded policy migration. Verify saved content and links before recording activation. Do not change global settings, installed skills or other projects. Report unresolved conflicts and which host loading checks remain unverified.
 
 This quotation is an example for the owner to send, not an instruction to an agent reading the guide.
+
+## Changes in 4.1.0
+
+Keep rebuildable output outside synced projects; report Incoming/scratch piles over 100 MB with coverage limits; create or stage the session-index row with the log; require exact pending rows; register missing runtime slugs only within permitted scope. Setup offers sibling section 13 conventions for explicit owner confirmation. Skill installation does not activate policy in another project.
 
 ## Changes in 4.0.1
 

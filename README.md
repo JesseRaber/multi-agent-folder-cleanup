@@ -2,7 +2,7 @@
 
 Agent skill for a shared project folder used by more than one AI model. It keeps Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models from treating a stale copy, an incoming draft, or a second roadmap as current.
 
-Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v2.0.0**; published releases are listed on GitHub.
+Canonical source for the skill and its OpenAI and Claude plugin packages. This branch holds **v2.1.0**; published releases are listed on GitHub.
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
@@ -10,9 +10,16 @@ Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/w
 
 ## Version
 
-`2.0.0`; see `CHANGELOG.md`.
+`2.1.0`; see `CHANGELOG.md`.
 
-Report as: **Loaded Multi-Agent Folder Cleanup v2.0.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
+Report as: **Loaded Multi-Agent Folder Cleanup v2.1.0 (SKILL.md at <path>; helpers <version>)**, taking `<version>` from an actual `--version` run; if no helper ran, say `helpers not run`.
+
+## What v2.1.0 adds
+
+- Orientation reports Incoming/scratch piles over 100 MB, including generated state, with explicit metadata coverage limits.
+- Orientation lists session logs without a matching index-table row and reports unavailable coverage separately.
+- Saving and setup guidance keeps rebuildable output outside synced projects, preserves durable evidence and makes onboarding and pending edits explicit.
+- Optional Project Rules 4.1.0 remain separate adoption material; upgrading the skill does not replace project policies.
 
 ## Install
 

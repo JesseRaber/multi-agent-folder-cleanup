@@ -1,5 +1,13 @@
 # Changelog
 
+### 2.1.0 — Synced workspace hygiene and continuity checks
+
+- Report oversized Incoming/scratch piles using logical metadata lengths with explicit coverage gaps, including generated folders.
+- List session logs without a session-index table row, distinguishing unavailable indexes from zero findings.
+- Keep rebuildable output outside synced projects while retaining durable source, evidence and release packages.
+- Offer explicit onboarding and portfolio scope choices; require exact pending rows and coordinate runtime registration.
+- Clarify supported host installation locations and keep proposed policy changes separate from adoption.
+
 ### 2.0.0 — Project setup and scoped workflows
 
 - Add Setup mode to adopt bundled project rules for a named folder while preserving existing records and project-specific choices.
