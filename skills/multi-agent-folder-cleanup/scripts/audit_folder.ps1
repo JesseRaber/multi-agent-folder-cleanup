@@ -117,7 +117,7 @@ param(
     [switch]$Version
 )
 
-$ScriptVersion = '2.0.0'   # must equal SKILL.md metadata.version
+$ScriptVersion = '2.1.0'   # must equal SKILL.md metadata.version
 if ($Version) { Write-Output "audit_folder.ps1 $ScriptVersion"; exit 0 }
 if (-not $Root) { throw "-Root is required" }
 
@@ -1322,6 +1322,76 @@ if ($Orient -or $SessionIndex -or $Pending) {
             "{0}: {1}" -f $k, ((@($v[$k] | Select-Object -First 4 | ForEach-Object { if ($_.Length -gt 60) { $_.Substring(0, 60) } else { $_ } })) -join ' | ') })
         return $v.Count
     }
+
+    function Write-OrientHygiene {
+        $pileRows = [Collections.Generic.List[string]]::new()
+        $gaps = [Collections.Generic.List[string]]::new()
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        $budget = if ($MaxSeconds -gt 0) { $MaxSeconds } else { 5 }
+        foreach ($area in @('Incoming', $ScratchDir)) {
+            $base = Resolve-ProjectReference $RootFull $area
+            if (-not $base) { $gaps.Add("$area (unsafe path)"); continue }
+            if (-not (Test-Path -LiteralPath $base)) { continue }
+            try { $parent = Get-Item -LiteralPath $base -Force -ErrorAction Stop
+                if (Test-LinkDirectory $parent) { $gaps.Add("$area (link skipped)"); continue }
+                $children = @(Get-ChildItem -LiteralPath $base -Force -ErrorAction Stop | Sort-Object Name)
+            } catch { $gaps.Add("$area (unreadable)"); continue }
+            foreach ($child in $children) {
+                if (Test-LinkDirectory $child) { $gaps.Add((Get-RelSlash $child.FullName) + ' (link skipped)'); continue }
+                if ($child -isnot [IO.DirectoryInfo]) { continue }
+                [long]$size = 0; $count = 0; $placeholders = 0
+                $todo = [Collections.Generic.Stack[IO.DirectoryInfo]]::new(); $todo.Push($child)
+                while ($todo.Count) {
+                    if ($timer.Elapsed.TotalSeconds -ge $budget) { $gaps.Add((Get-RelSlash $child.FullName) + ' (time limit; partial)'); break }
+                    $here = $todo.Pop()
+                    try {
+                        $entries = @(Get-ChildItem -LiteralPath $here.FullName -Force -ErrorAction Stop)
+                        foreach ($entry in $entries) {
+                            if ($timer.Elapsed.TotalSeconds -ge $budget) { $gaps.Add((Get-RelSlash $child.FullName) + ' (time limit; partial)'); $todo.Clear(); break }
+                            if (Test-LinkDirectory $entry) { $gaps.Add((Get-RelSlash $entry.FullName) + ' (link skipped)') }
+                            elseif ($entry -is [IO.DirectoryInfo]) { $todo.Push($entry) }
+                            else { $size += $entry.Length; $count++
+                                if ([long]$entry.Attributes -band (0x1000 -bor 0x40000 -bor 0x400000)) { $placeholders++ }
+                            }
+                        }
+                    } catch { $gaps.Add((Get-RelSlash $here.FullName) + ' (unreadable)') }
+                }
+                if ($size -gt 100000000) { $pileRows.Add(('{0}: {1} bytes; {2} files; {3} placeholder flags' -f (Get-RelSlash $child.FullName), $size, $count, $placeholders)) }
+            }
+        }
+        Write-Line ('  Incoming/scratch piles over 100 MB: {0} (decimal logical file lengths; generated state included; partial sums are lower bounds)' -f $pileRows.Count)
+        Write-Capped @($pileRows)
+        Write-Line ('  pile scan coverage gaps: {0} (metadata only; no allocated-size or sync proof)' -f $gaps.Count)
+        Write-Capped @($gaps)
+        $ix = Resolve-ProjectReference $RootFull $SessionIndexFile
+        $text = if ($ix) { Read-SmallText $ix } else { $null }
+        $table = ((@(($text -split "`n") | Where-Object { $_.TrimStart().StartsWith('|') })) -join "`n")
+        $sdir = Resolve-ProjectReference $RootFull $SessionsDir
+        $missing = [Collections.Generic.List[string]]::new(); $state = 'unavailable'
+        if ($null -ne $text -and $sdir -and (Test-ContentReadAllowed $sdir)) {
+            try {
+                foreach ($f in @(Get-ChildItem -LiteralPath $sdir -File -Force -ErrorAction Stop | Sort-Object Name)) {
+                    if ($f.Extension -ine '.md') { continue }
+                    $ids = @([regex]::Matches($f.Name, $UuidPattern) | ForEach-Object { $_.Value })
+                    if (-not $ids.Count) {
+                        $logText = Read-SmallText $f.FullName
+                        $field = [regex]::Match($logText, '(?im)^\s*(?:[-*]\s*)?\**Session ID\**\s*:\**\s*(.+)$')
+                        if ($field.Success) { $ids = @([regex]::Matches($field.Groups[1].Value, $UuidPattern) | ForEach-Object { $_.Value }) }
+                    }
+                    $found = $table.IndexOf($f.Name, [StringComparison]::OrdinalIgnoreCase) -ge 0
+                    foreach ($id in $ids) { if ($table.IndexOf($id, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $found = $true } }
+                    if (-not $found) { $missing.Add($f.Name) }
+                }
+                $state = [string]$missing.Count
+            } catch { $state = 'unavailable (listing incomplete)' }
+        }
+        Write-Line ("  session logs without index row: $state (filename or session UUID in table; leads only)")
+        Write-Capped @($missing)
+        $glance['piles over 100 MB'] = $pileRows.Count
+        $glance['pile scan coverage gaps'] = $gaps.Count
+        $glance['logs without index row'] = $state
+    }
+
     function Test-Mine($id) { return ($SessionId -and $id.ToLower().StartsWith($SessionId.ToLower())) }
 
     Write-Line "Read-only work-mode check of $RootFull"
@@ -1566,6 +1636,7 @@ if ($Orient -or $SessionIndex -or $Pending) {
             Write-Line ("  changed files the index never names: {0} (folder-level coverage may already include them)" -f $unindexed.Count)
             Write-Capped $unindexed
         } else { Write-Line ("  index {0}: NOT FOUND or unreadable; unindexed check skipped" -f ($idxList -join ', ')) }
+        Write-OrientHygiene
         $glance['possibly active writers'] = $activeIds.Count + $unpairedScratch.Count
         $glance['slugs with several headers'] = $slugVariantCount
         $glance['provenance PENDING files'] = $provO.Count

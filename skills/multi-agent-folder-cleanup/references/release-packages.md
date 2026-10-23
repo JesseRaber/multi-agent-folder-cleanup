@@ -7,3 +7,7 @@ Read this only when you build, stage, back up or install a skill or plugin packa
 - Keep staged and backup packages as ZIP plus `SHA256SUMS`; an extracted copy gets non-loading `SKILL.md`/`AGENTS.md` names.
 - When installing into a host, keep the backup of the previous version outside every folder the host scans for skills (hosts such as Codex load `SKILL.md` recursively, so a backup there becomes a second same-name skill). After install, require exactly one `SKILL.md` with that `name:` under the host's skill roots.
 - A saved ZIP is not proof of installation; matching files are not proof the host loads them. Confirm the version the host reports in a new session.
+
+## Installation location
+
+Install to the host’s supported configuration directory or managed upload channel, outside synced project roots. A workspace copy must match the selected current release and must not shadow a host installation. Identify which copy the host loads; matching files alone do not establish loading. A stale workspace copy is a finding: refresh or retire it only within explicit owner scope, preserving rollback outside scanned skill folders. Never hand-edit managed plugin caches.

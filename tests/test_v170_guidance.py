@@ -26,7 +26,7 @@ class TemplateTests(unittest.TestCase):
 
     # v1.7.1 bundles Project Rules 4.0.0 (R226/R231); the 3.3.0 assertions moved to their 4.0.0 clauses.
     def test_version_is_401(self):
-        self.assertIn("Version: 4.0.1", self.t)
+        self.assertIn("Version: 4.1.0", self.t)
 
     def test_section5_sequential_writer_default(self):
         s5 = section(self.t, "## 5.", "## 6.")
@@ -56,7 +56,7 @@ class TemplateTests(unittest.TestCase):
 
     def test_adoption_notes(self):
         a = read("references/project-rules/ADOPTION.md")
-        self.assertIn("# Optional Project Rules 4.0.1", a)
+        self.assertIn("# Optional Project Rules 4.1.0", a)
         self.assertIn("Only if the owner says yes, replace the placeholder", a)
 
 

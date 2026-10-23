@@ -45,7 +45,7 @@ import zipfile
 from collections import defaultdict
 from datetime import datetime, timezone
 
-VERSION = "2.0.0"  # must equal SKILL.md metadata.version
+VERSION = "2.1.0"  # must equal SKILL.md metadata.version
 
 ARCHIVE_EXT = {".zip", ".7z", ".rar", ".tar", ".gz", ".tgz"}
 
@@ -1620,6 +1620,100 @@ def report_session_index(root, args, limited):
             "slugs with several headers": slug_variants}
 
 
+def orient_hygiene(root, args, limited):
+    """Metadata-only pile scan, including generated state; never hydrates content.
+
+    Partial sums are lower bounds. A bounded scan must not turn a coverage gap
+    into an all-clear. Session matching is against table rows, not prose.
+    """
+    deadline = time.monotonic() + (args.max_seconds or 5)
+    gaps, piles = [], []
+    for area in ("Incoming", args.scratch_dir):
+        base = project_reference(root, area)
+        if not base or os.path.islink(base) or _is_windows_reparse(base):
+            gaps.append(area + " (unsafe path)")
+            continue
+        if not os.path.exists(base):
+            continue
+        try:
+            children = sorted(os.scandir(base), key=lambda e: (e.name.lower(), e.name))
+        except OSError:
+            gaps.append(area + " (unreadable)")
+            continue
+        for child in children:
+            if child.is_symlink() or _is_windows_reparse(child.path):
+                gaps.append(os.path.relpath(child.path, root) + " (link skipped)")
+                continue
+            if not child.is_dir(follow_symlinks=False):
+                continue
+            total, count, placeholders = 0, 0, 0
+            stack = [child.path]
+            while stack:
+                if time.monotonic() >= deadline:
+                    gaps.append(os.path.relpath(child.path, root) + " (time limit; partial)")
+                    break
+                here = stack.pop()
+                try:
+                    with os.scandir(here) as entries:
+                        for entry in entries:
+                            if time.monotonic() >= deadline:
+                                gaps.append(os.path.relpath(child.path, root) + " (time limit; partial)")
+                                stack.clear()
+                                break
+                            if entry.is_symlink() or _is_windows_reparse(entry.path):
+                                gaps.append(os.path.relpath(entry.path, root) + " (link skipped)")
+                            elif entry.is_dir(follow_symlinks=False):
+                                stack.append(entry.path)
+                            else:
+                                st = entry.stat(follow_symlinks=False)
+                                total += st.st_size
+                                count += 1
+                                placeholders += bool(getattr(st, "st_file_attributes", 0) &
+                                                     (0x1000 | 0x40000 | 0x400000))
+                except OSError:
+                    gaps.append(os.path.relpath(here, root) + " (unreadable)")
+            if total > 100_000_000:
+                piles.append(f"{os.path.relpath(child.path, root)}: {total} bytes; {count} files; "
+                             f"{placeholders} placeholder flags")
+    print(f"  Incoming/scratch piles over 100 MB: {len(piles)} (decimal logical file lengths; "
+          "generated state included; partial sums are lower bounds)")
+    for line in limited(piles):
+        print("    " + line)
+    print(f"  pile scan coverage gaps: {len(gaps)} (metadata only; no allocated-size or sync proof)")
+    for line in limited(gaps):
+        print("    " + line)
+
+    ix = project_reference(root, args.session_index_file)
+    text = read_small_text(ix) if ix and os.path.isfile(ix) else None
+    table = "\n".join(line for line in (text or "").splitlines() if line.lstrip().startswith("|"))
+    sdir = project_reference(root, args.sessions_dir)
+    missing = []
+    state = "unavailable"
+    if text is not None and sdir and content_read_allowed(sdir):
+        try:
+            for name in sorted(os.listdir(sdir)):
+                full = os.path.join(sdir, name)
+                if not name.lower().endswith(".md") or not os.path.isfile(full):
+                    continue
+                ids = UUID_RE.findall(name)
+                if not ids:
+                    log = read_small_text(full)
+                    fields = SESSION_FIELD_RE.findall((log or "")[:4096])
+                    ids = [uid for key, value in fields if key.lower() == "session id"
+                           for uid in UUID_RE.findall(value)]
+                if name.casefold() not in table.casefold() and not any(
+                        uid.casefold() in table.casefold() for uid in ids):
+                    missing.append(name)
+            state = str(len(missing))
+        except OSError:
+            state = "unavailable (listing incomplete)"
+    print(f"  session logs without index row: {state} (filename or session UUID in table; leads only)")
+    for name in limited(missing):
+        print("    " + name)
+    return {"piles over 100 MB": len(piles), "pile scan coverage gaps": len(gaps),
+            "logs without index row": state}
+
+
 def report_orient(root, args, limited):
     section("Orient")
     now = time.time()
@@ -1888,7 +1982,8 @@ def report_orient(root, args, limited):
             print(f"    {r}")
     else:
         print(f"  index {', '.join(index_paths)}: NOT FOUND or unreadable; unindexed check skipped")
-    return {"possibly active writers": len(active_ids) + len(unpaired_scratch),
+    hygiene = orient_hygiene(root, args, limited)
+    return {**hygiene, "possibly active writers": len(active_ids) + len(unpaired_scratch),
             "slugs with several headers": slug_variants,
             "provenance PENDING files": len(prov),
             "changed since baseline": len(changed),
