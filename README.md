@@ -6,6 +6,8 @@ Canonical source for the skill and its OpenAI and Claude plugin packages. This b
 
 An agent opening the folder cold should be able to tell what is true now, what is proposed, what is incoming, and what is historical without choosing between plausible copies.
 
+📖 **Read the write-up:** [Multi-Agent Folder Cleanup: Agent Skill for Shared Folders](https://jesseraber.net/multi-agent-folder-cleanup-agent-skill/) on jesseraber.net
+
 Documentation: [wiki](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki) · [install](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Install) · [modes](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Modes) · [safety rules](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/Safety-rules) · [FAQ](https://github.com/JesseRaber/multi-agent-folder-cleanup/wiki/FAQ) · [changelog](CHANGELOG.md)
 
 ## Version
