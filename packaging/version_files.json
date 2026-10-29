@@ -93,6 +93,11 @@
     "wiki/Changelog.md",
     "wiki/FAQ.md",
     "wiki/Scripts.md",
-    "README.md"
+    "README.md",
+    "wiki/Home.md",
+    "wiki/Install.md",
+    "wiki/Modes.md",
+    "wiki/_Footer.md",
+    "wiki/_Sidebar.md"
   ]
 }
