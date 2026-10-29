@@ -1,6 +1,8 @@
 # Install Multi-Agent Folder Cleanup
 
-Install the current release, **v2.1.0**, from [GitHub releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.1.0). The repository is the authority if a downloaded copy disagrees with it.
+Source documentation: repository source is 2.1.0; as of 2026-10-29 the latest published release is 2.0.0. Source installs and published downloads may report different versions.
+
+Install the current published release, **v2.0.0**, from [GitHub releases](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.0.0). The repository is the authority if a downloaded copy disagrees with it.
 
 This page names the package. Host steps stay in the install guides shipped inside each ZIP and in the [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md).
 
@@ -8,13 +10,13 @@ This page names the package. Host steps stay in the install guides shipped insid
 
 | Your AI app | Download | Why this package |
 |---|---|---|
-| Claude app skill upload, ChatGPT or Codex standalone skills, local models, any skills folder | `multi-agent-folder-cleanup-2.1.0-UNIVERSAL-skill.zip` | Full skill folder, including Work mode and the Python and PowerShell helpers |
-| Claude Code `/plugin install` | `multi-agent-folder-cleanup-2.1.0-claude-code-plugin.zip` | Plugin layout. The Claude app uploader rejects this ZIP |
-| Codex / ChatGPT plugin marketplace | `multi-agent-folder-cleanup-2.1.0-codex-chatgpt-plugin.zip` | OpenAI plugin package. Directory publication is a separate OpenAI review and is not claimed here |
-| Microsoft Copilot agent skill upload, **Grok** | `multi-agent-folder-cleanup-2.1.0-microsoft-copilot-agent-only.zip` | No `.ps1`. Copilot's skill upload rejects PowerShell scripts; Grok rejects the Universal ZIP because of `audit_folder.ps1` and accepts this one |
-| Gemini Apps skill upload | `multi-agent-folder-cleanup-2.1.0-gemini-apps-only.zip` | Omits audit scripts, `agents/openai.yaml`, and project rules. Gemini's upload scan rejects the audit script; regular Gemini chat rejects packages with scripts |
-| Opal skill import | `multi-agent-folder-cleanup-2.1.0-opal-only.zip` | Markdown only: `SKILL.md` plus `references/*.md` |
-| Optional Project Rules template only | `multi-agent-folder-cleanup-2.1.0-project-rules-optional.zip` | Copyable template. Installing the skill does not adopt it |
+| Claude app skill upload, ChatGPT or Codex standalone skills, local models, any skills folder | `multi-agent-folder-cleanup-2.0.0-UNIVERSAL-skill.zip` | Full skill folder, including Work mode and the Python and PowerShell helpers |
+| Claude Code `/plugin install` | `multi-agent-folder-cleanup-2.0.0-claude-code-plugin.zip` | Plugin layout. The Claude app uploader rejects this ZIP |
+| Codex / ChatGPT plugin marketplace | `multi-agent-folder-cleanup-2.0.0-codex-chatgpt-plugin.zip` | OpenAI plugin package. Directory publication is a separate OpenAI review and is not claimed here |
+| Microsoft Copilot agent skill upload, **Grok** | `multi-agent-folder-cleanup-2.0.0-microsoft-copilot-agent-only.zip` | No `.ps1`. Copilot's skill upload rejects PowerShell scripts; Grok rejects the Universal ZIP because of `audit_folder.ps1` and accepts this one |
+| Gemini Apps skill upload | `multi-agent-folder-cleanup-2.0.0-gemini-apps-only.zip` | Omits audit scripts, `agents/openai.yaml`, and project rules. Gemini's upload scan rejects the audit script; regular Gemini chat rejects packages with scripts |
+| Opal skill import | `multi-agent-folder-cleanup-2.0.0-opal-only.zip` | Markdown only: `SKILL.md` plus `references/*.md` |
+| Optional Project Rules template only | `multi-agent-folder-cleanup-2.0.0-project-rules-optional.zip` | Copyable template. Installing the skill does not adopt it |
 
 Coding agents that install from GitHub (Antigravity, Claude Code, Codex CLI) can use [the repository](https://github.com/JesseRaber/multi-agent-folder-cleanup) directly.
 

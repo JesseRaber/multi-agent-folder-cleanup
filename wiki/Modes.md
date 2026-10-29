@@ -1,5 +1,7 @@
 # Setup, Work, Audit, Plan, and Execute
 
+Source documentation: repository source is 2.1.0; as of 2026-10-29 the latest published release is 2.0.0. Source installs and published downloads may report different versions.
+
 Multi-Agent Folder Cleanup uses five modes. State the mode in the first line. The repository files are the protocol; this page only routes to them.
 
 | Mode | Use it when | It may | It may not |
@@ -28,4 +30,4 @@ Deletion is never in scope by default. Before any delete in Execute, run the rec
 
 Optional Project Rules are a separate adoption. Installing the skill does not install them.
 
-Current release: [v2.1.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.1.0).
+Current release: [v2.0.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.0.0).

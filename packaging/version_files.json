@@ -74,15 +74,15 @@
     },
     {
       "path": "wiki/Changelog.md",
-      "pattern": "Current release: \\*\\*\\[v{v}\\]"
+      "pattern": "Source documentation: repository source is {v}"
     },
     {
       "path": "wiki/_Footer.md",
-      "pattern": "current release \\[v{v}\\]"
+      "pattern": "Source documentation: repository source is {v}"
     },
     {
       "path": "wiki/_Sidebar.md",
-      "pattern": "Release v{v}\\]"
+      "pattern": "Source documentation: repository source is {v}"
     }
   ],
   "history": [
@@ -93,6 +93,11 @@
     "wiki/Changelog.md",
     "wiki/FAQ.md",
     "wiki/Scripts.md",
-    "README.md"
+    "README.md",
+    "wiki/Home.md",
+    "wiki/Install.md",
+    "wiki/Modes.md",
+    "wiki/_Footer.md",
+    "wiki/_Sidebar.md"
   ]
 }
