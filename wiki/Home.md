@@ -1,10 +1,12 @@
 # Multi-Agent Folder Cleanup
 
+Source documentation: repository source is 2.1.0; as of 2026-10-29 the latest published release is 2.0.0. Source installs and published downloads may report different versions.
+
 Agent skill for a shared project folder used by more than one AI model. It is for Claude, ChatGPT, Codex, Microsoft Copilot, Gemini, Grok, Opal, and local models that keep saving into the same OneDrive, SharePoint, NAS, or handoff workspace.
 
 Canonical skill: [`skills/multi-agent-folder-cleanup/`](https://github.com/JesseRaber/multi-agent-folder-cleanup/tree/main/skills/multi-agent-folder-cleanup)
 
-Version **2.1.0**. Report as: **Loaded Multi-Agent Folder Cleanup v2.1.0 (SKILL.md at <path>; helpers <version>)**, taking the helper version from an actual `--version` run or saying `helpers not run`. Current release: [v2.1.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.1.0).
+Version **2.1.0**. Report as: **Loaded Multi-Agent Folder Cleanup v2.1.0 (SKILL.md at <path>; helpers <version>)**, taking the helper version from an actual `--version` run or saying `helpers not run`. Current release: [v2.0.0](https://github.com/JesseRaber/multi-agent-folder-cleanup/releases/tag/v2.0.0).
 
 This page is a short pointer. The repository is the authority. A release archive, chat upload, or host-local cache is not. Protocol lives in the skill folder, not here, so this page does not drift into a second copy.
 
@@ -16,7 +18,7 @@ Goal: an agent opening a shared folder cold can tell what is true now, what is p
 - [Modes](Modes) — Work, Audit, Plan, and Execute
 - [Scripts](Scripts) — read-only audit, move, and record checks
 - [FAQ](FAQ) — common install and safety questions
-- [Changelog](Changelog) — what changed through v2.1.0 (v2.1.0 released 2026-10-14)
+- [Changelog](Changelog) — published v2.0.0 (released 2026-10-20); source 2.1.0 remains unreleased
 - [README](https://github.com/JesseRaber/multi-agent-folder-cleanup/blob/main/README.md) — repository landing page
 
 ## Install
